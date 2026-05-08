@@ -5,6 +5,13 @@ Desktop-orientierte PWA fuer grosse Displays mit drei klar getrennten Bereichen 
 - mitte: Trail-Bibliothek
 - rechts: Karte sowie aktive Workspaces wie Komoot-Download und Replay
 
+## Projektlinks
+- GitHub Pages: [https://marsrakete.github.io/trailthread/](https://marsrakete.github.io/trailthread/)
+- GitHub Repository: [https://github.com/marsrakete/trailthread](https://github.com/marsrakete/trailthread)
+- Kontakt: [millux@marsrakete.de](mailto:millux@marsrakete.de)
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/U7U01OC260)
+
 ## Funktionen
 - GPX-Import per Dateiauswahl
 - GPX-Einzelexport pro Track aus der Bibliothek
@@ -26,113 +33,6 @@ Desktop-orientierte PWA fuer grosse Displays mit drei klar getrennten Bereichen 
 Die App speichert Komoot-Konten lokal inklusive Passwort, weil der lokale Proxy damit arbeiten soll.
 Das App-Backup enthaelt diese Passwoerter ebenfalls.
 Diese Datei deshalb nur verschluesselt oder an vertrauenswuerdigen Orten aufbewahren.
-
-## Lokaler Start
-In einem Terminal:
-
-```powershell
-.\start-server.ps1
-```
-
-Optional fuer den Komoot-Teil in einem zweiten Terminal:
-
-```powershell
-.\start-komoot-proxy.ps1 -Mode real -DebugLog
-```
-
-Alternative als PHP-Version fuer lokale Tests:
-
-```powershell
-.\start-komoot-proxy-php.ps1 -Mode real -DebugLog
-```
-
-Zum Testen ohne echte Komoot-Anbindung:
-
-```powershell
-.\start-komoot-proxy.ps1 -Mode stub -DebugLog
-```
-
-Oder mit PHP:
-
-```powershell
-.\start-komoot-proxy-php.ps1 -Mode stub -DebugLog
-```
-
-Danach im Browser:
-- `http://localhost:5003/`
-
-## PHP-Proxy
-- Datei: `start-komoot-proxy.php`
-- gedacht fuer einen echten Apache-/LAMP-Server
-- benoetigt PHP mit aktivierter `curl`-Extension
-- speichert die Proxy-Session standardmaessig in `artifacts/komoot-proxy-session.json`
-- funktioniert direkt als einzelnes Endpoint-Script oder hinter einer Rewrite-Regel
-- unterstuetzt dieselben Endpunkte wie die PowerShell-Version:
-  - `/api/komoot/health`
-  - `/api/komoot/status`
-  - `/api/komoot/login`
-  - `/api/komoot/logout`
-  - `/api/komoot/tours`
-  - `/api/komoot/import`
-
-Empfohlene Umgebungsvariablen auf dem Server:
-- `KOMOOT_PROXY_MODE=real` oder `stub`
-- `KOMOOT_PROXY_DEBUG=1` fuer Debug-Logging
-- `KOMOOT_PROXY_ALLOWED_ORIGINS=https://deine-pwa.example`
-- `KOMOOT_PROXY_SESSION_FILE=/voller/pfad/komoot-proxy-session.json`
-- `KOMOOT_PROXY_TIMEZONE=Europe/Berlin`
-
-Beispiel fuer den Aufruf hinter Apache ohne Rewrite:
-- `https://example.org/start-komoot-proxy.php/api/komoot/health`
-
-Mit Rewrite-Regel kann dieselbe Datei auch sauber unter `/api/komoot/...` liegen.
-
-### .htaccess fuer Apache
-
-Im Webroot kann diese Rewrite-Regel verwendet werden:
-
-```apacheconf
-RewriteEngine On
-
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
-
-RewriteRule ^api/komoot(/.*)?$ start-komoot-proxy.php [QSA,L]
-```
-
-Die Datei liegt im Projekt bereits als [.htaccess](/C:/Users/millenseer/OneDrive%20-%20conet.de/Projekte/GPX/.htaccess:1).
-
-### Apache-Beispiel
-
-Beispiel fuer einen Virtual Host mit `mod_rewrite`:
-
-```apacheconf
-<VirtualHost *:80>
-    ServerName trailthread.example.org
-    DocumentRoot /var/www/trailthread
-
-    <Directory /var/www/trailthread>
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-    SetEnv KOMOOT_PROXY_MODE real
-    SetEnv KOMOOT_PROXY_DEBUG 0
-    SetEnv KOMOOT_PROXY_ALLOWED_ORIGINS https://trailthread.example.org
-    SetEnv KOMOOT_PROXY_SESSION_FILE /var/www/trailthread/artifacts/komoot-proxy-session.json
-    SetEnv KOMOOT_PROXY_TIMEZONE Europe/Berlin
-</VirtualHost>
-```
-
-Wichtig auf Apache-Seite:
-- `mod_rewrite` aktivieren
-- `AllowOverride All` oder passende `RewriteRule` direkt in der vHost-Konfiguration setzen
-- Schreibrechte fuer den Ordner der Session-Datei sicherstellen
-- `curl` in PHP aktivieren
-
-Danach sollte der Proxy unter dieser URL erreichbar sein:
-- `https://trailthread.example.org/api/komoot/health`
 
 ## Backup-Formate
 App-Backup:
@@ -170,9 +70,53 @@ Wichtig:
 - In den Einstellungen zeigt der Bereich `Aktualisierungen` die lokale Version an und kann eine neuere `version.js` per `cache: "no-cache"` pruefen.
 - Wenn `appVersion` oder `cacheVersion` abweichen, wird ein Reload angeboten, damit die neue Offline-Version aktiv wird.
 
-## Proxy-Konzept
-Die PWA spricht nicht direkt mit Komoot, sondern mit einem lokalen Proxy auf `http://localhost:8787`.
-Nur der Komoot-Workspace zeigt den Proxy-Status und die Diagnosefelder an.
+## Komoot-Import Und Lokaler Proxy
+Trailthread laedt Komoot-Tracks bewusst ohne eigene Cloud und ohne fremden Server. Die App spricht also nicht erst mit einem Online-Dienst von Trailthread, sondern arbeitet lokal auf deinem Rechner. Deine Touren, Fotos und Backups bleiben damit bei dir.
+
+Damit Komoot-Touren geladen werden koennen, musst du dich trotzdem mit deinem Komoot-Konto anmelden. Der Grund ist einfach: Komoot gibt persoenliche Touren nur fuer dein angemeldetes Konto frei. Trailthread braucht diese Anmeldung also nicht fuer Werbung oder eine eigene Cloud, sondern nur, damit dein lokaler Proxy Komoot in deinem Namen nach deinen Touren fragen kann.
+
+Warum ist dafuer ein lokaler Proxy noetig? Ein normaler Browser darf sich nicht einfach wie eine andere App bei Komoot anmelden und danach geschuetzte Tourdaten laden. Sitzungen, Weiterleitungen, Login-Antworten und Schutzmechanismen der Website lassen sich auf diese Weise im Browser allein nicht sauber und zuverlaessig abbilden. Deshalb laeuft daneben ein kleiner lokaler Helfer. Er nimmt nur die Anfragen deiner lokalen Trailthread-App entgegen, meldet sich bei Komoot an und liefert die geladenen Daten wieder an die App zurueck.
+
+Unter Windows ist der Start einfach:
+1. Ein PowerShell-Fenster im Projektordner oeffnen.
+2. Die App starten mit `.\start-server.ps1`.
+3. Fuer Komoot ein zweites PowerShell-Fenster oeffnen.
+4. Dort den lokalen Proxy starten mit `.\start-komoot-proxy.ps1 -Mode real`.
+5. Danach Trailthread im Browser oeffnen und im Komoot-Bereich dein Konto verbinden.
+
+Wenn du nur ausprobieren willst, kannst du statt echter Komoot-Daten auch den Demo-Modus nutzen:
+- `.\start-komoot-proxy.ps1 -Mode stub`
+
+Zusätzlich wichtig:
+- GPX-Dateien koennen direkt in die Bibliothek importiert werden.
+- Gespeicherte Tracks koennen einzeln wieder als GPX exportiert werden.
+- Fuer komplette Sicherungen gibt es ausserdem App-Backup und Touren-Backup.
+
+## Technischer Hintergrund
+Trailthread selbst ist eine lokale Web-App. Sie speichert ihre Daten im Browser, zeigt Karte und Replay an und verwaltet Tracks, Fotos, Beschreibungen, Backups und Einstellungen. Die App kann GPX-Dateien direkt importieren und einzelne Tracks wieder als GPX exportieren.
+
+Der Komoot-Teil ist davon getrennt: Dafuer gibt es den lokalen Proxy. Die App prueft im Komoot-Bereich zuerst, ob dieser Proxy erreichbar ist, und zeigt den Zustand auch in der Diagnose an. Erst wenn der Proxy laeuft, kann sich Trailthread ueber ihn bei Komoot anmelden, Tourenlisten abrufen und ausgewaehlte Touren importieren.
+
+Der Proxy uebernimmt dabei vor allem:
+- Anmeldung bei Komoot
+- Laden von Tourenlisten
+- Laden von Tour-Details
+- Laden von Tour-Fotos
+- Umwandlung der geladenen Trackdaten in das Format, das Trailthread intern speichert
+
+Die App selbst uebernimmt danach:
+- Anzeige in Bibliothek, Karte und Replay
+- lokale Speicherung aller importierten Daten
+- GPX-Einzelexport
+- App-Backup und Touren-Backup
+
+Die beiden Backup-Arten sind bewusst getrennt:
+- Das App-Backup enthaelt Konten, Sprache, Layout- und Anzeigeeinstellungen sowie Versionsangaben.
+- Das Touren-Backup enthaelt die gespeicherten Tracks mit GPX-Inhalt, Beschreibungen, Fotos, Trackpunkten, abgeleiteten Werten und `lastChanged` fuer spaetere Merge-Entscheidungen.
+- Das App-Backup enthaelt keine Touren.
+- Das Touren-Backup enthaelt keine Konten oder App-Einstellungen.
+
+Fuer den Komoot-Import nutzt der Proxy beobachtete Komoot-Web/API-Endpunkte unter `api.komoot.de`, zum Beispiel fuer Login, Tourenlisten, Tour-Details und Tour-Fotos. In diesem Projekt wird kein separates Komoot-SDK verwendet. Als Referenz fuer die Struktur einzelner inoffizieller Endpunkte diente unter anderem der inoffizielle Client [janthomas89/komoot-api-client](https://github.com/janthomas89/komoot-api-client). Diese Referenz ist keine Laufzeit-Abhaengigkeit von Trailthread. Wenn Komoot diese Endpunkte aendert, muss der Import gegebenenfalls angepasst werden.
 
 ## Lizenz
 Dieses Projekt steht unter `GPL-3.0-only`.

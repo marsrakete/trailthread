@@ -16,9 +16,9 @@
   --radius-xl: 28px;
   --radius-lg: 22px;
   --radius-md: 16px;
-  --sidebar-width: 20rem;
+  --sidebar-width: 11.25rem;
   --library-width: 25rem;
-  --left-pane-width: 20rem;
+  --left-pane-width: 11.25rem;
   --middle-pane-width: 25rem;
   --left-pane-min: 10.5rem;
   --middle-pane-min: 22rem;
@@ -2326,6 +2326,46 @@ body.is-library-compact .library-panel .pane-header-row {
   margin: 0 0 0.35rem;
 }
 
+.share-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.share-qr-image {
+  width: 7.2rem;
+  height: 7.2rem;
+  border-radius: 14px;
+  background: #fff;
+  padding: 0.35rem;
+  display: block;
+}
+
+.share-card-copy {
+  min-width: 0;
+}
+
+.share-card-copy .field-hint {
+  margin: 0 0 0.35rem;
+}
+
+.share-url {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.35rem 0.5rem;
+  border-radius: 10px;
+  background: rgba(17, 28, 25, 0.72);
+  color: var(--text);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
 #version-label {
   margin-bottom: 0.45rem;
   color: var(--text);
@@ -2342,6 +2382,10 @@ body.is-library-compact .library-panel .pane-header-row {
 
 #update-status[data-state="info"] {
   color: var(--muted);
+}
+
+#settings-dialog .modal-sheet > .button-row:last-child {
+  margin-top: 1rem;
 }
 
 .leaflet-control-zoom a {

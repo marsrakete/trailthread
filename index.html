@@ -4,7 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#11231f">
+  <meta name="description" content="Trailthread verbindet Tracks, Karten und Erinnerungen in einer lokalen Outdoor-App mit Bibliothek, Komoot-Import und Replay.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Trailthread">
+  <meta property="og:title" content="Trailthread">
+  <meta property="og:description" content="Tracks, Karten, Erinnerungen. Lokale Outdoor-App mit Bibliothek, Komoot-Import und Replay.">
+  <meta property="og:url" content="https://marsrakete.github.io/trailthread/">
+  <meta property="og:image" content="https://marsrakete.github.io/trailthread/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Trailthread">
+  <meta name="twitter:description" content="Tracks, Karten, Erinnerungen. Lokale Outdoor-App mit Bibliothek, Komoot-Import und Replay.">
+  <meta name="twitter:image" content="https://marsrakete.github.io/trailthread/icons/icon-512.png">
   <title>Trailthread</title>
+  <link rel="canonical" href="https://marsrakete.github.io/trailthread/">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://unpkg.com">
@@ -506,6 +518,25 @@
           <input id="track-width-input" type="range" min="4" max="10" step="1">
         </label>
         <div id="track-width-value" class="field-hint"></div>
+      </section>
+
+      <section class="settings-block">
+        <h3 data-i18n="shareTitle"></h3>
+        <p data-i18n="shareDescription"></p>
+        <div class="button-row">
+          <button id="share-app-button" class="button button-primary" type="button" data-i18n="shareButton"></button>
+        </div>
+        <div class="share-card">
+          <img
+            class="share-qr-image"
+            src="icons/trailthread-share-qr.svg"
+            alt="QR-Code zu Trailthread"
+          >
+          <div class="share-card-copy">
+            <p class="field-hint" data-i18n="shareScanHint"></p>
+            <code class="share-url">https://marsrakete.github.io/trailthread/</code>
+          </div>
+        </div>
       </section>
 
       <div class="button-row">
