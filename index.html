@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11231f">
+  <title>Trailthread</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <section class="brand-block">
+        <div class="pane-header-row">
+          <div class="brand-copy">
+            <img class="brand-icon" src="icons/icon.svg" alt="Trailthread Icon">
+            <div>
+            <p class="eyebrow" data-i18n="brandEyebrow"></p>
+            <h1>Trailthread</h1>
+            </div>
+          </div>
+          <button id="toggle-sidebar-compact-button" class="icon-button pane-toggle-button" type="button" aria-label="Linke Spalte schmal schalten" title="Linke Spalte schmal schalten">◧</button>
+        </div>
+        <p class="lead" data-i18n="brandLead"></p>
+      </section>
+
+      <div class="sidebar-top-actions">
+        <button id="open-settings-button" class="button button-subtle sidebar-utility-button" type="button" data-i18n="settingsButton"></button>
+        <button id="open-help-button" class="button button-subtle sidebar-utility-button" type="button" data-i18n="helpButton"></button>
+      </div>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2 data-i18n="workspaceTitle"></h2>
+          <p data-i18n="workspaceDescription"></p>
+        </div>
+        <div class="workspace-switcher">
+          <button id="workspace-library-button" class="workspace-button is-active" type="button" data-workspace="library" data-i18n="workspaceLibrary"></button>
+          <button id="workspace-komoot-button" class="workspace-button" type="button" data-workspace="komoot" data-i18n="workspaceKomoot"></button>
+          <button id="workspace-replay-button" class="workspace-button" type="button" data-workspace="replay" data-i18n="workspaceReplay"></button>
+        </div>
+      </section>
+
+      <section class="panel account-panel">
+        <div class="panel-heading">
+          <h2 data-i18n="accountsTitle"></h2>
+          <p data-i18n="accountsDescription"></p>
+        </div>
+        <div class="button-row">
+          <button id="add-account-button" class="button button-primary" type="button" data-i18n="addAccount"></button>
+        </div>
+        <div id="accounts-list" class="account-list" aria-live="polite"></div>
+      </section>
+
+      <section class="panel support-panel">
+        <p class="eyebrow" data-i18n="supportEyebrow"></p>
+        <p class="support-note" data-i18n="supportNote"></p>
+        <div class="support-actions">
+          <a href="https://ko-fi.com/U7U01OC260" target="_blank" rel="noreferrer noopener">
+            <img src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Support on Ko-fi">
+          </a>
+        </div>
+      </section>
+    </aside>
+
+    <div class="pane-resizer" data-resize-handle="left" aria-hidden="true"></div>
+
+    <aside class="library-column">
+      <section id="library-sidebar-panel" class="panel library-panel">
+        <div class="panel-heading pane-header-row">
+          <div>
+            <h2 data-i18n="libraryTitle"></h2>
+            <p id="library-summary" data-i18n="libraryEmpty"></p>
+          </div>
+          <button id="toggle-library-compact-button" class="icon-button pane-toggle-button" type="button" aria-label="Bibliothek schmal schalten" title="Bibliothek schmal schalten">◨</button>
+        </div>
+        <div class="library-controls">
+          <input id="library-search-input" class="library-search-input" type="search" placeholder="Search">
+          <div class="control-row">
+            <select id="library-type-filter">
+              <option value="all" data-i18n="filterAll"></option>
+              <option value="recorded" data-i18n="filterRecorded"></option>
+              <option value="planned" data-i18n="filterPlanned"></option>
+            </select>
+            <select id="library-sport-filter">
+              <option value="all" data-i18n="filterAllSports"></option>
+            </select>
+          </div>
+          <div class="control-row">
+            <select id="library-meta-filter">
+              <option value="all" data-i18n="filterAllDetails"></option>
+            </select>
+            <select id="library-sort-select">
+              <option value="recent" data-i18n="sortRecent"></option>
+              <option value="date" data-i18n="sortDate"></option>
+              <option value="name" data-i18n="sortName"></option>
+              <option value="distance" data-i18n="sortDistance"></option>
+            </select>
+          </div>
+        </div>
+        <div class="button-row compact-row library-toolbar">
+          <label class="button button-primary" for="file-input" data-i18n="addFiles"></label>
+          <input id="file-input" type="file" accept=".gpx" multiple hidden>
+          <button id="library-toggle-selection-button" class="button button-subtle" type="button" data-i18n="selectAll"></button>
+          <button id="export-tour-backup-button" class="button button-ghost" type="button" data-i18n="exportTours"></button>
+        </div>
+        <ul id="track-list" class="track-list" aria-live="polite"></ul>
+      </section>
+    </aside>
+
+    <div class="pane-resizer" data-resize-handle="middle" aria-hidden="true"></div>
+
+    <main class="main-pane">
+      <section id="library-workspace" class="workspace-view">
+        <header class="workspace-header">
+          <p class="status-kicker" data-i18n="mapKicker"></p>
+          <div id="status-pill" class="status-pill" data-i18n="statusReady"></div>
+        </header>
+        <div class="map-toolbar">
+          <button id="prev-track-button" class="button button-subtle toolbar-nav-button" type="button" data-i18n="prevTrack" aria-label="Vorheriger Track">←</button>
+          <button id="fit-all-button" class="button button-ghost" type="button" data-i18n="fitSelection"></button>
+          <button id="next-track-button" class="button button-subtle toolbar-nav-button" type="button" data-i18n="nextTrack" aria-label="Naechster Track">→</button>
+          <button id="map-photo-mode-button" class="button button-subtle" type="button"></button>
+        </div>
+        <section class="map-panel">
+          <div id="map" aria-label="OpenStreetMap track canvas"></div>
+          <div class="map-overlay">
+            <div class="overlay-block">
+              <span data-i18n="selectionTitle"></span>
+              <strong id="selection-stats">0</strong>
+            </div>
+            <div class="overlay-block">
+              <span data-i18n="distanceTitle"></span>
+              <strong id="distance-stats">0 km</strong>
+            </div>
+            <div class="overlay-block">
+              <span data-i18n="pointsTitle"></span>
+              <strong id="point-stats">0</strong>
+            </div>
+          </div>
+        </section>
+        <section class="profile-panel">
+          <div class="profile-header">
+            <div>
+              <p class="status-kicker" data-i18n="profileTitle"></p>
+              <strong id="profile-track-name">-</strong>
+            </div>
+            <div class="profile-stats">
+              <div class="profile-stat">
+                <span data-i18n="labelAvgSpeed"></span>
+                <strong id="profile-avg-speed">-</strong>
+              </div>
+              <div class="profile-stat">
+                <span data-i18n="distanceTitle"></span>
+                <strong id="profile-distance">-</strong>
+              </div>
+              <div class="profile-stat">
+                <span data-i18n="profileAltitudeRange"></span>
+                <strong id="profile-elevation-range">-</strong>
+              </div>
+              <div class="profile-stat">
+                <span data-i18n="profileAscent"></span>
+                <strong id="profile-ascent">-</strong>
+              </div>
+              <div class="profile-stat">
+                <span data-i18n="profileDescent"></span>
+                <strong id="profile-descent">-</strong>
+              </div>
+            </div>
+          </div>
+          <p id="profile-empty" class="profile-empty" data-i18n="profileHintNoTrack"></p>
+          <div id="profile-chart-shell" class="profile-chart-shell" hidden>
+            <svg id="profile-chart" class="profile-chart" viewBox="0 0 1000 260" preserveAspectRatio="xMidYMid meet" aria-label="Elevation profile"></svg>
+            <div id="profile-cursor-info" class="profile-cursor-info" hidden>
+              <div class="profile-cursor-row"><span data-i18n="labelAfter"></span><strong id="profile-cursor-after">-</strong></div>
+              <div class="profile-cursor-row"><span data-i18n="labelAltitudeCurrent"></span><strong id="profile-cursor-altitude">-</strong></div>
+              <div class="profile-cursor-row"><span data-i18n="labelGrade"></span><strong id="profile-cursor-grade">-</strong></div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="komoot-workspace" class="workspace-view" hidden>
+        <header class="workspace-header">
+          <div>
+            <p class="status-kicker" data-i18n="komootWorkspaceKicker"></p>
+            <h2 data-i18n="komootWorkspaceTitle"></h2>
+          </div>
+          <div id="komoot-status-pill" class="status-pill" data-i18n="komootProxyHint"></div>
+        </header>
+
+        <section class="panel workspace-panel">
+          <div class="panel-heading">
+            <h2 data-i18n="komootDownloadTitle"></h2>
+            <p data-i18n="komootDownloadDescription"></p>
+          </div>
+          <div class="control-row">
+            <select id="komoot-account-select"></select>
+            <button id="komoot-load-button" class="button button-primary" type="button" data-i18n="komootLoadTours"></button>
+            <button id="komoot-import-button" class="button button-ghost" type="button" data-i18n="komootImportSelected"></button>
+          </div>
+          <div id="komoot-progress" class="progress-block" hidden>
+            <div class="progress-copy">
+              <span id="komoot-progress-label">Laden...</span>
+              <strong id="komoot-progress-value">0%</strong>
+            </div>
+            <progress id="komoot-progress-bar" max="100" value="0"></progress>
+          </div>
+          <div class="diagnostics">
+            <div class="diagnostic-row">
+              <span data-i18n="komootDiagProxy"></span>
+              <strong id="komoot-diag-proxy">-</strong>
+            </div>
+            <div class="diagnostic-row">
+              <span data-i18n="komootDiagMode"></span>
+              <strong id="komoot-diag-mode">-</strong>
+            </div>
+            <div class="diagnostic-row">
+              <span data-i18n="komootDiagChecked"></span>
+              <strong id="komoot-diag-checked">-</strong>
+            </div>
+            <div class="diagnostic-row">
+              <span data-i18n="komootDiagError"></span>
+              <strong id="komoot-diag-error">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="workspace-grid">
+          <section class="panel workspace-panel">
+            <div class="panel-heading">
+              <h2 data-i18n="recordedTitle"></h2>
+              <p id="recorded-summary" data-i18n="recordedEmpty"></p>
+            </div>
+            <div class="button-row compact-row">
+              <button id="recorded-select-all-button" class="button button-subtle" type="button" data-i18n="selectAll"></button>
+            </div>
+            <ul id="recorded-tour-list" class="track-list tour-list" aria-live="polite"></ul>
+          </section>
+
+          <section class="panel workspace-panel">
+            <div class="panel-heading">
+              <h2 data-i18n="plannedTitle"></h2>
+              <p id="planned-summary" data-i18n="plannedEmpty"></p>
+            </div>
+            <div class="button-row compact-row">
+              <button id="planned-select-all-button" class="button button-subtle" type="button" data-i18n="selectAll"></button>
+            </div>
+            <ul id="planned-tour-list" class="track-list tour-list" aria-live="polite"></ul>
+          </section>
+        </section>
+      </section>
+
+      <section id="replay-workspace" class="workspace-view replay-workspace" hidden>
+        <section class="panel workspace-panel replay-top-panel">
+          <div class="replay-toolbar">
+            <div class="replay-title-block">
+              <h2 id="replay-track-title" data-i18n="replayEmptyTitle"></h2>
+              <p id="replay-track-subtitle" class="lead replay-track-meta" data-i18n="replayEmptySubtitle"></p>
+            </div>
+
+            <section class="replay-controls-panel">
+            <div class="replay-controls-grid">
+              <div class="replay-controls-row replay-controls-row-primary">
+                <div class="replay-transport-group" role="toolbar" aria-label="Replay transport">
+                <button id="replay-restart-button" class="icon-button replay-transport-button" type="button">
+                  <span class="replay-transport-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M7 5v14"></path>
+                      <path d="M18 7.5 10.5 12 18 16.5z"></path>
+                    </svg>
+                  </span>
+                  <span class="sr-only" data-i18n="replayRestart"></span>
+                </button>
+                <button id="replay-back-button" class="icon-button replay-transport-button" type="button">
+                  <span class="replay-transport-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M11.1 12 19 17V7z"></path>
+                      <path d="M5 12 12.9 17V7z"></path>
+                    </svg>
+                  </span>
+                  <span class="sr-only" data-i18n="replayBack"></span>
+                </button>
+                <button id="replay-play-button" class="icon-button replay-transport-button replay-transport-button-primary" type="button">
+                  <span class="replay-transport-icon replay-transport-icon-play" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 6.5v11l9-5.5z"></path>
+                    </svg>
+                  </span>
+                  <span class="sr-only" data-i18n="replayPlay"></span>
+                </button>
+                <button id="replay-pause-button" class="icon-button replay-transport-button" type="button">
+                  <span class="replay-transport-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M7 6h4v12H7z"></path>
+                      <path d="M13 6h4v12h-4z"></path>
+                    </svg>
+                  </span>
+                  <span class="sr-only">Pause</span>
+                </button>
+                <button id="replay-forward-button" class="icon-button replay-transport-button" type="button">
+                  <span class="replay-transport-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12.9 12 5 17V7z"></path>
+                      <path d="M19 12 11.1 17V7z"></path>
+                    </svg>
+                  </span>
+                  <span class="sr-only" data-i18n="replayForward"></span>
+                </button>
+                </div>
+                <div class="replay-inline-group replay-view-inline" role="tablist" aria-label="Replay view">
+                  <button id="replay-view-2d-button" class="button button-subtle is-active" type="button" data-replay-view="2d">2D</button>
+                  <button id="replay-view-3d-button" class="button button-subtle" type="button" data-replay-view="3d">3D</button>
+                </div>
+                <div class="replay-inline-group replay-speed-group">
+                  <label class="replay-control-label" for="replay-speed-select" data-i18n="replaySpeed"></label>
+                  <select id="replay-speed-select" class="replay-speed-select">
+                    <option value="0.5">0.5x</option>
+                    <option value="1">1x</option>
+                    <option value="2">2x</option>
+                    <option value="4">4x</option>
+                    <option value="8">8x</option>
+                    <option value="12">12x</option>
+                    <option value="16">16x</option>
+                    <option value="20">20x</option>
+                    <option value="25">25x</option>
+                    <option value="30">30x</option>
+                    <option value="40">40x</option>
+                    <option value="50">50x</option>
+                    <option value="100">100x</option>
+                  </select>
+                </div>
+                <div class="replay-inline-group replay-mode-group">
+                  <span class="replay-control-label" data-i18n="replayMode"></span>
+                  <div id="replay-progress-mode-group" class="segmented-control">
+                    <button id="replay-mode-time-button" class="button button-subtle" type="button" data-replay-mode="time" data-i18n="replayModeTime"></button>
+                    <button id="replay-mode-distance-button" class="button button-subtle is-active" type="button" data-replay-mode="distance" data-i18n="replayModeDistance"></button>
+                  </div>
+                </div>
+                <details class="replay-options-menu">
+                  <summary class="button button-subtle replay-options-summary">
+                    <span data-i18n="replayDisplay"></span>
+                    <span class="replay-options-chevron" aria-hidden="true">⌄</span>
+                  </summary>
+                  <div class="replay-options-popover">
+                    <div class="replay-options-section">
+                      <label class="replay-toggle"><input id="replay-follow-camera-input" type="checkbox" checked><span data-i18n="replayFollowCamera"></span></label>
+                      <label class="replay-toggle"><input id="replay-show-photos-input" type="checkbox" checked><span data-i18n="replayShowPhotos"></span></label>
+                      <label class="replay-toggle"><input id="replay-show-profile-input" type="checkbox" checked><span data-i18n="replayShowProfile"></span></label>
+                    </div>
+                    <div id="replay-camera-2d-row" class="replay-options-section replay-camera-inline" role="toolbar" aria-label="2D camera controls">
+                      <span class="replay-control-label replay-camera-inline-label" data-i18n="replayCamera2d"></span>
+                      <div class="segmented-control segmented-control-compact">
+                        <button class="button button-subtle is-active" type="button" data-replay-camera-2d="center" data-i18n="replayCameraCenter"></button>
+                        <button class="button button-subtle" type="button" data-replay-camera-2d="ahead" data-i18n="replayCameraAhead"></button>
+                        <button class="button button-subtle" type="button" data-replay-camera-2d="overview" data-i18n="replayCameraOverview"></button>
+                      </div>
+                    </div>
+                    <div id="replay-camera-3d-row" class="replay-options-section replay-camera-inline" role="toolbar" aria-label="3D camera controls" hidden>
+                      <span class="replay-control-label replay-camera-inline-label" data-i18n="replayCamera3d"></span>
+                      <div id="replay-camera-group" class="segmented-control segmented-control-compact">
+                        <button class="button button-subtle is-active" type="button" data-replay-camera="follow" data-i18n="replayCameraFollow"></button>
+                        <button class="button button-subtle" type="button" data-replay-camera="top" data-i18n="replayCameraTop"></button>
+                        <button class="button button-subtle" type="button" data-replay-camera="orbit" data-i18n="replayCameraOrbit"></button>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="replay-map-panel">
+          <div id="replay-map-shell" class="replay-map-shell">
+            <div id="replay-map-2d" class="replay-map-surface"></div>
+            <div id="replay-map-3d" class="replay-map-surface" hidden></div>
+          </div>
+          <div class="replay-map-overlay replay-map-readouts">
+            <div class="overlay-block">
+              <span data-i18n="labelDistance"></span>
+              <strong id="replay-distance-value">0.0 km</strong>
+            </div>
+            <div class="overlay-block">
+              <span data-i18n="profileAltitudeRange"></span>
+              <strong id="replay-altitude-value">-</strong>
+            </div>
+            <div class="overlay-block">
+              <span data-i18n="labelGrade"></span>
+              <strong id="replay-grade-value">-</strong>
+            </div>
+            <div class="overlay-block">
+              <span data-i18n="labelDuration"></span>
+              <strong id="replay-time-value">--:--:--</strong>
+            </div>
+            <div class="overlay-block">
+              <span data-i18n="profileAscent"></span>
+              <strong id="replay-ascent-value">-</strong>
+            </div>
+            <div class="overlay-block">
+              <span data-i18n="profileDescent"></span>
+              <strong id="replay-descent-value">-</strong>
+            </div>
+            <div class="overlay-block">
+              <span data-i18n="labelAvgSpeed"></span>
+              <strong id="replay-speed-value">-</strong>
+            </div>
+            <div class="overlay-block">
+              <span data-i18n="pointsTitle"></span>
+              <strong id="replay-point-value">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section id="replay-profile-panel" class="profile-panel replay-profile-panel">
+          <p id="replay-profile-empty" class="profile-empty" data-i18n="replayProfileHint"></p>
+          <div id="replay-profile-chart-shell" class="profile-chart-shell" hidden>
+            <svg id="replay-profile-chart" class="profile-chart" viewBox="0 0 1000 260" preserveAspectRatio="none" aria-label="Replay elevation profile"></svg>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="account-dialog" class="modal-dialog">
+    <form method="dialog" class="modal-sheet">
+      <div class="panel-heading">
+        <h2 data-i18n="accountDialogTitle"></h2>
+        <p data-i18n="accountDialogDescription"></p>
+      </div>
+      <label class="field">
+        <span data-i18n="komootEmailLabel"></span>
+        <input id="account-email-input" type="email" autocomplete="username">
+      </label>
+      <label class="field">
+        <span data-i18n="komootPasswordLabel"></span>
+        <input id="account-password-input" type="password" autocomplete="current-password">
+      </label>
+      <div class="button-row">
+        <button id="save-account-button" class="button button-primary" type="button" data-i18n="saveAccount"></button>
+        <button class="button button-ghost" type="button" data-close-dialog="account-dialog" data-i18n="cancelButton"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="settings-dialog" class="modal-dialog">
+    <form method="dialog" class="modal-sheet modal-sheet-wide">
+      <div class="panel-heading">
+        <h2 data-i18n="settingsTitle"></h2>
+        <p data-i18n="settingsDescription"></p>
+      </div>
+
+      <section class="settings-block">
+        <h3 data-i18n="updatesTitle"></h3>
+        <p data-i18n="updatesDescription"></p>
+        <div id="version-label" class="field-hint"></div>
+        <div class="button-row">
+          <button id="check-updates-button" class="button button-primary" type="button" data-i18n="checkUpdatesButton"></button>
+          <button id="reload-app-button" class="button button-ghost" type="button" data-i18n="reloadButton" hidden></button>
+        </div>
+        <p id="update-status" class="field-hint"></p>
+      </section>
+
+      <section class="settings-block">
+        <h3 data-i18n="backupTitle"></h3>
+        <p data-i18n="backupDescription"></p>
+        <div class="button-row">
+          <button id="export-backup-button" class="button button-primary" type="button" data-i18n="exportBackup"></button>
+          <label class="button button-ghost" for="backup-input" data-i18n="importBackup"></label>
+          <input id="backup-input" type="file" accept="application/json" hidden>
+        </div>
+      </section>
+
+      <section class="settings-block">
+        <h3 data-i18n="tourBackupTitle"></h3>
+        <p data-i18n="tourBackupDescription"></p>
+        <div class="button-row">
+          <button id="settings-export-tour-backup-button" class="button button-primary" type="button" data-i18n="exportTours"></button>
+          <label class="button button-ghost" for="tour-backup-input" data-i18n="importTours"></label>
+          <input id="tour-backup-input" type="file" accept=".json,.gz,application/json,application/gzip" hidden>
+        </div>
+      </section>
+
+      <section class="settings-block">
+        <h3 data-i18n="languageLabel"></h3>
+        <select id="language-select">
+          <option value="auto">Auto</option>
+          <option value="de">Deutsch</option>
+          <option value="en">English</option>
+          <option value="fr">Francais</option>
+        </select>
+      </section>
+
+      <section class="settings-block">
+        <h3 data-i18n="trackWidthTitle"></h3>
+        <p data-i18n="trackWidthDescription"></p>
+        <label class="field">
+          <span data-i18n="trackWidthLabel"></span>
+          <input id="track-width-input" type="range" min="4" max="10" step="1">
+        </label>
+        <div id="track-width-value" class="field-hint"></div>
+      </section>
+
+      <div class="button-row">
+        <button class="button button-ghost" type="button" data-close-dialog="settings-dialog" data-i18n="closeButton"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="help-dialog" class="modal-dialog">
+    <form method="dialog" class="modal-sheet modal-sheet-wide help-sheet">
+      <div class="panel-heading">
+        <h2 data-i18n="helpTitle"></h2>
+        <p id="help-status" class="field-hint"></p>
+      </div>
+      <div id="help-content" class="help-content"></div>
+      <div class="button-row">
+        <button class="button button-ghost" type="button" data-close-dialog="help-dialog" data-i18n="closeButton"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="modal-dialog">
+    <form method="dialog" class="modal-sheet modal-sheet-confirm">
+      <div class="panel-heading">
+        <h2 id="confirm-dialog-title">Bestaetigung</h2>
+        <p id="confirm-dialog-message"></p>
+      </div>
+      <div class="button-row">
+        <button id="confirm-dialog-confirm" class="button button-primary" type="submit" value="confirm">OK</button>
+        <button id="confirm-dialog-cancel" class="button button-ghost" type="submit" value="cancel">Abbrechen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="track-item-template">
+    <li class="track-item">
+      <div class="track-card-top">
+        <span class="track-swatch" aria-hidden="true"></span>
+        <div class="track-actions">
+          <input class="track-checkbox" type="checkbox" hidden>
+          <input class="track-color-input" type="color" value="#ff0000" aria-label="Track color">
+          <button class="icon-button export-button" type="button" title="Export GPX">⇩</button>
+          <button class="icon-button focus-button" type="button" title="Focus">⌖</button>
+          <button class="icon-button replay-button" type="button" title="Replay">▶</button>
+          <button class="icon-button expand-button" type="button" title="Expand">⤢</button>
+          <button class="icon-button delete-button" type="button" title="Delete">🗑</button>
+        </div>
+      </div>
+      <div class="track-main">
+        <div class="track-copy">
+          <strong class="track-name"></strong>
+          <p class="track-description" hidden></p>
+          <div class="track-facts"></div>
+          <span class="track-submeta"></span>
+          <div class="track-photo-strip" hidden></div>
+        </div>
+      </div>
+    </li>
+  </template>
+
+  <template id="account-item-template">
+    <div class="account-card">
+      <div class="account-copy">
+        <strong class="account-name"></strong>
+        <span class="account-meta"></span>
+      </div>
+      <div class="account-actions">
+        <button class="icon-button account-use-button" type="button" title="Use">◎</button>
+        <button class="icon-button account-delete-button" type="button" title="Delete">×</button>
+      </div>
+    </div>
+  </template>
+
+  <template id="tour-item-template">
+    <li class="track-item tour-item">
+      <label class="track-main">
+        <input class="tour-checkbox" type="checkbox">
+        <span class="track-copy">
+          <strong class="track-name"></strong>
+          <span class="track-meta"></span>
+          <span class="track-submeta"></span>
+        </span>
+      </label>
+    </li>
+  </template>
+
+  <template id="staging-item-template">
+    <li class="track-item compact-item">
+      <div class="track-copy">
+        <strong class="track-name"></strong>
+        <span class="track-meta"></span>
+        <span class="track-submeta"></span>
+      </div>
+    </li>
+  </template>
+
+  <dialog id="track-detail-dialog" class="modal-dialog">
+    <form method="dialog" class="modal-sheet modal-sheet-wide track-detail-dialog">
+      <div class="panel-heading">
+        <h2 id="track-detail-title">Track</h2>
+        <p id="track-detail-subtitle"></p>
+      </div>
+      <div id="track-detail-facts" class="track-detail-facts"></div>
+      <p id="track-detail-description" class="track-detail-description"></p>
+      <div id="track-detail-photos" class="track-detail-photos"></div>
+      <div class="button-row">
+        <button class="button button-ghost" type="button" data-close-dialog="track-detail-dialog" data-i18n="closeButton"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="photo-dialog" class="modal-dialog">
+    <form method="dialog" class="modal-sheet modal-sheet-wide photo-dialog">
+      <button id="photo-dialog-close" class="icon-button photo-dialog-close" type="button" aria-label="Schliessen">×</button>
+      <div class="panel-heading photo-dialog-heading">
+        <h2 id="photo-dialog-title">Foto</h2>
+        <p id="photo-dialog-subtitle"></p>
+      </div>
+      <div id="photo-dialog-stage" class="photo-dialog-stage">
+        <button id="photo-dialog-prev" class="icon-button photo-dialog-nav photo-dialog-nav-prev" type="button" aria-label="Previous">‹</button>
+        <img id="photo-dialog-image" class="photo-dialog-image" alt="">
+        <button id="photo-dialog-next" class="icon-button photo-dialog-nav photo-dialog-nav-next" type="button" aria-label="Next">›</button>
+      </div>
+      <p id="photo-dialog-caption" class="photo-dialog-caption" hidden></p>
+      <div id="photo-dialog-meta" class="track-detail-facts"></div>
+      <div id="photo-dialog-thumbs" class="photo-dialog-thumbs"></div>
+    </form>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="version.js"></script>
+  <script src="app.js" type="module"></script>
+</body>
+</html>
