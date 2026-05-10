@@ -35,6 +35,13 @@ Das App-Backup enthaelt diese Passwoerter ebenfalls.
 Diese Datei deshalb nur verschluesselt oder an vertrauenswuerdigen Orten aufbewahren.
 
 ## Backup-Formate
+Wichtig fuer den Unterschied zwischen normalem GPX-Export und Trailthread-Backup:
+- Ein GPX-Export ist fuer den Datenaustausch mit anderen Tools gedacht.
+- Ein GPX enthaelt ueblicherweise Trackpunkte, Zeit, Hoehe und einfache Metadaten.
+- Fotos werden dabei normalerweise nicht in die GPX-Datei eingebettet.
+- Eigene Tags haben in GPX ebenfalls keinen einheitlichen Standardplatz pro Track.
+- Genau deshalb gibt es in Trailthread zusaetzlich das Touren-Backup: Es bewahrt auch Fotos, Beschreibungen, eigene Tags und weitere App-Daten eines Tracks.
+
 App-Backup:
 - Konten inklusive Passwort
 - Sprache
@@ -52,6 +59,7 @@ Touren-Backup:
 - Track-Metadaten
 - GPX-Inhalte
 - Beschreibungen
+- eigene Tags und Favoritenstatus
 - Fotos inklusive gespeicherter Foto-Metadaten
 - Trackpunkte und daraus abgeleitete Werte wie Distanz, Bergauf und Bergab
 - importbezogene Metadaten wie Quelle, Datum, Sportart, Komoot-Infos und Farbauswahl
@@ -62,6 +70,9 @@ Touren-Backup:
 Wichtig:
 - Das App-Backup enthaelt keine Touren oder GPX-Dateien.
 - Das Touren-Backup enthaelt keine Konten, Passwoerter oder App-Einstellungen.
+- Ein Touren-Backup kann komplett oder nur fuer die aktuell ausgewaehlten Tracks erstellt werden.
+- Auch Teil-Backups bleiben spaeter wieder importierbar und laufen durch denselben Merge mit `lastChanged`.
+- Dadurch lassen sich einzelne Tracks inklusive Fotos, Beschreibungen, Tags und Metadaten gezielt mit anderen Nutzern teilen.
 - Beim Reimport von Touren-Backups werden Tracks mit gleicher ID anhand von `lastChanged` verglichen und bei Bedarf einzeln zur Ueberschreibung bestaetigt.
 
 ## Update-Mechanismus
@@ -90,12 +101,32 @@ Wenn du nur ausprobieren willst, kannst du statt echter Komoot-Daten auch den De
 Zusätzlich wichtig:
 - GPX-Dateien koennen direkt in die Bibliothek importiert werden.
 - Gespeicherte Tracks koennen einzeln wieder als GPX exportiert werden.
+- Mehrere ausgewaehlte Tracks koennen als ZIP mit einzelnen GPX-Dateien exportiert werden.
+- Optional koennen mehrere ausgewaehlte Tracks auch als eine gemeinsame Multi-Track-GPX exportiert werden.
 - Fuer komplette Sicherungen gibt es ausserdem App-Backup und Touren-Backup.
+- Das Touren-Backup gibt es auch fuer nur ausgewaehlte Tracks, damit sich komplette Trailthread-Tracks samt Fotos teilen lassen.
 
 ## Technischer Hintergrund
 Trailthread selbst ist eine lokale Web-App. Sie speichert ihre Daten im Browser, zeigt Karte und Replay an und verwaltet Tracks, Fotos, Beschreibungen, Backups und Einstellungen. Die App kann GPX-Dateien direkt importieren und einzelne Tracks wieder als GPX exportieren.
 
+Ein wichtiger Punkt dabei: GPX ist bewusst nur das Austauschformat fuer Strecken. Wenn du einen Track als GPX exportierst, nimmst du vor allem Geometrie, Zeit, Hoehe und einfache Metadaten mit. Die Fotos eines Tracks sind dagegen ein bewusstes Mehrwert-Merkmal von Trailthread und bleiben deshalb im gespeicherten Track sowie im Touren-Backup erhalten. Dasselbe gilt fuer eigene Tags und den Favoritenstatus. Genau das unterscheidet den einfachen GPX-Export von einer echten Trailthread-Sicherung.
+
 Der Komoot-Teil ist davon getrennt: Dafuer gibt es den lokalen Proxy. Die App prueft im Komoot-Bereich zuerst, ob dieser Proxy erreichbar ist, und zeigt den Zustand auch in der Diagnose an. Erst wenn der Proxy laeuft, kann sich Trailthread ueber ihn bei Komoot anmelden, Tourenlisten abrufen und ausgewaehlte Touren importieren.
+
+```mermaid
+flowchart LR
+    A["Trailthread App im Browser"] -->|"prueft Proxy-Verbindung"| B["Lokaler Komoot-Proxy"]
+    A -->|"GPX-Import / Export / Replay / Karte"| A
+    B -->|"Login mit lokal gespeichertem Konto"| C["Komoot"]
+    B -->|"laedt Tourenlisten, Details und Fotos"| C
+    C -->|"liefert geschuetzte Tourdaten nur fuer angemeldete Nutzer"| B
+    B -->|"gibt Trackdaten an die App zurueck"| A
+    A -->|"speichert Tracks, Fotos, Beschreibungen und Metadaten lokal"| D["Lokale Speicherung im Browser"]
+    D -->|"Touren-Backup enthaelt auch Fotos, Tags und App-Metadaten"| A
+    A -->|"GPX-Export gibt nur Strecken-Daten weiter"| E["Andere GPX-Tools"]
+
+    F["Warum nicht direkt im Browser?"] -->|"Login, Sitzungen, Weiterleitungen und Schutzmechanismen sind fuer reine Browser-Requests unzuverlaessig"| B
+```
 
 Der Proxy uebernimmt dabei vor allem:
 - Anmeldung bei Komoot
@@ -108,11 +139,12 @@ Die App selbst uebernimmt danach:
 - Anzeige in Bibliothek, Karte und Replay
 - lokale Speicherung aller importierten Daten
 - GPX-Einzelexport
+- GPX-Export fuer mehrere ausgewaehlte Tracks als ZIP oder als Multi-Track-GPX
 - App-Backup und Touren-Backup
 
 Die beiden Backup-Arten sind bewusst getrennt:
 - Das App-Backup enthaelt Konten, Sprache, Layout- und Anzeigeeinstellungen sowie Versionsangaben.
-- Das Touren-Backup enthaelt die gespeicherten Tracks mit GPX-Inhalt, Beschreibungen, Fotos, Trackpunkten, abgeleiteten Werten und `lastChanged` fuer spaetere Merge-Entscheidungen.
+- Das Touren-Backup enthaelt die gespeicherten Tracks mit GPX-Inhalt, Beschreibungen, eigenen Tags, Favoritenstatus, Fotos, Trackpunkten, abgeleiteten Werten und `lastChanged` fuer spaetere Merge-Entscheidungen.
 - Das App-Backup enthaelt keine Touren.
 - Das Touren-Backup enthaelt keine Konten oder App-Einstellungen.
 

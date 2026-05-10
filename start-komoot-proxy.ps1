@@ -133,6 +133,15 @@ function Get-FirstNonEmptyText($Values) {
     if ($null -eq $Value) {
       continue
     }
+    if ($Value -is [System.Collections.IDictionary]) {
+      continue
+    }
+    if (($Value -is [psobject]) -and -not ($Value -is [string]) -and @($Value.PSObject.Properties).Count) {
+      continue
+    }
+    if (($Value -is [System.Collections.IEnumerable]) -and -not ($Value -is [string])) {
+      continue
+    }
     $text = ([string]$Value).Trim()
     if ($text) {
       return $text
@@ -579,6 +588,51 @@ function Get-RealTourDetail([string]$TourId, [string]$Language = "en") {
   Invoke-KomootApi -Url $url -Headers $headers
 }
 
+function Get-KomootObjectProperty($InputObject, [string]$Name) {
+  if ($null -eq $InputObject) {
+    return $null
+  }
+  if ($InputObject -is [hashtable]) {
+    if ($InputObject.ContainsKey($Name)) {
+      return $InputObject[$Name]
+    }
+    return $null
+  }
+  $property = $InputObject.PSObject.Properties[$Name]
+  if ($property) {
+    return $property.Value
+  }
+  $null
+}
+
+function Get-KomootEmbeddedItems($Value) {
+  if ($null -eq $Value) {
+    return @()
+  }
+  if ($Value -is [string]) {
+    return @($Value)
+  }
+  if ($Value -is [hashtable] -or $Value.PSObject.Properties.Count -gt 0) {
+    foreach ($key in @('items', 'segments', 'elements', 'results', 'values', 'data', 'collection')) {
+      $nested = Get-KomootObjectProperty -InputObject $Value -Name $key
+      if ($null -ne $nested) {
+        return @(Get-KomootEmbeddedItems $nested)
+      }
+    }
+    if ((Get-KomootObjectProperty -InputObject $Value -Name 'name') -or (Get-KomootObjectProperty -InputObject $Value -Name 'type') -or (Get-KomootObjectProperty -InputObject $Value -Name 'instruction') -or $null -ne (Get-KomootObjectProperty -InputObject $Value -Name 'distance') -or $null -ne (Get-KomootObjectProperty -InputObject $Value -Name 'segment_length')) {
+      return @($Value)
+    }
+  }
+  if ($Value -is [System.Collections.IEnumerable] -and -not ($Value -is [string])) {
+    $items = @()
+    foreach ($entry in $Value) {
+      $items += @(Get-KomootEmbeddedItems $entry)
+    }
+    return $items
+  }
+  @($Value)
+}
+
 function Get-DemoGpx([string]$TourId, [string]$TourName) {
   $routes = @{
     "komoot-demo-1" = @(@{ lat = 48.1402; lng = 11.5568 }, @{ lat = 48.1376; lng = 11.5659 }, @{ lat = 48.1343; lng = 11.5748 }, @{ lat = 48.1287; lng = 11.5814 }, @{ lat = 48.1221; lng = 11.5872 })
@@ -763,6 +817,9 @@ try {
               $headers = New-BasicAuthHeader -User $session.UserId -Password $session.Token
               $coverImages = @(Get-RealTourCoverImages -TourId ([string]$tourId))
               $photoCandidates = @(Get-CoverImagePhotoCandidates $coverImages)
+              $surfaceItems = @(Get-KomootEmbeddedItems $tour._embedded.surfaces)
+              $wayTypeItems = @(Get-KomootEmbeddedItems $tour._embedded.way_types)
+              $directionItems = @(Get-KomootEmbeddedItems $tour._embedded.directions)
               $items += @{
                 id = [string]$tour.id
                 fileName = "$($tour.name)-$($tour.id).gpx"
@@ -772,8 +829,30 @@ try {
                 dateStart = if ($tour.date) { ([datetimeoffset]$tour.date).ToString("yyyy-MM-dd") } else { $null }
                 durationHours = if ($tour.duration) { [math]::Round(([double]$tour.duration / 3600), 1) } else { $null }
                 sport = $tour.sport
-                surfaces = @($tour._embedded.surfaces | ForEach-Object { if ($_ -is [string]) { $_ } elseif ($_.name) { $_.name } elseif ($_.type) { $_.type } })
-                wayTypes = @($tour._embedded.way_types | ForEach-Object { if ($_ -is [string]) { $_ } elseif ($_.name) { $_.name } elseif ($_.type) { $_.type } })
+                surfaces = @($surfaceItems | ForEach-Object { if ($_ -is [string]) { $_ } elseif ($_.name) { $_.name } elseif ($_.type) { $_.type } })
+                wayTypes = @($wayTypeItems | ForEach-Object { if ($_ -is [string]) { $_ } elseif ($_.name) { $_.name } elseif ($_.type) { $_.type } })
+                directions = @($directionItems | ForEach-Object {
+                  @{
+                    instruction = if ($_.instruction) { [string]$_.instruction } elseif ($_.text) { [string]$_.text } elseif ($_.name) { [string]$_.name } elseif ($_.title) { [string]$_.title } else { $null }
+                    distanceM = if ($null -ne $_.distance) { [double]$_.distance } elseif ($null -ne $_.segment_length) { [double]$_.segment_length } elseif ($null -ne $_.length) { [double]$_.length } else { $null }
+                    type = if ($_.type) { [string]$_.type } elseif ($_._type) { [string]$_._type } elseif ($_.icon) { [string]$_.icon } else { $null }
+                  }
+                })
+              }
+              if (-not $surfaceItems.Count) {
+                Write-DebugLog "Tour $($tour.id) returned no surfaces from Komoot" "INFO"
+              } else {
+                Write-DebugLog "Tour $($tour.id) surfaces: $($surfaceItems.Count) item(s)" "INFO"
+              }
+              if (-not $wayTypeItems.Count) {
+                Write-DebugLog "Tour $($tour.id) returned no way_types from Komoot" "INFO"
+              } else {
+                Write-DebugLog "Tour $($tour.id) way_types: $($wayTypeItems.Count) item(s)" "INFO"
+              }
+              if (-not $directionItems.Count) {
+                Write-DebugLog "Tour $($tour.id) returned no directions from Komoot" "INFO"
+              } else {
+                Write-DebugLog "Tour $($tour.id) directions: $($directionItems.Count) item(s)" "INFO"
               }
             }
           }

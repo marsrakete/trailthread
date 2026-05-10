@@ -498,6 +498,61 @@ select:hover {
   flex: 1 1 0;
 }
 
+.library-toolbar-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.library-toolbar-grid > .button,
+.library-toolbar-grid > label.button[for="file-input"] {
+  width: 100%;
+}
+
+.library-export-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.library-export-menu {
+  position: relative;
+}
+
+.library-export-summary {
+  min-width: var(--control-height);
+  width: var(--control-height);
+  justify-content: center;
+  padding: 0;
+  list-style: none;
+}
+
+.library-export-summary::-webkit-details-marker {
+  display: none;
+}
+
+.library-export-menu[open] {
+  z-index: 30;
+}
+
+.library-export-popover {
+  position: absolute;
+  top: calc(100% + 0.32rem);
+  right: 0;
+  z-index: 35;
+  min-width: 12.5rem;
+  padding: 0.45rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(19, 33, 30, 0.98);
+  box-shadow: 0 16px 34px rgba(7, 13, 12, 0.34);
+}
+
+.library-export-popover .button {
+  width: 100%;
+}
+
 .replay-speed-select,
 #replay-view-2d-button,
 #replay-view-3d-button,
@@ -512,6 +567,8 @@ select:hover {
 }
 
 #add-account-button,
+#export-selected-gpx-button,
+#export-selected-multitrack-gpx-button,
 #library-toggle-selection-button,
 #export-tour-backup-button,
 #settings-export-tour-backup-button,
@@ -612,6 +669,57 @@ input[type="range"]::-moz-range-thumb {
 .account-copy,
 .track-copy {
   min-width: 0;
+}
+
+.track-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.track-quick-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.track-quick-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 1.2rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.track-favorite-toggle {
+  cursor: pointer;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding-inline: 0.34rem;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.track-favorite-toggle:hover,
+.track-favorite-toggle:focus-visible {
+  color: #f0c98d;
+  border-color: rgba(240, 201, 141, 0.34);
+  background: rgba(240, 201, 141, 0.14);
+  transform: translateY(-1px);
+}
+
+.track-quick-badge.is-favorite {
+  color: #f0c98d;
+  border-color: rgba(240, 201, 141, 0.34);
+  background: rgba(240, 201, 141, 0.14);
 }
 
 .account-name,
@@ -1323,6 +1431,88 @@ input[type="range"]::-moz-range-thumb {
   border-radius: var(--control-radius);
 }
 
+.heatmap-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.heatmap-help-button {
+  width: 1.7rem;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.heatmap-help-popover {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 35;
+  width: min(18rem, 72vw);
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(16, 25, 23, 0.96);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.2rem);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.heatmap-help:hover .heatmap-help-popover,
+.heatmap-help:focus-within .heatmap-help-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.heatmap-help-popover strong {
+  font-size: 0.85rem;
+  line-height: 1.25;
+}
+
+.heatmap-help-popover p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.77rem;
+  line-height: 1.45;
+}
+
+.heatmap-help-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.76rem;
+}
+
+.heatmap-help-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  display: inline-block;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.heatmap-help-dot-low {
+  background: hsl(210 92% 58%);
+}
+
+.heatmap-help-dot-mid {
+  background: hsl(110 92% 52%);
+}
+
+.heatmap-help-dot-high {
+  background: hsl(12 92% 46%);
+}
+
 .map-panel {
   position: relative;
   overflow: hidden;
@@ -1604,6 +1794,20 @@ body.is-library-compact .library-panel .pane-header-row {
 .overlay-block strong {
   font-size: 0.74rem;
   line-height: 1;
+}
+
+.overlay-block-direction {
+  min-width: 0;
+  flex: 1 1 10rem;
+  overflow: hidden;
+}
+
+.overlay-block-direction strong {
+  display: inline-block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workspace-grid {
@@ -1999,6 +2203,71 @@ body.is-library-compact .library-panel .pane-header-row {
   white-space: pre-wrap;
 }
 
+.track-detail-edit-block {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.track-detail-edit-block textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
+.track-detail-analysis {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.track-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+}
+
+.track-analysis-card {
+  padding: 0.85rem 0.9rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.track-analysis-card h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.track-analysis-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.analysis-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.analysis-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.analysis-pill.is-favorite {
+  background: rgba(240, 201, 141, 0.18);
+  border-color: rgba(240, 201, 141, 0.34);
+}
+
 .track-detail-photos {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
@@ -2079,6 +2348,25 @@ body.is-library-compact .library-panel .pane-header-row {
   max-width: 100%;
   height: auto;
   border-radius: 16px;
+}
+
+.help-mermaid-block {
+  overflow: auto;
+  margin: 0 0 0.85rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(8, 14, 13, 0.42);
+}
+
+.help-mermaid-block.is-rendered {
+  padding: 0.55rem 0.7rem;
+}
+
+.help-mermaid-block svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .help-centered {
@@ -2178,6 +2466,52 @@ body.is-library-compact .library-panel .pane-header-row {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+}
+
+.onboarding-panel {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 0.6rem;
+  padding: 0.9rem 1rem;
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(185, 224, 196, 0.12), rgba(255, 255, 255, 0.04)),
+    rgba(24, 40, 37, 0.92);
+}
+
+.onboarding-steps {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.onboarding-step {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.onboarding-step.is-done {
+  color: var(--text);
+}
+
+.onboarding-step-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.74rem;
+  flex: 0 0 auto;
+}
+
+.onboarding-step.is-done .onboarding-step-badge {
+  background: rgba(185, 224, 196, 0.18);
+  border-color: rgba(185, 224, 196, 0.36);
+  color: var(--text);
 }
 
 .toolbar-nav-button {

@@ -100,8 +100,18 @@
               <option value="recorded" data-i18n="filterRecorded"></option>
               <option value="planned" data-i18n="filterPlanned"></option>
             </select>
+            <select id="library-favorite-filter">
+              <option value="all" data-i18n="filterAllFavorites"></option>
+              <option value="favorites" data-i18n="filterFavoritesOnly"></option>
+              <option value="non-favorites" data-i18n="filterNoFavorites"></option>
+            </select>
+          </div>
+          <div class="control-row">
             <select id="library-sport-filter">
               <option value="all" data-i18n="filterAllSports"></option>
+            </select>
+            <select id="library-tag-filter">
+              <option value="all" data-i18n="filterAllTags"></option>
             </select>
           </div>
           <div class="control-row">
@@ -116,11 +126,23 @@
             </select>
           </div>
         </div>
-        <div class="button-row compact-row library-toolbar">
+        <div class="button-row compact-row library-toolbar library-toolbar-grid">
           <label class="button button-primary" for="file-input" data-i18n="addFiles"></label>
           <input id="file-input" type="file" accept=".gpx" multiple hidden>
+          <div class="library-export-split">
+            <button id="export-selected-gpx-button" class="button button-subtle" type="button" data-i18n="exportSelectedGpx"></button>
+            <details id="export-selected-gpx-menu" class="library-export-menu">
+              <summary class="button button-subtle library-export-summary" aria-label="Weitere Exportoptionen" title="Weitere Exportoptionen">
+                <span class="replay-options-chevron">⌄</span>
+              </summary>
+              <div class="library-export-popover">
+                <button id="export-selected-multitrack-gpx-button" class="button button-ghost" type="button" data-i18n="exportSelectedMultiTrackGpx"></button>
+              </div>
+            </details>
+          </div>
           <button id="library-toggle-selection-button" class="button button-subtle" type="button" data-i18n="selectAll"></button>
           <button id="export-tour-backup-button" class="button button-ghost" type="button" data-i18n="exportTours"></button>
+          <button id="export-selected-tour-backup-button" class="button button-ghost" type="button" data-i18n="exportSelectedTours"></button>
         </div>
         <ul id="track-list" class="track-list" aria-live="polite"></ul>
       </section>
@@ -139,7 +161,40 @@
           <button id="fit-all-button" class="button button-ghost" type="button" data-i18n="fitSelection"></button>
           <button id="next-track-button" class="button button-subtle toolbar-nav-button" type="button" data-i18n="nextTrack" aria-label="Naechster Track">→</button>
           <button id="map-photo-mode-button" class="button button-subtle" type="button"></button>
+          <div class="heatmap-help">
+            <button id="map-heatmap-button" class="button button-subtle" type="button" data-i18n="mapHeatmap"></button>
+            <button class="icon-button heatmap-help-button" type="button" aria-label="Heatmap-Hilfe" title="Heatmap-Hilfe">?</button>
+            <div class="heatmap-help-popover" role="note">
+              <strong data-i18n="heatmapHelpTitle"></strong>
+              <p data-i18n="heatmapHelpText"></p>
+              <div class="heatmap-help-legend">
+                <span class="heatmap-help-dot heatmap-help-dot-low"></span>
+                <span data-i18n="heatmapHelpLow"></span>
+              </div>
+              <div class="heatmap-help-legend">
+                <span class="heatmap-help-dot heatmap-help-dot-mid"></span>
+                <span data-i18n="heatmapHelpMid"></span>
+              </div>
+              <div class="heatmap-help-legend">
+                <span class="heatmap-help-dot heatmap-help-dot-high"></span>
+                <span data-i18n="heatmapHelpHigh"></span>
+              </div>
+            </div>
+          </div>
         </div>
+        <section id="onboarding-panel" class="panel onboarding-panel" hidden>
+          <div class="panel-heading">
+            <h2 data-i18n="onboardingTitle"></h2>
+            <p data-i18n="onboardingDescription"></p>
+          </div>
+          <div id="onboarding-steps" class="onboarding-steps"></div>
+          <div class="button-row compact-row">
+            <label class="button button-primary" for="file-input" data-i18n="onboardingImport"></label>
+            <button id="onboarding-komoot-button" class="button button-subtle" type="button" data-i18n="onboardingKomoot"></button>
+            <button id="onboarding-replay-button" class="button button-ghost" type="button" data-i18n="onboardingReplay"></button>
+          </div>
+          <p id="onboarding-hint" class="field-hint" data-i18n="onboardingHint"></p>
+        </section>
         <section class="map-panel">
           <div id="map" aria-label="OpenStreetMap track canvas"></div>
           <div class="map-overlay">
@@ -382,6 +437,15 @@
                         <button class="button button-subtle" type="button" data-replay-camera="orbit" data-i18n="replayCameraOrbit"></button>
                       </div>
                     </div>
+                    <div class="replay-options-section replay-camera-inline" role="toolbar" aria-label="Replay jumps">
+                      <span class="replay-control-label replay-camera-inline-label" data-i18n="replayJumpTitle"></span>
+                      <div class="segmented-control segmented-control-compact">
+                        <button id="replay-jump-start-button" class="button button-subtle" type="button" data-i18n="replayJumpStart"></button>
+                        <button id="replay-jump-high-button" class="button button-subtle" type="button" data-i18n="replayJumpHighest"></button>
+                        <button id="replay-jump-photo-button" class="button button-subtle" type="button" data-i18n="replayJumpPhoto"></button>
+                        <button id="replay-jump-end-button" class="button button-subtle" type="button" data-i18n="replayJumpEnd"></button>
+                      </div>
+                    </div>
                   </div>
                 </details>
               </div>
@@ -427,6 +491,10 @@
             <div class="overlay-block">
               <span data-i18n="pointsTitle"></span>
               <strong id="replay-point-value">-</strong>
+            </div>
+            <div class="overlay-block overlay-block-direction">
+              <span data-i18n="replayNextDirection"></span>
+              <strong id="replay-direction-value">-</strong>
             </div>
           </div>
         </section>
@@ -475,7 +543,7 @@
         <div id="version-label" class="field-hint"></div>
         <div class="button-row">
           <button id="check-updates-button" class="button button-primary" type="button" data-i18n="checkUpdatesButton"></button>
-          <button id="reload-app-button" class="button button-ghost" type="button" data-i18n="reloadButton" hidden></button>
+          <button id="reload-app-button" class="button button-ghost" type="button" data-i18n="reloadButton"></button>
         </div>
         <p id="update-status" class="field-hint"></p>
       </section>
@@ -495,6 +563,7 @@
         <p data-i18n="tourBackupDescription"></p>
         <div class="button-row">
           <button id="settings-export-tour-backup-button" class="button button-primary" type="button" data-i18n="exportTours"></button>
+          <button id="settings-export-selected-tour-backup-button" class="button button-subtle" type="button" data-i18n="exportSelectedTours"></button>
           <label class="button button-ghost" for="tour-backup-input" data-i18n="importTours"></label>
           <input id="tour-backup-input" type="file" accept=".json,.gz,application/json,application/gzip" hidden>
         </div>
@@ -585,9 +654,12 @@
           <button class="icon-button delete-button" type="button" title="Delete">🗑</button>
         </div>
       </div>
-      <div class="track-main">
-        <div class="track-copy">
-          <strong class="track-name"></strong>
+        <div class="track-main">
+          <div class="track-copy">
+          <div class="track-title-row">
+            <strong class="track-name"></strong>
+            <div class="track-quick-badges"></div>
+          </div>
           <p class="track-description" hidden></p>
           <div class="track-facts"></div>
           <span class="track-submeta"></span>
@@ -639,10 +711,32 @@
         <h2 id="track-detail-title">Track</h2>
         <p id="track-detail-subtitle"></p>
       </div>
+      <section id="track-detail-edit-block" class="track-detail-edit-block" hidden>
+        <label class="field">
+          <span data-i18n="editTrackNameLabel"></span>
+          <input id="track-detail-name-input" type="text" maxlength="160">
+        </label>
+        <label class="replay-toggle">
+          <input id="track-detail-favorite-input" type="checkbox">
+          <span data-i18n="editTrackFavoriteLabel"></span>
+        </label>
+        <label class="field">
+          <span data-i18n="editTrackTagsLabel"></span>
+          <input id="track-detail-tags-input" type="text" maxlength="240">
+        </label>
+        <label class="field">
+          <span data-i18n="editTrackDescriptionLabel"></span>
+          <textarea id="track-detail-description-input" rows="5"></textarea>
+        </label>
+      </section>
       <div id="track-detail-facts" class="track-detail-facts"></div>
       <p id="track-detail-description" class="track-detail-description"></p>
+      <section id="track-detail-analysis" class="track-detail-analysis"></section>
       <div id="track-detail-photos" class="track-detail-photos"></div>
       <div class="button-row">
+        <button id="track-detail-edit-button" class="button button-subtle" type="button" data-i18n="editTrackButton"></button>
+        <button id="track-detail-save-button" class="button button-primary" type="button" data-i18n="saveTrackButton" hidden></button>
+        <button id="track-detail-cancel-button" class="button button-ghost" type="button" data-i18n="cancelEditButton" hidden></button>
         <button class="button button-ghost" type="button" data-close-dialog="track-detail-dialog" data-i18n="closeButton"></button>
       </div>
     </form>
