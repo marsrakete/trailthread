@@ -126,14 +126,14 @@ function appRunsOnLoopbackOrigin() {
 function proxyBaseUrl() {
   return appRunsOnLoopbackOrigin() ? PROXY_PATH : `${LOCAL_PROXY_ORIGIN}${PROXY_PATH}`;
 }
-function shouldRequestLocalNetworkAccess() {
+function shouldRequestLoopbackAccess() {
   return !appRunsOnLoopbackOrigin() && /^https?:$/i.test(globalThis.location?.protocol || "");
 }
 function proxyBlockedByHostedLoopbackPolicy(message = "") {
   const normalized = `${message ?? ""}`.toLowerCase();
   return normalized.includes("loopback address space")
     || normalized.includes("private network access")
-    || (normalized.includes("failed to fetch") && shouldRequestLocalNetworkAccess());
+    || (normalized.includes("failed to fetch") && shouldRequestLoopbackAccess());
 }
 function normalizeProxyError(error) {
   const message = `${error?.message ?? error ?? ""}`.trim();
@@ -3824,7 +3824,7 @@ async function proxyRequest(path, options = {}) {
       method: options.method ?? 'GET',
       headers: options.body ? { 'Content-Type': 'application/json' } : {},
       body: options.body ? JSON.stringify(options.body) : undefined,
-      targetAddressSpace: shouldRequestLocalNetworkAccess() ? 'local' : undefined
+      targetAddressSpace: shouldRequestLoopbackAccess() ? 'loopback' : undefined
     });
   } catch (error) {
     throw new Error(normalizeProxyError(error));
