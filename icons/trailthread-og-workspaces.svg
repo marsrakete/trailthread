@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Trailthread Workspaces</title>
+  <desc id="desc">Open-Graph-Grafik mit Trailthread-Logo und den drei Arbeitsbereichen Bibliothek, Komoot-Download und Replay.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#11231f"/>
+      <stop offset="52%" stop-color="#183129"/>
+      <stop offset="100%" stop-color="#28433a"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#223931"/>
+      <stop offset="100%" stop-color="#182c27"/>
+    </linearGradient>
+    <linearGradient id="panelStroke" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#4b6a61"/>
+      <stop offset="100%" stop-color="#304c43"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#08110f" flood-opacity=".28"/>
+    </filter>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#08110f" flood-opacity=".18"/>
+    </filter>
+    <style>
+      .eyebrow { font: 700 16px/1.2 Arial, sans-serif; letter-spacing: 3px; text-transform: uppercase; fill: #9fdcb4; }
+      .title { font: 700 54px/1.04 Arial, sans-serif; fill: #f5f8f6; }
+      .subtitle { font: 400 23px/1.45 Arial, sans-serif; fill: #c9d4cf; }
+      .card-title { font: 700 24px/1.15 Arial, sans-serif; fill: #f5f8f6; }
+      .card-text { font: 400 18px/1.45 Arial, sans-serif; fill: #c7d2cd; }
+      .label { font: 700 18px/1 Arial, sans-serif; fill: #dbe6e1; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1066" cy="98" r="174" fill="#ffffff" fill-opacity=".05"/>
+  <circle cx="132" cy="534" r="154" fill="#ffffff" fill-opacity=".04"/>
+  <path d="M0 548c167-50 324-72 501-42c219 37 356-5 699-123v247H0Z" fill="#ffffff" fill-opacity=".04"/>
+
+  <g transform="translate(76 72)">
+    <rect width="164" height="164" rx="42" fill="#132723" filter="url(#shadow)"/>
+    <path d="M44 112c24-34 39-61 53-92c19 22 28 46 42 68c10-16 21-34 35-55c14 28 24 49 41 79" fill="none" stroke="#86f0ab" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <circle cx="44" cy="112" r="10" fill="#ff9f68"/>
+    <circle cx="171" cy="111" r="10" fill="#76d6ff"/>
+  </g>
+
+  <g transform="translate(286 86)">
+    <text class="eyebrow" x="0" y="0">Trailthread</text>
+    <text class="title" x="0" y="68">Outdoor-Tracks Tools</text>
+    <text class="subtitle" x="0" y="142">Bibliothek zum Organisieren, Komoot-Download zum Laden</text>
+    <text class="subtitle" x="0" y="176">und Replay zum Nachfahren in 2D oder 3D.</text>
+  </g>
+
+  <g transform="translate(76 274)">
+    <g transform="translate(0 0)" filter="url(#soft)">
+      <rect width="332" height="214" rx="30" fill="url(#panel)" stroke="url(#panelStroke)" stroke-width="2"/>
+      <circle cx="54" cy="52" r="28" fill="#243f37"/>
+      <path d="M34 39c0-5 4-9 9-9h11l6 7h24c5 0 9 4 9 9v19c0 5-4 9-9 9H43c-5 0-9-4-9-9Z" fill="none" stroke="#86f0ab" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M42 50h30M42 58h24" fill="none" stroke="#ffcf9e" stroke-width="4" stroke-linecap="round"/>
+      <text class="card-title" x="104" y="49">Bibliothek</text>
+      <text class="card-text" x="32" y="108">Tracks, Fotos, Tags und Backups</text>
+      <text class="card-text" x="32" y="138">lokal verwalten, filtern und</text>
+      <text class="card-text" x="32" y="168">auf Karte plus Höhenprofil lesen.</text>
+    </g>
+
+    <g transform="translate(344 0)" filter="url(#soft)">
+      <rect width="332" height="214" rx="30" fill="url(#panel)" stroke="url(#panelStroke)" stroke-width="2"/>
+      <circle cx="54" cy="52" r="28" fill="#243f37"/>
+      <path d="M42 34h25c4 0 7 3 7 7v19c0 4-3 7-7 7H52l-10 10V67h-2c-4 0-7-3-7-7V41c0-4 3-7 7-7Z" fill="none" stroke="#76d6ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M43 46h21M43 54h15" fill="none" stroke="#76d6ff" stroke-width="4" stroke-linecap="round"/>
+      <text class="card-title" x="92" y="44">Komoot-</text>
+      <text class="card-title" x="92" y="72">Download</text>
+      <text class="card-text" x="32" y="108">Geplante und gemachte Touren</text>
+      <text class="card-text" x="32" y="138">über den lokalen Proxy laden</text>
+      <text class="card-text" x="32" y="168">und in die Bibliothek übernehmen.</text>
+    </g>
+
+    <g transform="translate(688 0)" filter="url(#soft)">
+      <rect width="332" height="214" rx="30" fill="url(#panel)" stroke="url(#panelStroke)" stroke-width="2"/>
+      <circle cx="54" cy="52" r="28" fill="#243f37"/>
+      <circle cx="54" cy="52" r="16" fill="#b7e5bf"/>
+      <path d="M50 44l14 8l-14 8Z" fill="#183129"/>
+      <text class="card-title" x="92" y="49">Replay</text>
+      <text class="card-text" x="32" y="108">Tracks animiert entlang der</text>
+      <text class="card-text" x="32" y="138">Strecke zeigen, mit Profil, Fotos</text>
+      <text class="card-text" x="32" y="168">und Navigationshinweisen.</text>
+    </g>
+  </g>
+</svg>

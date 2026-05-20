@@ -19,15 +19,27 @@ const CURRENT_VERSION_INFO = Object.freeze(globalThis.APP_VERSION_INFO || {
   label: "",
 });
 const REPLAY_TIME_SCALE = 1;
-const REPLAY_DISTANCE_SECONDS = 480;
+const REPLAY_DISTANCE_SECONDS = 1200;
 const APP_SHARE_URL = "https://marsrakete.github.io/trailthread/";
 
-const state = { db: null, map: null, replayMap2d: null, replayMap3d: null, replayMap3dReady: false, layers: new Map(), heatmapLayer: null, tracks: [], accounts: [], settings: { id: "app", language: "auto", activeWorkspace: "library", activeAccountId: null, leftPaneWidth: 180, middlePaneWidth: 400, sidebarCompact: false, libraryCompact: false, photoOverlayOnly: false, heatmapMode: false, trackLineWeight: 6, komootCaches: {} }, selectedTrackIds: new Set(), highlightedTrackId: null, libraryUi: { focusTrackId: null, scrollTop: 0 }, profileUi: { trackId: null, samples: [], plot: null, hoverMarker: null }, photoDialogUi: { trackId: null, photos: [], index: 0, swipeStartX: null }, trackDetailUi: { trackId: null, editing: false }, resizeUi: { handle: null, startX: 0, leftPaneWidth: 180, middlePaneWidth: 400, rafId: null }, komootTours: [], selectedKomootTourIds: new Set(), komootUi: { focusTourId: null, focusList: null, scrollTopByList: { recorded: 0, planned: 0 }, focusOffsetByList: { recorded: null, planned: null }, progress: { active: false, label: '', value: 0, indeterminate: false } }, replay: { activeTrackId: null, replayTrack: null, view: '2d', mode: 'distance', playing: false, speed: 4, cursor: 0, followCamera: true, showPhotos: true, showProfile: true, cameraMode2d: 'center', cameraMode3d: 'orbit', rafId: null, lastFrameAt: 0, layers2d: { route: null, played: null, marker: null, photos: null }, sources3dReady: false, marker3d: null, lastApplied2DMode: null, last2DCameraAppliedAt: 0 }, proxy: { online: false, mode: null, lastCheckAt: null, lastError: null } };
+const state = { db: null, map: null, replayMap2d: null, replayMap3d: null, replayMap3dReady: false, layers: new Map(), heatmapLayer: null, heatmapStats: null, tracks: [], accounts: [], settings: { id: "app", language: "auto", activeWorkspace: "library", activeAccountId: null, leftPaneWidth: 180, middlePaneWidth: 400, sidebarCompact: false, libraryCompact: false, photoOverlayOnly: false, heatmapMode: false, segmentOverlayMode: false, replayDirectionOverlayCollapsed: false, trackLineWeight: 6, komootCaches: {} }, selectedTrackIds: new Set(), highlightedTrackId: null, libraryUi: { focusTrackId: null, scrollTop: 0 }, mergeUi: { orderedTrackIds: [] }, profileUi: { trackId: null, samples: [], plot: null, hoverMarker: null }, photoDialogUi: { trackId: null, photos: [], index: 0, swipeStartX: null }, trackDetailUi: { trackId: null, editing: false }, resizeUi: { handle: null, startX: 0, leftPaneWidth: 180, middlePaneWidth: 400, rafId: null }, komootTours: [], selectedKomootTourIds: new Set(), komootUi: { focusTourId: null, focusList: null, scrollTopByList: { recorded: 0, planned: 0 }, focusOffsetByList: { recorded: null, planned: null }, progress: { active: false, label: '', value: 0, indeterminate: false } }, replay: { activeTrackId: null, replayTrack: null, view: '2d', mode: 'distance', playing: false, speed: 4, cursor: 0, followCamera: true, showPhotos: true, showProfile: true, cameraMode2d: 'center', cameraMode3d: 'orbit', rafId: null, lastFrameAt: 0, layers2d: { route: null, played: null, marker: null, photos: null }, sources3dReady: false, marker3d: null, lastApplied2DMode: null, last2DCameraAppliedAt: 0, profileRender: { key: null, geometry: null } }, proxy: { online: false, mode: null, lastCheckAt: null, lastError: null } };
+
+const libraryDerivedCache = {
+  tracksRef: null,
+  language: '',
+  sports: [],
+  customTags: [],
+  metaTags: [],
+  filteredKey: '',
+  filteredTracks: [],
+  filteredIds: new Set(),
+  selectSignatures: { sport: '', tag: '', meta: '' }
+};
 
 const el = {
-  workspaceButtons: [...document.querySelectorAll('.workspace-button[data-workspace]')], settingsButton: document.querySelector('#open-settings-button'), helpButton: document.querySelector('#open-help-button'), toggleSidebarCompactButton: document.querySelector('#toggle-sidebar-compact-button'), toggleLibraryCompactButton: document.querySelector('#toggle-library-compact-button'), libraryWorkspace: document.querySelector('#library-workspace'), komootWorkspace: document.querySelector('#komoot-workspace'), replayWorkspace: document.querySelector('#replay-workspace'), statusPill: document.querySelector('#status-pill'), komootStatusPill: document.querySelector('#komoot-status-pill'), addAccountButton: document.querySelector('#add-account-button'), accountsList: document.querySelector('#accounts-list'), fileInput: document.querySelector('#file-input'), exportSelectedGpxButton: document.querySelector('#export-selected-gpx-button'), exportSelectedGpxMenu: document.querySelector('#export-selected-gpx-menu'), exportSelectedMultiTrackGpxButton: document.querySelector('#export-selected-multitrack-gpx-button'), trackList: document.querySelector('#track-list'), onboardingPanel: document.querySelector('#onboarding-panel'), onboardingSteps: document.querySelector('#onboarding-steps'), onboardingKomootButton: document.querySelector('#onboarding-komoot-button'), onboardingReplayButton: document.querySelector('#onboarding-replay-button'), onboardingHint: document.querySelector('#onboarding-hint'), librarySearchInput: document.querySelector('#library-search-input'), libraryTypeFilter: document.querySelector('#library-type-filter'), libraryFavoriteFilter: document.querySelector('#library-favorite-filter'), librarySportFilter: document.querySelector('#library-sport-filter'), libraryTagFilter: document.querySelector('#library-tag-filter'), libraryMetaFilter: document.querySelector('#library-meta-filter'), librarySortSelect: document.querySelector('#library-sort-select'), fitAllButton: document.querySelector('#fit-all-button'), mapPhotoModeButton: document.querySelector('#map-photo-mode-button'), prevTrackButton: document.querySelector('#prev-track-button'), nextTrackButton: document.querySelector('#next-track-button'), resizeHandles: [...document.querySelectorAll('[data-resize-handle]')], toggleSelectionButton: document.querySelector('#toggle-selection-button'), libraryToggleSelectionButton: document.querySelector('#library-toggle-selection-button'), selectionStats: document.querySelector('#selection-stats'), distanceStats: document.querySelector('#distance-stats'), pointStats: document.querySelector('#point-stats'), profileTrackName: document.querySelector('#profile-track-name'), profileDistance: document.querySelector('#profile-distance'), profileElevationRange: document.querySelector('#profile-elevation-range'), profileAscent: document.querySelector('#profile-ascent'), profileDescent: document.querySelector('#profile-descent'), profileAvgSpeed: document.querySelector('#profile-avg-speed'), profileEmpty: document.querySelector('#profile-empty'), profileChartShell: document.querySelector('#profile-chart-shell'), profileChart: document.querySelector('#profile-chart'), profileCursorInfo: document.querySelector('#profile-cursor-info'), profileCursorAfter: document.querySelector('#profile-cursor-after'), profileCursorAltitude: document.querySelector('#profile-cursor-altitude'), profileCursorGrade: document.querySelector('#profile-cursor-grade'), selectionList: document.querySelector('#selection-list'), recentList: document.querySelector('#staging-list'), recentSummary: document.querySelector('#staging-summary'), librarySummary: document.querySelector('#library-summary'), komootAccountSelect: document.querySelector('#komoot-account-select'), komootLoadButton: document.querySelector('#komoot-load-button'), komootImportButton: document.querySelector('#komoot-import-button'), komootProgress: document.querySelector('#komoot-progress'), komootProgressLabel: document.querySelector('#komoot-progress-label'), komootProgressValue: document.querySelector('#komoot-progress-value'), komootProgressBar: document.querySelector('#komoot-progress-bar'), recordedList: document.querySelector('#recorded-tour-list'), plannedList: document.querySelector('#planned-tour-list'), recordedSummary: document.querySelector('#recorded-summary'), plannedSummary: document.querySelector('#planned-summary'), recordedSelectAllButton: document.querySelector('#recorded-select-all-button'), plannedSelectAllButton: document.querySelector('#planned-select-all-button'), diagProxy: document.querySelector('#komoot-diag-proxy'), diagMode: document.querySelector('#komoot-diag-mode'), diagChecked: document.querySelector('#komoot-diag-checked'), diagError: document.querySelector('#komoot-diag-error'), replayTrackTitle: document.querySelector('#replay-track-title'), replayTrackSubtitle: document.querySelector('#replay-track-subtitle'), replayViewButtons: [...document.querySelectorAll('[data-replay-view]')], replayRestartButton: document.querySelector('#replay-restart-button'), replayPlayButton: document.querySelector('#replay-play-button'), replayPauseButton: document.querySelector('#replay-pause-button'), replayBackButton: document.querySelector('#replay-back-button'), replayForwardButton: document.querySelector('#replay-forward-button'), replayJumpStartButton: document.querySelector('#replay-jump-start-button'), replayJumpHighButton: document.querySelector('#replay-jump-high-button'), replayJumpPhotoButton: document.querySelector('#replay-jump-photo-button'), replayJumpEndButton: document.querySelector('#replay-jump-end-button'), replaySpeedSelect: document.querySelector('#replay-speed-select'), replayModeButtons: [...document.querySelectorAll('[data-replay-mode]')], replayCamera2dRow: document.querySelector('#replay-camera-2d-row'), replayCamera3dRow: document.querySelector('#replay-camera-3d-row'), replayCamera2dButtons: [...document.querySelectorAll('[data-replay-camera-2d]')], replayCameraButtons: [...document.querySelectorAll('[data-replay-camera]')], replayFollowCameraInput: document.querySelector('#replay-follow-camera-input'), replayShowPhotosInput: document.querySelector('#replay-show-photos-input'), replayShowProfileInput: document.querySelector('#replay-show-profile-input'), replayMap2d: document.querySelector('#replay-map-2d'), replayMap3d: document.querySelector('#replay-map-3d'), replayDistanceValue: document.querySelector('#replay-distance-value'), replayAltitudeValue: document.querySelector('#replay-altitude-value'), replayGradeValue: document.querySelector('#replay-grade-value'), replayTimeValue: document.querySelector('#replay-time-value'), replayProfilePanel: document.querySelector('#replay-profile-panel'), replayProfileTrackName: document.querySelector('#replay-profile-track-name'), replayAscentValue: document.querySelector('#replay-ascent-value'), replayDescentValue: document.querySelector('#replay-descent-value'), replaySpeedValue: document.querySelector('#replay-speed-value'), replayPointValue: document.querySelector('#replay-point-value'), replayDirectionValue: document.querySelector('#replay-direction-value'), replayProfileEmpty: document.querySelector('#replay-profile-empty'), replayProfileChartShell: document.querySelector('#replay-profile-chart-shell'), replayProfileChart: document.querySelector('#replay-profile-chart'), accountDialog: document.querySelector('#account-dialog'), accountEmailInput: document.querySelector('#account-email-input'), accountPasswordInput: document.querySelector('#account-password-input'), saveAccountButton: document.querySelector('#save-account-button'), settingsDialog: document.querySelector('#settings-dialog'), helpDialog: document.querySelector('#help-dialog'), helpStatus: document.querySelector('#help-status'), helpContent: document.querySelector('#help-content'), exportBackupButton: document.querySelector('#export-backup-button'), backupInput: document.querySelector('#backup-input'), exportTourBackupButton: document.querySelector('#export-tour-backup-button'), settingsExportTourBackupButton: document.querySelector('#settings-export-tour-backup-button'), tourBackupInput: document.querySelector('#tour-backup-input'), languageSelect: document.querySelector('#language-select'), trackWidthInput: document.querySelector('#track-width-input'), trackWidthValue: document.querySelector('#track-width-value'), trackItemTemplate: document.querySelector('#track-item-template'), accountItemTemplate: document.querySelector('#account-item-template'), tourItemTemplate: document.querySelector('#tour-item-template'), stagingItemTemplate: document.querySelector('#staging-item-template'), trackDetailDialog: document.querySelector('#track-detail-dialog'), trackDetailTitle: document.querySelector('#track-detail-title'), trackDetailSubtitle: document.querySelector('#track-detail-subtitle'), trackDetailEditBlock: document.querySelector('#track-detail-edit-block'), trackDetailNameInput: document.querySelector('#track-detail-name-input'), trackDetailFavoriteInput: document.querySelector('#track-detail-favorite-input'), trackDetailTagsInput: document.querySelector('#track-detail-tags-input'), trackDetailDescriptionInput: document.querySelector('#track-detail-description-input'), trackDetailFacts: document.querySelector('#track-detail-facts'), trackDetailDescription: document.querySelector('#track-detail-description'), trackDetailAnalysis: document.querySelector('#track-detail-analysis'), trackDetailPhotos: document.querySelector('#track-detail-photos'), trackDetailEditButton: document.querySelector('#track-detail-edit-button'), trackDetailSaveButton: document.querySelector('#track-detail-save-button'), trackDetailCancelButton: document.querySelector('#track-detail-cancel-button'),
+workspaceButtons: [...document.querySelectorAll('.workspace-button[data-workspace]')], settingsButton: document.querySelector('#open-settings-button'), helpButton: document.querySelector('#open-help-button'), toggleSidebarCompactButton: document.querySelector('#toggle-sidebar-compact-button'), toggleLibraryCompactButton: document.querySelector('#toggle-library-compact-button'), libraryWorkspace: document.querySelector('#library-workspace'), komootWorkspace: document.querySelector('#komoot-workspace'), replayWorkspace: document.querySelector('#replay-workspace'), statusToast: document.querySelector('#status-toast'), komootStatusPill: document.querySelector('#komoot-status-pill'), addAccountButton: document.querySelector('#add-account-button'), accountsList: document.querySelector('#accounts-list'), fileInput: document.querySelector('#file-input'), exportSelectedGpxButton: document.querySelector('#export-selected-gpx-button'), exportSelectedGpxMenu: document.querySelector('#export-selected-gpx-menu'), exportSelectedMultiTrackGpxButton: document.querySelector('#export-selected-multitrack-gpx-button'), mergeSelectedTracksButton: document.querySelector('#merge-selected-tracks-button'), trackList: document.querySelector('#track-list'), onboardingPanel: document.querySelector('#onboarding-panel'), onboardingSteps: document.querySelector('#onboarding-steps'), onboardingKomootButton: document.querySelector('#onboarding-komoot-button'), onboardingReplayButton: document.querySelector('#onboarding-replay-button'), onboardingHint: document.querySelector('#onboarding-hint'), librarySearchInput: document.querySelector('#library-search-input'), libraryTypeFilter: document.querySelector('#library-type-filter'), libraryFavoriteFilter: document.querySelector('#library-favorite-filter'), librarySportFilter: document.querySelector('#library-sport-filter'), libraryTagFilter: document.querySelector('#library-tag-filter'), libraryMetaFilter: document.querySelector('#library-meta-filter'), librarySortSelect: document.querySelector('#library-sort-select'), fitAllButton: document.querySelector('#fit-all-button'), mapPhotoModeButton: document.querySelector('#map-photo-mode-button'), prevTrackButton: document.querySelector('#prev-track-button'), nextTrackButton: document.querySelector('#next-track-button'), resizeHandles: [...document.querySelectorAll('[data-resize-handle]')], toggleSelectionButton: document.querySelector('#toggle-selection-button'), libraryToggleSelectionButton: document.querySelector('#library-toggle-selection-button'), selectionStats: document.querySelector('#selection-stats'), distanceStats: document.querySelector('#distance-stats'), pointStats: document.querySelector('#point-stats'), profileTrackName: document.querySelector('#profile-track-name'), profileDistance: document.querySelector('#profile-distance'), profileElevationRange: document.querySelector('#profile-elevation-range'), profileAscent: document.querySelector('#profile-ascent'), profileDescent: document.querySelector('#profile-descent'), profileAvgSpeed: document.querySelector('#profile-avg-speed'), profileSegmentSummary: document.querySelector('#profile-segment-summary'), profileSurfaceBreakdown: document.querySelector('#profile-surface-breakdown'), profileWaytypeBreakdown: document.querySelector('#profile-waytype-breakdown'), profileEmpty: document.querySelector('#profile-empty'), profileChartShell: document.querySelector('#profile-chart-shell'), profileChart: document.querySelector('#profile-chart'), profileCursorInfo: document.querySelector('#profile-cursor-info'), profileCursorAfter: document.querySelector('#profile-cursor-after'), profileCursorAltitude: document.querySelector('#profile-cursor-altitude'), profileCursorGrade: document.querySelector('#profile-cursor-grade'), selectionList: document.querySelector('#selection-list'), recentList: document.querySelector('#staging-list'), recentSummary: document.querySelector('#staging-summary'), librarySummary: document.querySelector('#library-summary'), komootAccountSelect: document.querySelector('#komoot-account-select'), komootLoadButton: document.querySelector('#komoot-load-button'), komootImportButton: document.querySelector('#komoot-import-button'), komootProgress: document.querySelector('#komoot-progress'), komootProgressLabel: document.querySelector('#komoot-progress-label'), komootProgressValue: document.querySelector('#komoot-progress-value'), komootProgressBar: document.querySelector('#komoot-progress-bar'), recordedList: document.querySelector('#recorded-tour-list'), plannedList: document.querySelector('#planned-tour-list'), recordedSummary: document.querySelector('#recorded-summary'), plannedSummary: document.querySelector('#planned-summary'), recordedSelectAllButton: document.querySelector('#recorded-select-all-button'), plannedSelectAllButton: document.querySelector('#planned-select-all-button'), diagProxy: document.querySelector('#komoot-diag-proxy'), diagMode: document.querySelector('#komoot-diag-mode'), diagChecked: document.querySelector('#komoot-diag-checked'), diagError: document.querySelector('#komoot-diag-error'), replayTrackTitle: document.querySelector('#replay-track-title'), replayTrackSubtitle: document.querySelector('#replay-track-subtitle'), replayViewButtons: [...document.querySelectorAll('[data-replay-view]')], replayRestartButton: document.querySelector('#replay-restart-button'), replayPlayButton: document.querySelector('#replay-play-button'), replayPauseButton: document.querySelector('#replay-pause-button'), replayBackButton: document.querySelector('#replay-back-button'), replayForwardButton: document.querySelector('#replay-forward-button'), replayJumpStartButton: document.querySelector('#replay-jump-start-button'), replayJumpHighButton: document.querySelector('#replay-jump-high-button'), replayJumpPhotoButton: document.querySelector('#replay-jump-photo-button'), replayJumpEndButton: document.querySelector('#replay-jump-end-button'), replaySpeedSelect: document.querySelector('#replay-speed-select'), replayModeButtons: [...document.querySelectorAll('[data-replay-mode]')], replayCamera2dRow: document.querySelector('#replay-camera-2d-row'), replayCamera3dRow: document.querySelector('#replay-camera-3d-row'), replayCamera2dButtons: [...document.querySelectorAll('[data-replay-camera-2d]')], replayCameraButtons: [...document.querySelectorAll('[data-replay-camera]')], replayFollowCameraInput: document.querySelector('#replay-follow-camera-input'), replayShowPhotosInput: document.querySelector('#replay-show-photos-input'), replayShowProfileInput: document.querySelector('#replay-show-profile-input'), replayMap2d: document.querySelector('#replay-map-2d'), replayMap3d: document.querySelector('#replay-map-3d'), replayDirectionOverlay: document.querySelector('#replay-direction-overlay'), replayDirectionOverlayToggle: document.querySelector('#replay-direction-overlay-toggle'), replayDirectionOverlayIcon: document.querySelector('#replay-direction-overlay-icon'), replayDistanceValue: document.querySelector('#replay-distance-value'), replayAltitudeValue: document.querySelector('#replay-altitude-value'), replayGradeValue: document.querySelector('#replay-grade-value'), replayTimeValue: document.querySelector('#replay-time-value'), replayProfilePanel: document.querySelector('#replay-profile-panel'), replayProfileTrackName: document.querySelector('#replay-profile-track-name'), replayAscentValue: document.querySelector('#replay-ascent-value'), replayDescentValue: document.querySelector('#replay-descent-value'), replaySpeedValue: document.querySelector('#replay-speed-value'), replayPointValue: document.querySelector('#replay-point-value'), replayDirectionValue: document.querySelector('#replay-direction-value'), replayProfileEmpty: document.querySelector('#replay-profile-empty'), replayProfileChartShell: document.querySelector('#replay-profile-chart-shell'), replayProfileChart: document.querySelector('#replay-profile-chart'), accountDialog: document.querySelector('#account-dialog'), accountEmailInput: document.querySelector('#account-email-input'), accountPasswordInput: document.querySelector('#account-password-input'), saveAccountButton: document.querySelector('#save-account-button'), settingsDialog: document.querySelector('#settings-dialog'), helpDialog: document.querySelector('#help-dialog'), helpStatus: document.querySelector('#help-status'), helpContent: document.querySelector('#help-content'), exportBackupButton: document.querySelector('#export-backup-button'), backupInput: document.querySelector('#backup-input'), exportTourBackupButton: document.querySelector('#export-tour-backup-button'), settingsExportTourBackupButton: document.querySelector('#settings-export-tour-backup-button'), tourBackupInput: document.querySelector('#tour-backup-input'), languageSelect: document.querySelector('#language-select'), trackWidthInput: document.querySelector('#track-width-input'), trackWidthValue: document.querySelector('#track-width-value'), trackItemTemplate: document.querySelector('#track-item-template'), accountItemTemplate: document.querySelector('#account-item-template'), tourItemTemplate: document.querySelector('#tour-item-template'), stagingItemTemplate: document.querySelector('#staging-item-template'), trackDetailDialog: document.querySelector('#track-detail-dialog'), trackDetailTitle: document.querySelector('#track-detail-title'), trackDetailSubtitle: document.querySelector('#track-detail-subtitle'), trackDetailEditBlock: document.querySelector('#track-detail-edit-block'), trackDetailNameInput: document.querySelector('#track-detail-name-input'), trackDetailFavoriteInput: document.querySelector('#track-detail-favorite-input'), trackDetailTagsInput: document.querySelector('#track-detail-tags-input'), trackDetailDescriptionInput: document.querySelector('#track-detail-description-input'), trackDetailFacts: document.querySelector('#track-detail-facts'), trackDetailDescription: document.querySelector('#track-detail-description'), trackDetailAnalysis: document.querySelector('#track-detail-analysis'), trackDetailPhotos: document.querySelector('#track-detail-photos'), trackDetailEditButton: document.querySelector('#track-detail-edit-button'), trackDetailSaveButton: document.querySelector('#track-detail-save-button'), trackDetailCancelButton: document.querySelector('#track-detail-cancel-button'),
   photoDialog: document.querySelector('#photo-dialog'), photoDialogTitle: document.querySelector('#photo-dialog-title'), photoDialogSubtitle: document.querySelector('#photo-dialog-subtitle'), photoDialogStage: document.querySelector('#photo-dialog-stage'), photoDialogImage: document.querySelector('#photo-dialog-image'), photoDialogCaption: document.querySelector('#photo-dialog-caption'), photoDialogMeta: document.querySelector('#photo-dialog-meta'), photoDialogThumbs: document.querySelector('#photo-dialog-thumbs'), photoDialogPrev: document.querySelector('#photo-dialog-prev'), photoDialogNext: document.querySelector('#photo-dialog-next'), photoDialogClose: document.querySelector('#photo-dialog-close'),
-  confirmDialog: document.querySelector('#confirm-dialog'), confirmDialogTitle: document.querySelector('#confirm-dialog-title'), confirmDialogMessage: document.querySelector('#confirm-dialog-message'), confirmDialogConfirm: document.querySelector('#confirm-dialog-confirm'), confirmDialogCancel: document.querySelector('#confirm-dialog-cancel')
+  confirmDialog: document.querySelector('#confirm-dialog'), confirmDialogTitle: document.querySelector('#confirm-dialog-title'), confirmDialogMessage: document.querySelector('#confirm-dialog-message'), confirmDialogConfirm: document.querySelector('#confirm-dialog-confirm'), confirmDialogCancel: document.querySelector('#confirm-dialog-cancel'), mergeDialog: document.querySelector('#merge-dialog'), mergeDialogFirstName: document.querySelector('#merge-track-first-name'), mergeDialogFirstMeta: document.querySelector('#merge-track-first-meta'), mergeDialogSecondName: document.querySelector('#merge-track-second-name'), mergeDialogSecondMeta: document.querySelector('#merge-track-second-meta'), mergeDialogSwapButton: document.querySelector('#merge-dialog-swap-button'), mergeDialogConfirm: document.querySelector('#merge-dialog-confirm')
 };
 
 Object.assign(el, {
@@ -36,6 +48,9 @@ Object.assign(el, {
   reloadAppButton: document.querySelector('#reload-app-button'),
   updateStatus: document.querySelector('#update-status'),
   mapHeatmapButton: document.querySelector('#map-heatmap-button'),
+  mapSegmentButton: document.querySelector('#map-segment-button'),
+  segmentHelpSurfaceItems: document.querySelector('#segment-help-surface-items'),
+  segmentHelpWaytypeItems: document.querySelector('#segment-help-waytype-items'),
   shareAppButton: document.querySelector('#share-app-button'),
   exportSelectedTourBackupButton: document.querySelector('#export-selected-tour-backup-button'),
   settingsExportSelectedTourBackupButton: document.querySelector('#settings-export-selected-tour-backup-button')
@@ -49,6 +64,7 @@ let updateInProgress = false;
 let reloadInProgress = false;
 let lastAutoUpdateCheckAt = 0;
 let komootRestoreRaf = 0;
+let statusToastTimer = 0;
 
 const lang = () => (state.settings.language && state.settings.language !== 'auto' ? state.settings.language : (translations[navigator.language.slice(0, 2)] ? navigator.language.slice(0, 2) : 'de'));
 const t = (key, params = {}) => Object.entries(params).reduce((v, [k, r]) => v.replaceAll(`{${k}}`, String(r)), (translations[lang()][key] ?? translations.de[key] ?? key));
@@ -86,6 +102,7 @@ const trackTypeLabel = (value) => value === 'planned' ? t('typePlanned') : value
 const trackSourceLabel = (value) => value === 'komoot' ? t('trackSourceKomoot') : value === 'backup' ? t('trackSourceBackup') : t('trackSourceLocal');
 const signature = (track) => `${track.source}|${track.accountEmail ?? ''}|${track.sourceTrackId ?? ''}|${track.name}|${track.dateStart ?? ''}|${track.pointCount ?? 0}`;
 const remoteTrackKey = (track) => track?.source && track?.accountEmail && track?.sourceTrackId ? `${track.source}|${track.accountEmail}|${track.sourceTrackId}` : null;
+const komootTrackUrl = (track) => track?.source === 'komoot' && track?.sourceTrackId ? `https://www.komoot.de/tour/${track.sourceTrackId}` : null;
 const isoNow = () => new Date().toISOString();
 function trackLastChanged(track) {
   return track?.lastChanged || track?.updatedAt || track?.importedAt || null;
@@ -170,6 +187,15 @@ async function get(store, key) { return reqToPromise(state.db.transaction(store,
 async function put(store, value) { const tx = state.db.transaction(store, 'readwrite'); tx.objectStore(store).put(value); return new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
 async function putMany(store, values) { const tx = state.db.transaction(store, 'readwrite'); values.forEach((value) => tx.objectStore(store).put(value)); return new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
 async function del(store, key) { const tx = state.db.transaction(store, 'readwrite'); tx.objectStore(store).delete(key); return new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+async function getMany(store, keys) {
+  const uniqueKeys = [...new Set((keys || []).filter(Boolean))];
+  if (!uniqueKeys.length) return [];
+  const tx = state.db.transaction(store, 'readonly');
+  const objectStore = tx.objectStore(store);
+  const requests = uniqueKeys.map((key) => reqToPromise(objectStore.get(key)));
+  const values = await Promise.all(requests);
+  return values.filter(Boolean);
+}
 async function saveSettings() { await put(STORES.settings, { ...state.settings, id: 'app' }); }
 function normalizeKomootTourSummary(tour, account) {
   return {
@@ -271,7 +297,23 @@ function endPaneResize() {
   saveSettings().catch(() => {});
 }
 
-function setStatus(message, error = false) { el.statusPill.textContent = message; el.statusPill.style.color = error ? 'var(--danger)' : 'var(--muted)'; }
+function setStatus(message, error = false) {
+  if (!el.statusToast) return;
+  if (statusToastTimer) {
+    window.clearTimeout(statusToastTimer);
+    statusToastTimer = 0;
+  }
+  el.statusToast.textContent = message;
+  el.statusToast.hidden = false;
+  el.statusToast.classList.toggle('is-error', !!error);
+  el.statusToast.classList.add('is-visible');
+  statusToastTimer = window.setTimeout(() => {
+    el.statusToast.classList.remove('is-visible');
+    window.setTimeout(() => {
+      if (!el.statusToast.classList.contains('is-visible')) el.statusToast.hidden = true;
+    }, 180);
+  }, error ? 4200 : 2600);
+}
 function setKomootStatus(message, error = false) { el.komootStatusPill.textContent = message; el.komootStatusPill.style.color = error ? 'var(--danger)' : 'var(--muted)'; }
 function confirmAction(message, { title = null, confirmLabel = null, cancelLabel = null } = {}) {
   return new Promise((resolve) => {
@@ -637,6 +679,9 @@ function normalizePhotos(photos) {
 function photoDisplayUrl(photo) {
   return photo?.objectUrl || photo?.externalUrl || photo?.sourceUrl || photo?.url || '';
 }
+function collectTrackPhotoBlobIds(tracks) {
+  return [...new Set((tracks || []).flatMap((track) => normalizePhotos(track?.photos).map((photo) => photo.blobId).filter(Boolean)))];
+}
 async function hydrateTrackPhotos(track, photoBlobMap = null) {
   const photos = normalizePhotos(track.photos).map((photo) => ({ ...photo }));
   for (const photo of photos) {
@@ -653,7 +698,7 @@ async function hydrateTrackPhotos(track, photoBlobMap = null) {
   return { ...track, photos };
 }
 async function hydrateTracksPhotos(tracks) {
-  const photoRecords = await all(STORES.photos);
+  const photoRecords = await getMany(STORES.photos, collectTrackPhotoBlobIds(tracks));
   const photoBlobMap = new Map(photoRecords.map((entry) => [entry.id, entry]));
   const hydrated = [];
   for (const track of tracks) hydrated.push(await hydrateTrackPhotos(track, photoBlobMap));
@@ -782,7 +827,7 @@ function markerIconHtml(label, color, highlighted) {
   return `<span class="km-marker${highlighted ? ' is-highlighted' : ''}" style="--marker-color:${color}">${label}</span>`;
 }
 function arrowIconHtml(color, rotation, highlighted) {
-    return `<span class="track-arrow${highlighted ? ' is-highlighted' : ''}" style="--arrow-color:${color}; --arrow-rotation:${rotation - 90}deg"></span>`;
+    return `<span class="track-arrow${highlighted ? ' is-highlighted' : ''}" style="--arrow-color:${color}; --arrow-rotation:${(rotation ?? 0) + 90}deg"></span>`;
   }
   function replayMarkerIconHtml(rotation) {
     return `<span class="replay-marker-arrow" style="--replay-arrow-rotation:${(rotation ?? 0) + 90}deg"></span>`;
@@ -924,6 +969,8 @@ function parseGpx(text) {
 function buildTrackRecord({ gpxText, fileName, source, type, account, description = null, photos = null, meta = null }) {
   const parsed = parseGpx(gpxText);
   const timestamp = isoNow();
+  const surfaceSegments = normalizeRangeSegments(meta?.surfaceSegments);
+  const wayTypeSegments = normalizeRangeSegments(meta?.wayTypeSegments);
   const track = {
     id: id('track'),
     name: parsed.name || fileName?.replace(/\.gpx$/i, '') || t('unnamedTrack'),
@@ -935,6 +982,7 @@ function buildTrackRecord({ gpxText, fileName, source, type, account, descriptio
     accountEmail: account?.email ?? null,
     accountLabel: account?.label ?? null,
     sourceTrackId: account?.sourceTrackId ?? null,
+    komootUrl: source === 'komoot' && account?.sourceTrackId ? `https://www.komoot.de/tour/${account.sourceTrackId}` : null,
     importedAt: timestamp,
     lastChanged: timestamp,
     dateStart: source === 'komoot' ? resolveTrackDate(meta?.dateStart, parsed.dateStart) : resolveTrackDate(parsed.dateStart, meta?.dateStart),
@@ -948,8 +996,10 @@ function buildTrackRecord({ gpxText, fileName, source, type, account, descriptio
     durationHours: meta?.durationHours ?? parsed.durationHours ?? null,
     avgSpeedKmh: meta?.durationHours ? Number((parsed.distanceKm / meta.durationHours).toFixed(1)) : parsed.avgSpeedKmh ?? null,
     sport: meta?.sport ?? null,
-    surfaces: normalizeTagList(meta?.surfaces),
-    wayTypes: normalizeTagList(meta?.wayTypes),
+    surfaces: normalizeTagList(meta?.surfaces).length ? normalizeTagList(meta?.surfaces) : segmentValues(surfaceSegments),
+    wayTypes: normalizeTagList(meta?.wayTypes).length ? normalizeTagList(meta?.wayTypes) : segmentValues(wayTypeSegments),
+    surfaceSegments,
+    wayTypeSegments,
     directions: normalizeDirections(meta?.directions),
     favorite: false,
     tags: [],
@@ -961,23 +1011,204 @@ function buildTrackRecord({ gpxText, fileName, source, type, account, descriptio
   track.signature = signature(track); return track;
 }
 
+function normalizedElementLabel(value) {
+  return cleanText(typeof value === 'string' ? value.replace(/^[a-z]+#/, '') : value);
+}
+const DETAIL_VALUE_LABELS = {
+  asphalt: { de: 'Asphalt', en: 'Asphalt', fr: 'Asphalte' },
+  paved: { de: 'Befestigt', en: 'Paved', fr: 'Revetu' },
+  paving_stones: { de: 'Pflastersteine', en: 'Paving stones', fr: 'Paves' },
+  compacted: { de: 'Verdichtet', en: 'Compacted', fr: 'Compacte' },
+  fine_gravel: { de: 'Feiner Schotter', en: 'Fine gravel', fr: 'Gravier fin' },
+  gravel: { de: 'Schotter', en: 'Gravel', fr: 'Gravier' },
+  cobblestone: { de: 'Kopfsteinpflaster', en: 'Cobblestone', fr: 'Paves anciens' },
+  unpaved: { de: 'Unbefestigt', en: 'Unpaved', fr: 'Non revetu' },
+  ground: { de: 'Naturboden', en: 'Ground', fr: 'Sol naturel' },
+  dirt: { de: 'Erde', en: 'Dirt', fr: 'Terre' },
+  grass: { de: 'Wiese', en: 'Grass', fr: 'Herbe' },
+  sand: { de: 'Sand', en: 'Sand', fr: 'Sable' },
+  cycleway: { de: 'Radweg', en: 'Cycleway', fr: 'Piste cyclable' },
+  minor_road: { de: 'Nebenstrasse', en: 'Minor road', fr: 'Route secondaire' },
+  track: { de: 'Wirtschaftsweg', en: 'Track', fr: 'Piste' },
+  path: { de: 'Pfad', en: 'Path', fr: 'Sentier' },
+  street: { de: 'Strasse', en: 'Street', fr: 'Rue' },
+  road: { de: 'Strasse', en: 'Road', fr: 'Route' },
+  service_road: { de: 'Serviceweg', en: 'Service road', fr: 'Voie de service' },
+  footpath: { de: 'Fussweg', en: 'Footpath', fr: 'Chemin pieton' },
+  singletrack: { de: 'Singletrail', en: 'Singletrack', fr: 'Singletrack' },
+  way: { de: 'Pfad', en: 'Path', fr: 'Sentier' },
+  trail_d1: { de: 'Wanderpfad', en: 'Hiking trail', fr: 'Sentier de randonnee' },
+  trail_d2: { de: 'Bergwanderpfad', en: 'Mountain trail', fr: 'Sentier de montagne' }
+};
+const DIRECTION_VALUE_LABELS = {
+  s: { de: 'Start', en: 'Start', fr: 'Depart' },
+  tls: { de: 'Ampel', en: 'Traffic lights', fr: 'Feu tricolore' },
+  tl: { de: 'Links abbiegen', en: 'Turn left', fr: 'Tourner a gauche' },
+  tr: { de: 'Rechts abbiegen', en: 'Turn right', fr: 'Tourner a droite' },
+  tsl: { de: 'Leicht links abbiegen', en: 'Turn slight left', fr: 'Tourner legerement a gauche' },
+  tsr: { de: 'Leicht rechts abbiegen', en: 'Turn slight right', fr: 'Tourner legerement a droite' },
+  ts: { de: 'Geradeaus weiter', en: 'Continue straight', fr: 'Continuer tout droit' },
+  tfl: { de: 'Scharf links abbiegen', en: 'Turn far left', fr: 'Tourner fortement a gauche' },
+  tfr: { de: 'Scharf rechts abbiegen', en: 'Turn far right', fr: 'Tourner fortement a droite' },
+  kl: { de: 'Links halten', en: 'Keep left', fr: 'Rester a gauche' },
+  kr: { de: 'Rechts halten', en: 'Keep right', fr: 'Rester a droite' },
+  sl: { de: 'Leicht links', en: 'Slight left', fr: 'Legerement a gauche' },
+  sr: { de: 'Leicht rechts', en: 'Slight right', fr: 'Legerement a droite' },
+  shl: { de: 'Scharf links', en: 'Sharp left', fr: 'Fort a gauche' },
+  shr: { de: 'Scharf rechts', en: 'Sharp right', fr: 'Fort a droite' },
+  c: { de: 'Geradeaus', en: 'Continue straight', fr: 'Tout droit' },
+  tu: { de: 'Wenden', en: 'Make a U-turn', fr: 'Faire demi-tour' },
+  traffic_lights: { de: 'Ampel', en: 'Traffic lights', fr: 'Feu tricolore' },
+  departure: { de: 'Start', en: 'Start', fr: 'Depart' },
+  start: { de: 'Start', en: 'Start', fr: 'Depart' },
+  destination: { de: 'Ziel', en: 'Destination', fr: 'Arrivee' },
+  finish: { de: 'Ziel', en: 'Finish', fr: 'Arrivee' },
+  straight: { de: 'Geradeaus', en: 'Straight ahead', fr: 'Tout droit' },
+  continue: { de: 'Weiter', en: 'Continue', fr: 'Continuer' },
+  continue_straight: { de: 'Geradeaus weiter', en: 'Continue straight', fr: 'Continuer tout droit' },
+  turn_left: { de: 'Links abbiegen', en: 'Turn left', fr: 'Tourner a gauche' },
+  turn_right: { de: 'Rechts abbiegen', en: 'Turn right', fr: 'Tourner a droite' },
+  slight_left: { de: 'Leicht links', en: 'Slight left', fr: 'Legerement a gauche' },
+  slight_right: { de: 'Leicht rechts', en: 'Slight right', fr: 'Legerement a droite' },
+  sharp_left: { de: 'Scharf links', en: 'Sharp left', fr: 'Fort a gauche' },
+  sharp_right: { de: 'Scharf rechts', en: 'Sharp right', fr: 'Fort a droite' },
+  keep_left: { de: 'Links halten', en: 'Keep left', fr: 'Rester a gauche' },
+  keep_right: { de: 'Rechts halten', en: 'Keep right', fr: 'Rester a droite' },
+  u_turn: { de: 'Wenden', en: 'Make a U-turn', fr: 'Faire demi-tour' },
+  uturn: { de: 'Wenden', en: 'Make a U-turn', fr: 'Faire demi-tour' },
+  roundabout: { de: 'Kreisverkehr', en: 'Roundabout', fr: 'Rond-point' },
+  enter_roundabout: { de: 'In den Kreisverkehr', en: 'Enter roundabout', fr: 'Entrer dans le rond-point' },
+  exit_roundabout: { de: 'Kreisverkehr verlassen', en: 'Exit roundabout', fr: 'Sortir du rond-point' },
+  merge: { de: 'Einfaedeln', en: 'Merge', fr: 'S inserer' },
+  fork: { de: 'Gabelung', en: 'Fork', fr: 'Bifurcation' },
+  ferry: { de: 'Faehre', en: 'Ferry', fr: 'Ferry' },
+  stairs: { de: 'Treppe', en: 'Stairs', fr: 'Escaliers' },
+  tunnel: { de: 'Tunnel', en: 'Tunnel', fr: 'Tunnel' }
+};
+function displayDetailValue(value) {
+  const key = `${value ?? ''}`.trim().toLowerCase();
+  if (!key) return '';
+  const mapped = DETAIL_VALUE_LABELS[key];
+  if (mapped) return mapped[lang()] || mapped.de || mapped.en || value;
+  return key.replaceAll('_', ' ').replace(/\b\w/g, (match) => match.toUpperCase());
+}
+function directionValueLabel(value) {
+  const key = cleanText(value).toLowerCase();
+  if (!key) return '';
+  const mapped = DIRECTION_VALUE_LABELS[key];
+  if (mapped) return mapped[lang()] || mapped.de || mapped.en || value;
+  return '';
+}
+function directionLooksTechnical(value) {
+  const text = cleanText(value);
+  if (!text) return false;
+  return /^[A-Z0-9_#-]{2,}$/.test(text) || /^[a-z0-9_]+$/.test(text);
+}
+function humanizeDirectionFallback(value) {
+  return cleanText(value).replaceAll('_', ' ').replace(/\b\w/g, (match) => match.toUpperCase());
+}
+function translateDirectionText(value) {
+  const text = cleanText(value);
+  if (!text) return '';
+  const exact = directionValueLabel(text);
+  if (exact) return exact;
+  const replaced = text.replace(/\b[A-Za-z0-9_#-]+\b/g, (token) => {
+    const translated = directionValueLabel(token);
+    return translated || token;
+  });
+  if (replaced !== text) return replaced;
+  if (directionLooksTechnical(text)) return humanizeDirectionFallback(text);
+  return text;
+}
+function uniqueTextList(values) { return [...new Set((values ?? []).map((value) => cleanText(value)).filter(Boolean))]; }
 function normalizeTagList(value) {
-  if (Array.isArray(value)) return value.map((item) => cleanText(item?.name || item?.type || item)).filter(Boolean);
+  if (Array.isArray(value)) return uniqueTextList(value.map((item) => item?.name || item?.type || item?.label || item?.surface || item?.surface_type || item?.way_type || item?.wayType || item?.value || item?.slug || normalizedElementLabel(item?.element) || item));
+  if (value && typeof value === 'object') {
+    const nested = [
+      ...(Array.isArray(value.items) ? value.items : []),
+      ...(Array.isArray(value.values) ? value.values : []),
+      ...(Array.isArray(value.surfaces) ? value.surfaces : []),
+      ...(Array.isArray(value.way_types) ? value.way_types : []),
+      ...(Array.isArray(value.wayTypes) ? value.wayTypes : []),
+    ];
+    if (nested.length) return uniqueTextList(nested.map((item) => item?.name || item?.type || item?.label || item?.surface || item?.surface_type || item?.way_type || item?.wayType || item?.value || item?.slug || normalizedElementLabel(item?.element) || item));
+  }
   return [];
+}
+function normalizeRangeSegments(value) {
+  const items = Array.isArray(value)
+    ? value
+    : value && typeof value === 'object'
+      ? [
+          ...(Array.isArray(value.items) ? value.items : []),
+          ...(Array.isArray(value.values) ? value.values : []),
+          ...(Array.isArray(value.surfaces) ? value.surfaces : []),
+          ...(Array.isArray(value.way_types) ? value.way_types : []),
+          ...(Array.isArray(value.wayTypes) ? value.wayTypes : []),
+        ]
+      : [];
+  return items.map((item) => {
+    if (!item || typeof item !== 'object') return null;
+    const from = Number(item.from ?? item.start ?? item.begin ?? item.indexFrom);
+    const to = Number(item.to ?? item.end ?? item.stop ?? item.indexTo);
+    const segmentValue = cleanText(item?.value || item?.name || item?.type || item?.label || item?.surface || item?.surface_type || item?.way_type || item?.wayType || item?.slug || normalizedElementLabel(item?.element));
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || !segmentValue) return null;
+    return {
+      from: Math.max(0, Math.round(from)),
+      to: Math.max(0, Math.round(to)),
+      value: segmentValue,
+      raw: cleanText(item?.element || item?.slug || item?.type || item?.name || item?.value) || segmentValue
+    };
+  }).filter(Boolean);
+}
+function segmentValues(segments) {
+  return [...new Set(normalizeRangeSegments(segments).map((segment) => segment.value).filter(Boolean))];
+}
+function segmentPercentages(segments) {
+  const normalized = normalizeRangeSegments(segments);
+  if (!normalized.length) return [];
+  const totals = new Map();
+  let sum = 0;
+  normalized.forEach((segment) => {
+    const span = Math.max(0, Number(segment.to) - Number(segment.from));
+    if (!span || !segment.value) return;
+    totals.set(segment.value, (totals.get(segment.value) || 0) + span);
+    sum += span;
+  });
+  if (!sum) return [];
+  return [...totals.entries()]
+    .map(([value, amount]) => ({ value, percent: Math.round((amount / sum) * 100) }))
+    .filter((item) => item.percent > 0)
+    .sort((a, b) => b.percent - a.percent || a.value.localeCompare(b.value));
+}
+function profileSegmentBreakdownMarkup(segments, type) {
+  const items = segmentPercentages(segments);
+  if (!items.length) return `<span class="map-segment-empty">${t('analysisNone')}</span>`;
+  return items.slice(0, 5).map(({ value, percent }) => {
+    const swatch = type === 'surface'
+      ? `<svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true"><line x1="1" y1="4" x2="31" y2="4" stroke="${surfaceSegmentColor(value)}" stroke-width="4" stroke-linecap="round"></line></svg>`
+      : `<svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true"><line x1="1" y1="4" x2="31" y2="4" stroke="rgba(248, 251, 250, 0.92)" stroke-width="3" stroke-linecap="round" stroke-dasharray="${wayTypeSegmentDash(value)}"></line></svg>`;
+    return `<span class="profile-segment-chip">${swatch}<span>${escapeHtml(displayDetailValue(value))}</span><strong>${percent}%</strong></span>`;
+  }).join('');
 }
 function normalizeDirections(value) {
   if (!Array.isArray(value)) return [];
   return value.map((item, index) => {
-    const instruction = cleanText(item?.instruction || item?.text || item?.name || item?.title || item?.hint);
+    const rawInstruction = cleanText(item?.instruction || item?.text || item?.name || item?.title || item?.hint);
     const distanceRaw = item?.distanceM ?? item?.distance ?? item?.segment_length ?? item?.length ?? null;
     const distanceM = Number.isFinite(Number(distanceRaw)) ? Math.round(Number(distanceRaw)) : null;
-    const type = cleanText(item?.type || item?._type || item?.icon || item?.direction);
-    if (!instruction && !type && !Number.isFinite(distanceM)) return null;
+    const rawType = cleanText(item?.type || item?._type || item?.icon || item?.direction);
+    if (!rawInstruction && !rawType && !Number.isFinite(distanceM)) return null;
+    const instruction = translateDirectionText(rawInstruction || rawType);
+    const type = translateDirectionText(rawType);
     return {
       index,
       instruction: instruction || type || `${t('analysisStepFallback')} ${index + 1}`,
       distanceM,
-      type: type || null
+      prefixDistanceM: Number.isFinite(Number(item?.prefixDistanceM)) ? Math.max(0, Math.round(Number(item.prefixDistanceM))) : 0,
+      type: type || null,
+      rawInstruction: rawInstruction || null,
+      rawType: rawType || null
     };
   }).filter(Boolean);
 }
@@ -1003,45 +1234,75 @@ function iconForSport(value) {
   if (sport.includes('bike') || sport.includes('bicycle') || sport.includes('mtb') || sport.includes('cycle')) return '🚴';
   return '•';
 }
-function metaTags(track) { return [...normalizeTagList(track.surfaces), ...normalizeTagList(track.wayTypes)]; }
-function allSports() { return [...new Set(state.tracks.map((track) => track.sport).filter(Boolean))].sort(); }
-function allMetaTags() { return [...new Set(state.tracks.flatMap((track) => metaTags(track)).filter(Boolean))].sort((a, b) => a.localeCompare(b)); }
-function allCustomTags() { return [...new Set(state.tracks.flatMap((track) => normalizeTagList(track.tags)).filter(Boolean))].sort((a, b) => a.localeCompare(b, lang())); }
+function metaTags(track) {
+  const surfaceTags = segmentValues(track.surfaceSegments);
+  const wayTypeTags = segmentValues(track.wayTypeSegments);
+  return [...new Set([
+    ...(surfaceTags.length ? surfaceTags : normalizeTagList(track.surfaces)),
+    ...(wayTypeTags.length ? wayTypeTags : normalizeTagList(track.wayTypes))
+  ].filter(Boolean))];
+}
+function ensureLibraryDerivedCache() {
+  const currentLanguage = lang();
+  if (libraryDerivedCache.tracksRef === state.tracks && libraryDerivedCache.language === currentLanguage) return libraryDerivedCache;
+  libraryDerivedCache.tracksRef = state.tracks;
+  libraryDerivedCache.language = currentLanguage;
+  libraryDerivedCache.sports = [...new Set(state.tracks.map((track) => track.sport).filter(Boolean))].sort();
+  libraryDerivedCache.metaTags = [...new Set(state.tracks.flatMap((track) => metaTags(track)).filter(Boolean))].sort((a, b) => a.localeCompare(b, lang()));
+  libraryDerivedCache.customTags = [...new Set(state.tracks.flatMap((track) => normalizeTagList(track.tags)).filter(Boolean))].sort((a, b) => a.localeCompare(b, lang()));
+  libraryDerivedCache.filteredKey = '';
+  libraryDerivedCache.filteredTracks = [];
+  libraryDerivedCache.filteredIds = new Set();
+  libraryDerivedCache.selectSignatures = { sport: '', tag: '', meta: '' };
+  return libraryDerivedCache;
+}
+function allSports() { return ensureLibraryDerivedCache().sports; }
+function allMetaTags() { return ensureLibraryDerivedCache().metaTags; }
+function allCustomTags() { return ensureLibraryDerivedCache().customTags; }
+function syncSelectOptions(select, items, currentValue, signatureKey) {
+  if (!select) return;
+  const signature = items.map((item) => `${item.value}:${item.label}`).join('|');
+  if (libraryDerivedCache.selectSignatures[signatureKey] !== signature) {
+    select.replaceChildren();
+    items.forEach((item) => {
+      const option = document.createElement('option');
+      option.value = item.value;
+      option.textContent = item.label;
+      select.append(option);
+    });
+    libraryDerivedCache.selectSignatures[signatureKey] = signature;
+  }
+  select.value = items.some((item) => item.value === currentValue) ? currentValue : 'all';
+}
+function currentLibraryFilterState() {
+  return {
+    q: el.librarySearchInput?.value.trim().toLowerCase() || '',
+    type: el.libraryTypeFilter?.value || 'all',
+    favorite: el.libraryFavoriteFilter?.value || 'all',
+    sport: el.librarySportFilter?.value || 'all',
+    tag: el.libraryTagFilter?.value || 'all',
+    meta: el.libraryMetaFilter?.value || 'all',
+    sort: el.librarySortSelect?.value || 'imported'
+  };
+}
 function renderLibraryFilters() {
+  ensureLibraryDerivedCache();
   const currentFavorite = el.libraryFavoriteFilter.value || 'all';
   const currentSport = el.librarySportFilter.value || 'all';
   const currentTag = el.libraryTagFilter.value || 'all';
   const currentMeta = el.libraryMetaFilter.value || 'all';
-  el.librarySportFilter.replaceChildren();
-  el.libraryTagFilter.replaceChildren();
-  el.libraryMetaFilter.replaceChildren();
   el.libraryFavoriteFilter.value = ['all', 'favorites', 'non-favorites'].includes(currentFavorite) ? currentFavorite : 'all';
-  [{ value: 'all', label: t('filterAllSports') }, ...allSports().map((sport) => ({ value: sport, label: sportLabel(sport) }))].forEach((item) => {
-    const option = document.createElement('option');
-    option.value = item.value;
-    option.textContent = item.label;
-    option.selected = item.value === currentSport;
-    el.librarySportFilter.append(option);
-  });
-  [{ value: 'all', label: t('filterAllTags') }, ...allCustomTags().map((tag) => ({ value: tag, label: tag }))].forEach((item) => {
-    const option = document.createElement('option');
-    option.value = item.value;
-    option.textContent = item.label;
-    option.selected = item.value === currentTag;
-    el.libraryTagFilter.append(option);
-  });
-  if (![...el.libraryTagFilter.options].some((option) => option.value === currentTag)) el.libraryTagFilter.value = 'all';
-  [{ value: 'all', label: t('filterAllDetails') }, ...allMetaTags().map((tag) => ({ value: tag, label: tag }))].forEach((item) => {
-    const option = document.createElement('option');
-    option.value = item.value;
-    option.textContent = item.label;
-    option.selected = item.value === currentMeta;
-    el.libraryMetaFilter.append(option);
-  });
+  syncSelectOptions(el.librarySportFilter, [{ value: 'all', label: t('filterAllSports') }, ...allSports().map((sport) => ({ value: sport, label: sportLabel(sport) }))], currentSport, 'sport');
+  syncSelectOptions(el.libraryTagFilter, [{ value: 'all', label: t('filterAllTags') }, ...allCustomTags().map((tag) => ({ value: tag, label: tag }))], currentTag, 'tag');
+  syncSelectOptions(el.libraryMetaFilter, [{ value: 'all', label: t('filterAllDetails') }, ...allMetaTags().map((tag) => ({ value: tag, label: displayDetailValue(tag) }))], currentMeta, 'meta');
 }
 
 function filteredTracks() {
-  const q = el.librarySearchInput.value.trim().toLowerCase(); const type = el.libraryTypeFilter.value; const favorite = el.libraryFavoriteFilter.value; const sport = el.librarySportFilter.value; const tag = el.libraryTagFilter.value; const meta = el.libraryMetaFilter.value; const sort = el.librarySortSelect.value; let tracks = [...state.tracks];
+  ensureLibraryDerivedCache();
+  const { q, type, favorite, sport, tag, meta, sort } = currentLibraryFilterState();
+  const cacheKey = [q, type, favorite, sport, tag, meta, sort].join('||');
+  if (libraryDerivedCache.tracksRef === state.tracks && libraryDerivedCache.filteredKey === cacheKey) return libraryDerivedCache.filteredTracks;
+  let tracks = [...state.tracks];
   if (type !== 'all') tracks = tracks.filter((track) => track.type === type);
   if (favorite === 'favorites') tracks = tracks.filter((track) => !!track.favorite);
   if (favorite === 'non-favorites') tracks = tracks.filter((track) => !track.favorite);
@@ -1050,7 +1311,24 @@ function filteredTracks() {
   if (meta !== 'all') tracks = tracks.filter((track) => metaTags(track).includes(meta));
   if (q) tracks = tracks.filter((track) => [track.name, track.description, track.accountLabel, track.accountEmail, track.source, track.dateStart, track.sport, ...metaTags(track), ...normalizeTagList(track.tags)].filter(Boolean).join(' ').toLowerCase().includes(q));
   tracks.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'distance' ? (b.distanceKm ?? 0) - (a.distanceKm ?? 0) : sort === 'date' ? `${b.dateStart ?? ''}`.localeCompare(`${a.dateStart ?? ''}`) : (b.importedAt ?? '').localeCompare(a.importedAt ?? ''));
+  libraryDerivedCache.filteredKey = cacheKey;
+  libraryDerivedCache.filteredTracks = tracks;
+  libraryDerivedCache.filteredIds = new Set(tracks.map((track) => track.id));
   return tracks;
+}
+function filteredTrackIdSet() {
+  filteredTracks();
+  return libraryDerivedCache.filteredIds;
+}
+function visibleSelectedTracks() {
+  const visibleIds = filteredTrackIdSet();
+  return state.tracks.filter((track) => state.selectedTrackIds.has(track.id) && visibleIds.has(track.id));
+}
+function refreshLibraryFilterView() {
+  renderLibrary();
+  renderToggleSelectionButton();
+  syncMap();
+  renderProfile();
 }
 function recentTracks() { return [...state.tracks].sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? '')).slice(0, 12); }
 function activeAccount() { return state.accounts.find((account) => account.id === state.settings.activeAccountId) ?? null; }
@@ -1241,15 +1519,13 @@ function trackFactsMarkup(track) {
   if (track.elevationGainM != null) facts.push(createFact('↗', t('labelAscent'), fmtMeters(track.elevationGainM)));
   if (track.elevationLossM != null) facts.push(createFact('↘', t('labelDescent'), fmtMeters(track.elevationLossM)));
   if (track.sport) facts.push(createFact(iconForSport(track.sport), t('labelSport'), sportLabel(track.sport)));
-  normalizeTagList(track.surfaces).slice(0, 2).forEach((item) => facts.push(`<span class="track-tag-chip">${t('labelSurface')}: ${item}</span>`));
-  normalizeTagList(track.wayTypes).slice(0, 2).forEach((item) => facts.push(`<span class="track-tag-chip">${t('labelWayType')}: ${item}</span>`));
   normalizeTagList(track.tags).slice(0, 3).forEach((item) => facts.push(`<span class="track-tag-chip">#${escapeHtml(item)}</span>`));
   return facts.join('');
 }
 function analysisPills(items) {
   const values = normalizeTagList(items);
   if (!values.length) return `<span class="analysis-pill">${t('analysisNone')}</span>`;
-  return values.slice(0, 8).map((item) => `<span class="analysis-pill">${escapeHtml(item)}</span>`).join('');
+  return values.slice(0, 8).map((item) => `<span class="analysis-pill">${escapeHtml(displayDetailValue(item))}</span>`).join('');
 }
 function booleanLabel(value) {
   return value ? t('analysisYes') : t('analysisNo');
@@ -1423,16 +1699,68 @@ function renderTrackExtras(copyNode, track) {
   if (facts) facts.innerHTML = trackFactsMarkup(track);
   renderPhotoGrid(photoStrip, track, 6);
 }
-function openTrackDetail(trackId) {
+function openTrackDetail(trackId, startEditing = false) {
   const track = state.tracks.find((item) => item.id === trackId);
   if (!track) return;
   state.trackDetailUi.trackId = track.id;
-  state.trackDetailUi.editing = false;
+  state.trackDetailUi.editing = !!startEditing;
   renderTrackDetailDialog();
   el.trackDetailDialog.showModal();
+  if (startEditing) {
+    queueMicrotask(() => {
+      el.trackDetailNameInput?.focus();
+      el.trackDetailNameInput?.select();
+    });
+  }
 }
 function allFilteredSelected() { const tracks = filteredTracks(); return tracks.length > 0 && tracks.every((track) => state.selectedTrackIds.has(track.id)); }
 function renderToggleSelectionButton() { if (el.libraryToggleSelectionButton) el.libraryToggleSelectionButton.textContent = allFilteredSelected() ? t('clearSelection') : t('selectAll'); }
+function selectedTracksForMerge() {
+  const preferredOrder = filteredTracks().filter((track) => state.selectedTrackIds.has(track.id) && track.points?.length);
+  const fallback = state.tracks.filter((track) => state.selectedTrackIds.has(track.id) && track.points?.length && !preferredOrder.some((item) => item.id === track.id));
+  const ordered = preferredOrder.concat(fallback);
+  if (state.highlightedTrackId && ordered.some((track) => track.id === state.highlightedTrackId)) {
+    ordered.sort((a, b) => (a.id === state.highlightedTrackId ? -1 : b.id === state.highlightedTrackId ? 1 : 0));
+  }
+  return ordered;
+}
+function renderMergeSelectedTracksButton() {
+  if (!el.mergeSelectedTracksButton) return;
+  const tracks = selectedTracksForMerge();
+  const enabled = tracks.length === 2;
+  el.mergeSelectedTracksButton.disabled = !enabled;
+  el.mergeSelectedTracksButton.setAttribute('title', enabled ? t('mergeSelectedTracks') : t('mergeSelectedTracksNeedTwo'));
+}
+function mergeDialogTracks() {
+  return state.mergeUi.orderedTrackIds.map((trackId) => state.tracks.find((track) => track.id === trackId)).filter(Boolean);
+}
+function renderMergeDialog() {
+  if (!el.mergeDialog) return;
+  const [firstTrack, secondTrack] = mergeDialogTracks();
+  if (el.mergeDialogFirstName) el.mergeDialogFirstName.textContent = firstTrack?.name || t('unnamedTrack');
+  if (el.mergeDialogSecondName) el.mergeDialogSecondName.textContent = secondTrack?.name || t('unnamedTrack');
+  if (el.mergeDialogFirstMeta) {
+    el.mergeDialogFirstMeta.textContent = firstTrack
+      ? t('trackMeta', { distance: fmtKm(firstTrack.distanceKm), points: fmtNum(firstTrack.pointCount), type: trackTypeLabel(firstTrack.type) })
+      : '-';
+  }
+  if (el.mergeDialogSecondMeta) {
+    el.mergeDialogSecondMeta.textContent = secondTrack
+      ? t('trackMeta', { distance: fmtKm(secondTrack.distanceKm), points: fmtNum(secondTrack.pointCount), type: trackTypeLabel(secondTrack.type) })
+      : '-';
+  }
+  if (el.mergeDialogConfirm) el.mergeDialogConfirm.disabled = !(firstTrack && secondTrack);
+}
+function openMergeDialog() {
+  const tracks = selectedTracksForMerge();
+  if (tracks.length !== 2) {
+    setStatus(t('mergeSelectedTracksNeedTwo'), true);
+    return;
+  }
+  state.mergeUi.orderedTrackIds = tracks.map((track) => track.id);
+  renderMergeDialog();
+  if (el.mergeDialog && !el.mergeDialog.open) el.mergeDialog.showModal();
+}
 function trackWidthPresetLabel(value) {
   const weight = Number(value) || 6;
   if (lang() === 'fr') {
@@ -1468,9 +1796,27 @@ function renderMapPhotoModeButton() {
 function renderMapHeatmapButton() {
   if (!el.mapHeatmapButton) return;
   const active = !!state.settings.heatmapMode;
-  el.mapHeatmapButton.disabled = !active && !canRenderHeatmap();
+  const available = canRenderHeatmap();
   el.mapHeatmapButton.classList.toggle('is-active', active);
   el.mapHeatmapButton.setAttribute('aria-pressed', active ? 'true' : 'false');
+  el.mapHeatmapButton.setAttribute('aria-disabled', (!active && !available) ? 'true' : 'false');
+  el.mapHeatmapButton.setAttribute('title', !active && !available ? t('heatmapNeedsMultipleTracks') : t('mapHeatmap'));
+}
+function highlightedTrackWithSegments() {
+  const track = state.tracks.find((item) => item.id === state.highlightedTrackId);
+  if (!track || !state.selectedTrackIds.has(track.id) || !filteredTrackIdSet().has(track.id)) return null;
+  const hasSurfaceSegments = normalizeRangeSegments(track.surfaceSegments).length > 0;
+  const hasWayTypeSegments = normalizeRangeSegments(track.wayTypeSegments).length > 0;
+  return hasSurfaceSegments || hasWayTypeSegments ? track : null;
+}
+function renderMapSegmentButton() {
+  if (!el.mapSegmentButton) return;
+  const active = !!state.settings.segmentOverlayMode;
+  const availableTrack = highlightedTrackWithSegments();
+  el.mapSegmentButton.classList.toggle('is-active', active);
+  el.mapSegmentButton.setAttribute('aria-pressed', active ? 'true' : 'false');
+  el.mapSegmentButton.setAttribute('aria-disabled', (!active && !availableTrack) ? 'true' : 'false');
+  el.mapSegmentButton.setAttribute('title', !active && !availableTrack ? t('segmentOverlayNeedsTrack') : t('mapSegments'));
 }
 function renderPaneCompactButtons() {
   const sidebarCompact = !!state.settings.sidebarCompact;
@@ -1498,7 +1844,7 @@ function renderPaneCompactButtons() {
 }
 
 function renderI18n() {
-  document.documentElement.lang = lang(); document.title = 'Trailthread'; document.querySelectorAll('[data-i18n]').forEach((node) => { node.textContent = t(node.dataset.i18n); }); el.librarySearchInput.placeholder = t('searchPlaceholder'); el.librarySearchInput.setAttribute('aria-label', t('searchPlaceholder')); el.prevTrackButton?.setAttribute('aria-label', lang() === 'fr' ? 'Trace precedente' : lang() === 'en' ? 'Previous track' : 'Vorheriger Track'); el.prevTrackButton?.setAttribute('title', lang() === 'fr' ? 'Trace precedente' : lang() === 'en' ? 'Previous track' : 'Vorheriger Track'); el.nextTrackButton?.setAttribute('aria-label', lang() === 'fr' ? 'Trace suivante' : lang() === 'en' ? 'Next track' : 'Naechster Track'); el.nextTrackButton?.setAttribute('title', lang() === 'fr' ? 'Trace suivante' : lang() === 'en' ? 'Next track' : 'Naechster Track'); el.photoDialogClose?.setAttribute('aria-label', t('closeButton')); el.photoDialogClose?.setAttribute('title', t('closeButton')); [['replayRestartButton', 'replayRestart'], ['replayBackButton', 'replayBack'], ['replayPlayButton', 'replayPlay'], ['replayPauseButton', 'replayStop'], ['replayForwardButton', 'replayForward']].forEach(([ref, key]) => { el[ref]?.setAttribute('aria-label', t(key)); el[ref]?.setAttribute('title', t(key)); }); el.languageSelect.value = state.settings.language ?? 'auto'; renderTrackWidthControl(); renderMapPhotoModeButton(); renderMapHeatmapButton(); renderPaneCompactButtons(); renderReplayControls(); renderVersionLabel();
+  document.documentElement.lang = lang(); document.title = 'Trailthread'; document.querySelectorAll('[data-i18n]').forEach((node) => { node.textContent = t(node.dataset.i18n); }); el.librarySearchInput.placeholder = t('searchPlaceholder'); el.librarySearchInput.setAttribute('aria-label', t('searchPlaceholder')); el.prevTrackButton?.setAttribute('aria-label', lang() === 'fr' ? 'Trace precedente' : lang() === 'en' ? 'Previous track' : 'Vorheriger Track'); el.prevTrackButton?.setAttribute('title', lang() === 'fr' ? 'Trace precedente' : lang() === 'en' ? 'Previous track' : 'Vorheriger Track'); el.nextTrackButton?.setAttribute('aria-label', lang() === 'fr' ? 'Trace suivante' : lang() === 'en' ? 'Next track' : 'Naechster Track'); el.nextTrackButton?.setAttribute('title', lang() === 'fr' ? 'Trace suivante' : lang() === 'en' ? 'Next track' : 'Naechster Track'); el.photoDialogClose?.setAttribute('aria-label', t('closeButton')); el.photoDialogClose?.setAttribute('title', t('closeButton')); [['replayRestartButton', 'replayRestart'], ['replayBackButton', 'replayBack'], ['replayPlayButton', 'replayPlay'], ['replayPauseButton', 'replayStop'], ['replayForwardButton', 'replayForward']].forEach(([ref, key]) => { el[ref]?.setAttribute('aria-label', t(key)); el[ref]?.setAttribute('title', t(key)); }); el.languageSelect.value = state.settings.language ?? 'auto'; renderTrackWidthControl(); renderMapPhotoModeButton(); renderMapHeatmapButton(); renderMapSegmentButton(); renderPaneCompactButtons(); renderReplayControls(); renderVersionLabel();
 }
 function renderOnboardingPanel() {
   if (!el.onboardingPanel) return;
@@ -1555,8 +1901,10 @@ function renderLibrary() {
     const colorInput = frag.querySelector('.track-color-input');
     const copy = frag.querySelector('.track-copy');
     const name = frag.querySelector('.track-name');
+    const komootLinkButton = frag.querySelector('.komoot-link-button');
     const focusButton = frag.querySelector('.focus-button');
     const replayButton = frag.querySelector('.replay-button');
+    const editButton = frag.querySelector('.edit-button');
     const exportButton = frag.querySelector('.export-button');
     const expandButton = frag.querySelector('.expand-button');
     const deleteButton = frag.querySelector('.delete-button');
@@ -1569,6 +1917,7 @@ function renderLibrary() {
     colorInput.value = track.color;
     name.textContent = track.name;
     renderTrackExtras(copy, track);
+    const originalTrackUrl = track.komootUrl || komootTrackUrl(track);
     item.addEventListener('click', (event) => {
       if (event.target.closest('.track-actions')) return;
       if (state.settings.activeWorkspace === 'replay') {
@@ -1604,11 +1953,20 @@ function renderLibrary() {
       swatch.style.background = updatedTrack.color;
       updateTrackLayerStyle(updatedTrack.id);
     });
+    komootLinkButton.hidden = !originalTrackUrl;
+    komootLinkButton.textContent = '↗';
+    komootLinkButton.title = t('openInKomoot');
+    komootLinkButton.setAttribute('aria-label', t('openInKomoot'));
+    if (originalTrackUrl) komootLinkButton.addEventListener('click', (event) => { event.stopPropagation(); window.open(originalTrackUrl, '_blank', 'noopener,noreferrer'); });
+    editButton.textContent = '✎';
+    editButton.title = t('editTrackButton');
+    editButton.setAttribute('aria-label', t('editTrackButton'));
+    editButton.addEventListener('click', (event) => { event.stopPropagation(); openTrackDetail(track.id, true); });
     exportButton.textContent = '⇩';
     exportButton.title = t('exportTrackGpx');
     exportButton.setAttribute('aria-label', t('exportTrackGpx'));
     exportButton.addEventListener('click', (event) => { event.stopPropagation(); exportTrackGpx(track.id); });
-    focusButton.textContent = '⌖';
+    focusButton.textContent = '≣';
     focusButton.title = t('focusTrack');
     focusButton.setAttribute('aria-label', t('focusTrack'));
     focusButton.addEventListener('click', (event) => { event.stopPropagation(); focusTrack(track.id); });
@@ -1625,12 +1983,14 @@ function renderLibrary() {
     el.trackList.append(frag);
   });
   renderToggleSelectionButton();
+  renderMergeSelectedTracksButton();
   restoreLibraryListState();
 }
 function renderSelection() {
   const tracks = state.tracks.filter((track) => state.selectedTrackIds.has(track.id)); el.selectionStats.textContent = fmtNum(tracks.length); el.distanceStats.textContent = `${fmtKm(tracks.reduce((sum, track) => sum + (track.distanceKm ?? 0), 0))} km`; el.pointStats.textContent = fmtNum(tracks.reduce((sum, track) => sum + (track.pointCount ?? 0), 0));
   const overlay = el.selectionStats?.closest('.map-overlay');
   if (overlay?.parentElement) overlay.parentElement.append(overlay);
+  renderMergeSelectedTracksButton();
   if (!el.selectionList) return;
   el.selectionList.replaceChildren();
   if (!tracks.length) { const li = document.createElement('li'); li.className = 'track-item compact-item'; li.textContent = t('noSelection'); el.selectionList.append(li); return; }
@@ -1641,15 +2001,14 @@ function renderRecent() {
   const tracks = recentTracks(); el.recentList.replaceChildren(); el.recentSummary.textContent = tracks.length ? t('recentSummary', { count: tracks.length }) : t('inboxEmpty');
   tracks.forEach((track) => { const frag = el.stagingItemTemplate.content.cloneNode(true); frag.querySelector('.track-name').textContent = track.name; frag.querySelector('.track-meta').textContent = t('trackMeta', { distance: fmtKm(track.distanceKm), points: fmtNum(track.pointCount), type: trackTypeLabel(track.type) }); frag.querySelector('.track-submeta').textContent = t('trackSubmeta', { date: fmtDate(track.importedAt), source: track.accountLabel || trackSourceLabel(track.source) }); el.recentList.append(frag); });
 }
-function preserveKomootListState(listName, tourId = null) {
+function preserveKomootListState(listName) {
   const container = listName === 'recorded' ? el.recordedList : el.plannedList;
+  if (!container) return;
   state.komootUi.scrollTopByList[listName] = container.scrollTop;
-  if (!tourId) {
-    state.komootUi.focusOffsetByList[listName] = null;
-    return;
-  }
-  const item = container.querySelector(`.tour-item[data-tour-id="${tourId}"]`);
-  state.komootUi.focusOffsetByList[listName] = item ? (item.offsetTop - container.scrollTop) : null;
+}
+function preserveAllKomootListStates() {
+  preserveKomootListState('recorded');
+  preserveKomootListState('planned');
 }
 function preserveLibraryListState(trackId = null) {
   state.libraryUi.scrollTop = el.trackList?.scrollTop ?? 0;
@@ -1667,33 +2026,22 @@ function restoreKomootListState() {
     if (!container) return;
     container.scrollTop = state.komootUi.scrollTopByList[listName] ?? 0;
   });
-  if (state.komootUi.focusTourId) {
-    const listName = state.komootUi.focusList === 'planned' ? 'planned' : 'recorded';
-    const container = listName === 'planned' ? el.plannedList : el.recordedList;
-    if (!container) return;
-    const item = container.querySelector(`.tour-item[data-tour-id="${state.komootUi.focusTourId}"]`);
-    const offset = state.komootUi.focusOffsetByList[listName];
-    if (item && offset != null) {
-      container.scrollTop = Math.max(0, item.offsetTop - offset);
-    }
-    if (item) {
-      item.focus({ preventScroll: true });
-      item.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    } else {
-      const checkbox = container.querySelector(`.tour-checkbox[data-tour-id="${state.komootUi.focusTourId}"]`);
-      if (checkbox) {
-        checkbox.focus({ preventScroll: true });
-      }
-    }
-  }
+}
+function renderKomootSelectionUi() {
+  const recorded = state.komootTours.filter((tour) => tour.type === 'recorded');
+  const planned = state.komootTours.filter((tour) => tour.type === 'planned');
+  el.recordedSelectAllButton.textContent = recorded.length && recorded.every((tour) => state.selectedKomootTourIds.has(tour.id)) ? t('clearSelection') : t('selectAll');
+  el.plannedSelectAllButton.textContent = planned.length && planned.every((tour) => state.selectedKomootTourIds.has(tour.id)) ? t('clearSelection') : t('selectAll');
 }
 function renderKomoot() {
   const toggleTourSelection = (tour, listName, checked) => {
-    preserveKomootListState(listName, tour.id);
-    state.komootUi.focusTourId = tour.id;
-    state.komootUi.focusList = listName;
     checked ? state.selectedKomootTourIds.add(tour.id) : state.selectedKomootTourIds.delete(tour.id);
-    renderKomoot();
+    const container = listName === 'recorded' ? el.recordedList : el.plannedList;
+    const item = container?.querySelector(`.tour-item[data-tour-id="${tour.id}"]`);
+    const checkbox = container?.querySelector(`.tour-checkbox[data-tour-id="${tour.id}"]`);
+    if (checkbox) checkbox.checked = checked;
+    if (item) item.classList.toggle('is-selected', checked);
+    renderKomootSelectionUi();
     void persistKomootCache(state.settings.activeAccountId);
   };
   const renderList = (container, tours, listName) => {
@@ -1731,7 +2079,7 @@ function renderKomoot() {
     });
   };
   const byNewest = (left, right) => `${right.date ?? ''}`.localeCompare(`${left.date ?? ''}`);
-  const recorded = state.komootTours.filter((tour) => tour.type === 'recorded').sort(byNewest); const planned = state.komootTours.filter((tour) => tour.type === 'planned').sort(byNewest); renderList(el.recordedList, recorded, 'recorded'); renderList(el.plannedList, planned, 'planned'); el.recordedSummary.textContent = recorded.length ? t('komootLoadedSummary', { count: recorded.length }) : t('recordedEmpty'); el.plannedSummary.textContent = planned.length ? t('komootLoadedSummary', { count: planned.length }) : t('plannedEmpty'); el.recordedSelectAllButton.textContent = recorded.length && recorded.every((tour) => state.selectedKomootTourIds.has(tour.id)) ? t('clearSelection') : t('selectAll'); el.plannedSelectAllButton.textContent = planned.length && planned.every((tour) => state.selectedKomootTourIds.has(tour.id)) ? t('clearSelection') : t('selectAll'); if (komootRestoreRaf) window.cancelAnimationFrame(komootRestoreRaf); komootRestoreRaf = window.requestAnimationFrame(() => { restoreKomootListState(); komootRestoreRaf = 0; });
+  const recorded = state.komootTours.filter((tour) => tour.type === 'recorded').sort(byNewest); const planned = state.komootTours.filter((tour) => tour.type === 'planned').sort(byNewest); renderList(el.recordedList, recorded, 'recorded'); renderList(el.plannedList, planned, 'planned'); restoreKomootListState(); el.recordedSummary.textContent = recorded.length ? t('komootLoadedSummary', { count: recorded.length }) : t('recordedEmpty'); el.plannedSummary.textContent = planned.length ? t('komootLoadedSummary', { count: planned.length }) : t('plannedEmpty'); renderKomootSelectionUi(); if (komootRestoreRaf) window.cancelAnimationFrame(komootRestoreRaf); komootRestoreRaf = window.requestAnimationFrame(() => { restoreKomootListState(); komootRestoreRaf = 0; });
   renderKomootLoadButton();
 }
 function renderProxy() { el.diagProxy.textContent = state.proxy.online ? t('proxyOnline') : t('proxyUnknown'); el.diagMode.textContent = state.proxy.mode ? t(state.proxy.mode === 'stub' ? 'proxyModeStub' : 'proxyModeReal') : t('proxyModeUnknown'); el.diagChecked.textContent = state.proxy.lastCheckAt ? new Date(state.proxy.lastCheckAt).toLocaleString(lang()) : t('lastCheckNever'); el.diagError.textContent = state.proxy.lastError || t('noError'); }
@@ -1784,7 +2132,8 @@ function focusProfileSample(sample) {
   state.map.panTo([sample.lat, sample.lng], { animate: true, duration: 0.35 });
 }
 function renderProfile() {
-  const track = state.selectedTrackIds.has(state.highlightedTrackId)
+  const visibleIds = filteredTrackIdSet();
+  const track = state.selectedTrackIds.has(state.highlightedTrackId) && visibleIds.has(state.highlightedTrackId)
     ? (state.tracks.find((item) => item.id === state.highlightedTrackId) ?? null)
     : null;
   el.profileTrackName.textContent = track?.name || '-';
@@ -1797,6 +2146,9 @@ function renderProfile() {
   state.profileUi.samples = [];
   state.profileUi.plot = null;
   clearProfileHover();
+  if (el.profileSegmentSummary) el.profileSegmentSummary.hidden = true;
+  if (el.profileSurfaceBreakdown) el.profileSurfaceBreakdown.innerHTML = '';
+  if (el.profileWaytypeBreakdown) el.profileWaytypeBreakdown.innerHTML = '';
   if (!track) {
     el.profileEmpty.hidden = false;
     el.profileEmpty.textContent = t('profileHintNoTrack');
@@ -1812,6 +2164,12 @@ function renderProfile() {
     el.profileChart.innerHTML = '';
     return;
   }
+  const surfaceBreakdown = profileSegmentBreakdownMarkup(track.surfaceSegments, 'surface');
+  const wayTypeBreakdown = profileSegmentBreakdownMarkup(track.wayTypeSegments, 'waytype');
+  const hasSegmentSummary = state.settings.segmentOverlayMode && (normalizeRangeSegments(track.surfaceSegments).length || normalizeRangeSegments(track.wayTypeSegments).length);
+  if (el.profileSegmentSummary) el.profileSegmentSummary.hidden = !hasSegmentSummary;
+  if (el.profileSurfaceBreakdown) el.profileSurfaceBreakdown.innerHTML = surfaceBreakdown;
+  if (el.profileWaytypeBreakdown) el.profileWaytypeBreakdown.innerHTML = wayTypeBreakdown;
   const minEle = Math.min(...samples.map((point) => point.ele));
   const maxEle = Math.max(...samples.map((point) => point.ele));
   const maxDist = Math.max(track.distanceKm || samples.at(-1)?.cumulativeKm || 0, 0.1);
@@ -1938,9 +2296,17 @@ function buildReplayTrack(track) {
     return { photoIndex, sampleIndex: bestIndex, distanceKm: samples[bestIndex]?.cumulativeKm ?? 0 };
   }).filter(Boolean);
   const normalizedDirections = normalizeDirections(track.directions);
+  let cumulativeDirectionKm = 0;
   const directionMarkers = normalizedDirections.map((direction, directionIndex) => {
-    const fallbackDistanceKm = totalDistanceKm ? (((directionIndex + 1) / Math.max(1, normalizedDirections.length + 1)) * totalDistanceKm) : 0;
-    const distanceKm = Number.isFinite(direction.distanceM) ? clamp((direction.distanceM / 1000), 0, totalDistanceKm) : fallbackDistanceKm;
+    if (Number.isFinite(direction.prefixDistanceM) && direction.prefixDistanceM > 0) {
+      cumulativeDirectionKm += Number(direction.prefixDistanceM) / 1000;
+    }
+    const distanceKm = clamp(cumulativeDirectionKm, 0, totalDistanceKm);
+    if (Number.isFinite(direction.distanceM)) {
+      cumulativeDirectionKm += Math.max(0, Number(direction.distanceM)) / 1000;
+    } else if (totalDistanceKm) {
+      cumulativeDirectionKm = ((directionIndex + 1) / Math.max(1, normalizedDirections.length + 1)) * totalDistanceKm;
+    }
     const sampleIndex = samples.reduce((best, sample, index) => Math.abs((sample.cumulativeKm ?? 0) - distanceKm) < Math.abs((samples[best]?.cumulativeKm ?? 0) - distanceKm) ? index : best, 0);
     return {
       directionIndex,
@@ -2324,24 +2690,7 @@ function renderReplayControls() {
   if (el.replayShowPhotosInput) el.replayShowPhotosInput.disabled = !hasTrack;
   if (el.replayShowProfileInput) el.replayShowProfileInput.disabled = !hasTrack;
 }
-function renderReplayProfile() {
-  const replayTrack = state.replay.replayTrack;
-  const frame = replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor);
-  const visible = !!(replayTrack && replayTrack.track.hasElevation && state.replay.showProfile);
-  el.replayProfilePanel.hidden = !state.replay.showProfile;
-  el.replayWorkspace?.classList.toggle('is-profile-collapsed', !state.replay.showProfile);
-  if (el.replayProfileTrackName) el.replayProfileTrackName.textContent = replayTrack?.track?.name || '-';
-  el.replayAscentValue.textContent = replayTrack?.track?.hasElevation ? fmtMeters(replayTrack.track.elevationGainM) : '-';
-  el.replayDescentValue.textContent = replayTrack?.track?.hasElevation ? fmtMeters(replayTrack.track.elevationLossM) : '-';
-  el.replaySpeedValue.textContent = frame?.elapsedSec > 0 && frame?.cumulativeKm > 0 ? fmtHours((frame.cumulativeKm / frame.elapsedSec) * 3600) : '-';
-  el.replayPointValue.textContent = replayTrack && frame ? `${fmtNum(Math.min(replayTrack.samples.length, Math.round(frame.pointIndex ?? 0) + 1))} / ${fmtNum(replayTrack.samples.length)}` : '-';
-  el.replayProfileEmpty.hidden = visible;
-  el.replayProfileChartShell.hidden = !visible;
-  if (!visible) {
-    el.replayProfileEmpty.textContent = replayTrack && !replayTrack.track.hasElevation ? t('profileHintNoElevation') : t('replayProfileHint');
-    el.replayProfileChart.innerHTML = '';
-    return;
-  }
+function buildReplayProfileGeometry(replayTrack) {
   const samples = replayTrack.samples;
   const width = 1000;
   const height = 260;
@@ -2360,15 +2709,74 @@ function renderReplayProfile() {
     const rawY = midY - (normalized * halfPlotHeight);
     return clamp(rawY, padding.top, height - padding.bottom);
   };
-  const polyline = samples.map((sample) => `${xFor(sample.cumulativeKm)},${yFor(sample.ele ?? min)}`).join(' ');
-  const cursorX = frame ? xFor(frame.cumulativeKm) : padding.left;
-  const cursorY = frame ? yFor(frame.ele ?? min) : yFor(min);
+  return {
+    key: `${replayTrack.track.id}:${replayTrack.samples.length}:${replayTrack.totalDistanceKm}:${replayTrack.track.color || ''}`,
+    width,
+    height,
+    padding,
+    min,
+    xFor,
+    yFor,
+    polyline: samples.map((sample) => `${xFor(sample.cumulativeKm)},${yFor(sample.ele ?? min)}`).join(' ')
+  };
+}
+function ensureReplayProfileGeometry(replayTrack) {
+  if (!replayTrack) return null;
+  const current = state.replay.profileRender;
+  const nextKey = `${replayTrack.track.id}:${replayTrack.samples.length}:${replayTrack.totalDistanceKm}:${replayTrack.track.color || ''}`;
+  if (current.key === nextKey && current.geometry) return current.geometry;
+  const geometry = buildReplayProfileGeometry(replayTrack);
+  state.replay.profileRender = { key: geometry.key, geometry };
+  return geometry;
+}
+function renderReplayProfileStaticChart(replayTrack, geometry) {
+  const startX = geometry.padding.left;
+  const startY = geometry.yFor(geometry.min);
   el.replayProfileChart.innerHTML = `
-    <line class="profile-grid-line" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
-    <polyline class="profile-line" points="${polyline}" stroke="${replayTrack.track.color || '#9ed5b0'}"></polyline>
-    <line class="profile-hover-line" x1="${cursorX}" y1="${padding.top}" x2="${cursorX}" y2="${height - padding.bottom}"></line>
-    <circle class="profile-hover-dot" cx="${cursorX}" cy="${cursorY}" r="7"></circle>
+    <line class="profile-grid-line" x1="${geometry.padding.left}" y1="${geometry.height - geometry.padding.bottom}" x2="${geometry.width - geometry.padding.right}" y2="${geometry.height - geometry.padding.bottom}"></line>
+    <polyline class="profile-line" points="${geometry.polyline}" stroke="${replayTrack.track.color || '#9ed5b0'}"></polyline>
+    <line class="profile-hover-line" x1="${startX}" y1="${geometry.padding.top}" x2="${startX}" y2="${geometry.height - geometry.padding.bottom}"></line>
+    <circle class="profile-hover-dot" cx="${startX}" cy="${startY}" r="7"></circle>
   `;
+  el.replayProfileChart.dataset.geometryKey = geometry.key;
+}
+function updateReplayProfileCursor(geometry, frame) {
+  const cursorX = frame ? geometry.xFor(frame.cumulativeKm) : geometry.padding.left;
+  const cursorY = frame ? geometry.yFor(frame.ele ?? geometry.min) : geometry.yFor(geometry.min);
+  const cursorLine = el.replayProfileChart.querySelector('.profile-hover-line');
+  const cursorDot = el.replayProfileChart.querySelector('.profile-hover-dot');
+  if (cursorLine) {
+    cursorLine.setAttribute('x1', `${cursorX}`);
+    cursorLine.setAttribute('x2', `${cursorX}`);
+  }
+  if (cursorDot) {
+    cursorDot.setAttribute('cx', `${cursorX}`);
+    cursorDot.setAttribute('cy', `${cursorY}`);
+  }
+}
+function renderReplayProfile() {
+  const replayTrack = state.replay.replayTrack;
+  const frame = replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor);
+  const visible = !!(replayTrack && replayTrack.track.hasElevation && state.replay.showProfile);
+  el.replayProfilePanel.hidden = !state.replay.showProfile;
+  el.replayWorkspace?.classList.toggle('is-profile-collapsed', !state.replay.showProfile);
+  if (el.replayProfileTrackName) el.replayProfileTrackName.textContent = replayTrack?.track?.name || '-';
+  el.replayAscentValue.textContent = replayTrack?.track?.hasElevation ? fmtMeters(replayTrack.track.elevationGainM) : '-';
+  el.replayDescentValue.textContent = replayTrack?.track?.hasElevation ? fmtMeters(replayTrack.track.elevationLossM) : '-';
+  el.replaySpeedValue.textContent = frame?.elapsedSec > 0 && frame?.cumulativeKm > 0 ? fmtHours((frame.cumulativeKm / frame.elapsedSec) * 3600) : '-';
+  el.replayPointValue.textContent = replayTrack && frame ? `${fmtNum(Math.min(replayTrack.samples.length, Math.round(frame.pointIndex ?? 0) + 1))} / ${fmtNum(replayTrack.samples.length)}` : '-';
+  el.replayProfileEmpty.hidden = visible;
+  el.replayProfileChartShell.hidden = !visible;
+  if (!visible) {
+    el.replayProfileEmpty.textContent = replayTrack && !replayTrack.track.hasElevation ? t('profileHintNoElevation') : t('replayProfileHint');
+    el.replayProfileChart.innerHTML = '';
+    state.replay.profileRender = { key: null, geometry: null };
+    return;
+  }
+  const geometry = ensureReplayProfileGeometry(replayTrack);
+  if (!geometry) return;
+  if (el.replayProfileChart.dataset.geometryKey !== geometry.key) renderReplayProfileStaticChart(replayTrack, geometry);
+  updateReplayProfileCursor(geometry, frame);
 }
 function renderReplayTimeline() {}
 function updateReplayReadouts(replayTrack, frame) {
@@ -2377,6 +2785,17 @@ function updateReplayReadouts(replayTrack, frame) {
   el.replayGradeValue.textContent = frame ? fmtGrade(frame.gradePercent) : '-';
   el.replayTimeValue.textContent = frame ? fmtElapsedShort(frame.elapsedSec) : '--:--:--';
   if (el.replayDirectionValue) el.replayDirectionValue.textContent = replayDirectionText(replayTrack, frame);
+}
+function renderReplayDirectionOverlay(replayTrack, frame) {
+  if (!el.replayDirectionOverlay || !el.replayDirectionOverlayIcon || !el.replayDirectionOverlayToggle) return;
+  const collapsed = !!state.settings.replayDirectionOverlayCollapsed;
+  el.replayDirectionOverlay.hidden = collapsed;
+  el.replayDirectionOverlayIcon.hidden = !collapsed;
+  el.replayDirectionOverlayToggle.textContent = collapsed ? '+' : '–';
+  el.replayDirectionOverlayToggle.setAttribute('aria-label', collapsed ? t('replayDirectionShow') : t('replayDirectionHide'));
+  el.replayDirectionOverlayToggle.setAttribute('title', collapsed ? t('replayDirectionShow') : t('replayDirectionHide'));
+  el.replayDirectionOverlayIcon.setAttribute('aria-label', t('replayDirectionShow'));
+  el.replayDirectionOverlayIcon.setAttribute('title', t('replayDirectionShow'));
 }
 function renderReplayWorkspace() {
   const replayTrack = state.replay.replayTrack;
@@ -2390,6 +2809,7 @@ function renderReplayWorkspace() {
     el.replayTrackTitle.textContent = t('replayEmptyTitle');
     el.replayTrackSubtitle.textContent = t('replayEmptySubtitle');
     updateReplayReadouts(null, null);
+    renderReplayDirectionOverlay(null, null);
     renderReplayTimeline();
     renderReplayProfile();
     clearReplayScene();
@@ -2406,6 +2826,7 @@ function renderReplayWorkspace() {
     el.replayTrackSubtitle.textContent = t('replayEmptySubtitle');
   }
   updateReplayReadouts(replayTrack, frame);
+  renderReplayDirectionOverlay(replayTrack, frame);
   renderReplayTimeline();
   renderReplayProfile();
   updateReplayScene();
@@ -2536,6 +2957,96 @@ function layerStyleForTrack(track, casing = false) {
     ? { color: highlighted ? TRACK_HIGHLIGHT_CASING : TRACK_CASING_COLOR, weight: highlighted ? baseWeight + 6 : baseWeight + 4, opacity: 0.98, dashArray: null, lineCap: 'round', lineJoin: 'round' }
     : { color: highlighted ? HIGHLIGHT_COLOR : track.color, weight: highlighted ? baseWeight + 2 : baseWeight, opacity: 1, dashArray: track.type === 'planned' ? '10 8' : null, lineCap: 'round', lineJoin: 'round' };
 }
+function surfaceSegmentColor(value) {
+  const key = `${value ?? ''}`.toLowerCase();
+  if (key.includes('asphalt')) return '#2563eb';
+  if ((key.includes('paved') && !key.includes('unpaved')) || key.includes('concrete')) return '#0f766e';
+  if (key.includes('paving') || key.includes('sett') || key.includes('cobbl')) return '#f59e0b';
+  if (key.includes('compacted')) return '#c2410c';
+  if (key.includes('fine_gravel')) return '#fb7185';
+  if (key.includes('gravel')) return '#f97316';
+  if (key.includes('unpaved')) return '#7c3aed';
+  if (key.includes('dirt') || key.includes('ground') || key.includes('earth') || key.includes('mud')) return '#92400e';
+  if (key.includes('sand')) return '#eab308';
+  if (key.includes('grass')) return '#65a30d';
+  const hue = hashString(key) % 360;
+  return `hsl(${hue} 78% 58%)`;
+}
+function wayTypeSegmentDash(value) {
+  const key = `${value ?? ''}`.toLowerCase();
+  if (key.includes('cycleway')) return '10 6';
+  if (key.includes('path') || key.includes('trail') || key.includes('singletrack')) return '2 6';
+  if (key.includes('track') || key.includes('service')) return '14 5';
+  if (key.includes('street') || key.includes('road')) return '6 4';
+  return '4 5';
+}
+function scaledSegmentIndices(track, segments, segment) {
+  const pointCount = track?.points?.length ?? 0;
+  if (pointCount < 2) return null;
+  const maxTo = Math.max(1, ...segments.map((item) => Number(item?.to) || 0));
+  const pointMax = pointCount - 1;
+  const scale = pointMax / maxTo;
+  const from = clamp(Math.round((Number(segment.from) || 0) * scale), 0, Math.max(0, pointMax - 1));
+  const to = clamp(Math.round((Number(segment.to) || 0) * scale), Math.min(pointMax, from + 1), pointMax);
+  if (to <= from) return null;
+  return { from, to };
+}
+function buildTrackSegmentLayers(track) {
+  const layers = [];
+  const baseWeight = Math.max(4, Number(state.settings.trackLineWeight) || 6);
+  const surfaceSegments = normalizeRangeSegments(track.surfaceSegments);
+  const wayTypeSegments = normalizeRangeSegments(track.wayTypeSegments);
+  if (surfaceSegments.length) {
+    surfaceSegments.forEach((segment) => {
+      const indices = scaledSegmentIndices(track, surfaceSegments, segment);
+      if (!indices) return;
+      const latLngs = track.points.slice(indices.from, indices.to + 1).map((point) => [point.lat, point.lng]);
+      if (latLngs.length < 2) return;
+      layers.push(L.polyline(latLngs, {
+        interactive: false,
+        color: surfaceSegmentColor(segment.value),
+        weight: Math.max(4, baseWeight + 1),
+        opacity: 0.92,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }));
+    });
+  }
+  if (wayTypeSegments.length) {
+    wayTypeSegments.forEach((segment) => {
+      const indices = scaledSegmentIndices(track, wayTypeSegments, segment);
+      if (!indices) return;
+      const latLngs = track.points.slice(indices.from, indices.to + 1).map((point) => [point.lat, point.lng]);
+      if (latLngs.length < 2) return;
+      layers.push(L.polyline(latLngs, {
+        interactive: false,
+        color: 'rgba(248, 251, 250, 0.92)',
+        weight: Math.max(2, Math.round(baseWeight / 2)),
+        opacity: 0.95,
+        dashArray: wayTypeSegmentDash(segment.value),
+        lineCap: 'butt',
+        lineJoin: 'round'
+      }));
+    });
+  }
+  return L.layerGroup(layers);
+}
+function legendItemsMarkup(values, type) {
+  return values.map((value) => {
+    const label = escapeHtml(displayDetailValue(value));
+    const svg = type === 'surface'
+      ? `<svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true"><line x1="1" y1="4" x2="31" y2="4" stroke="${surfaceSegmentColor(value)}" stroke-width="4" stroke-linecap="round"></line></svg>`
+      : `<svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true"><line x1="1" y1="4" x2="31" y2="4" stroke="rgba(248, 251, 250, 0.92)" stroke-width="3" stroke-linecap="round" stroke-dasharray="${wayTypeSegmentDash(value)}"></line></svg>`;
+    return `<div class="map-segment-legend-item">${svg}<span>${label}</span></div>`;
+  }).join('');
+}
+function renderMapSegmentLegend() {
+  const track = state.tracks.find((item) => item.id === state.highlightedTrackId);
+  const surfaceValues = track ? segmentValues(track.surfaceSegments) : [];
+  const wayTypeValues = track ? segmentValues(track.wayTypeSegments) : [];
+  if (el.segmentHelpSurfaceItems) el.segmentHelpSurfaceItems.innerHTML = surfaceValues.length ? legendItemsMarkup(surfaceValues, 'surface') : `<span class="map-segment-empty">${t('analysisNone')}</span>`;
+  if (el.segmentHelpWaytypeItems) el.segmentHelpWaytypeItems.innerHTML = wayTypeValues.length ? legendItemsMarkup(wayTypeValues, 'waytype') : `<span class="map-segment-empty">${t('analysisNone')}</span>`;
+}
 function buildTrackDecorations(track) {
   const zoom = state.map?.getZoom?.() ?? 0;
   const { kmStep, arrowStep } = decorationStepsForZoom(zoom);
@@ -2583,18 +3094,18 @@ function updateTrackLayerStyle(trackId) {
   syncMap();
 }
 function heatmapTrackSet() {
-  return state.tracks.filter((track) => state.selectedTrackIds.has(track.id) && (track.points?.length ?? 0) > 1);
+  return visibleSelectedTracks().filter((track) => (track.points?.length ?? 0) > 1);
 }
-function canRenderHeatmap() {
-  return heatmapTrackSet().length > 1;
-}
-function heatmapStepForLatitude(lat) {
-  const meters = 42;
-  const latStep = meters / 111320;
-  const cosLat = Math.max(0.2, Math.cos((lat * Math.PI) / 180));
-  const lngStep = meters / (111320 * cosLat);
-  return { latStep, lngStep };
-}
+  function canRenderHeatmap() {
+    return heatmapTrackSet().length > 1;
+  }
+  function heatmapStepForLatitude(lat) {
+    const meters = 60;
+    const latStep = meters / 111320;
+    const cosLat = Math.max(0.2, Math.cos((lat * Math.PI) / 180));
+    const lngStep = meters / (111320 * cosLat);
+    return { latStep, lngStep };
+  }
 function snapHeatmapPoint(lat, lng) {
   const { latStep, lngStep } = heatmapStepForLatitude(lat);
   const snappedLat = Math.round(lat / latStep) * latStep;
@@ -2612,33 +3123,45 @@ function heatmapColor(ratio) {
   const lightness = 58 - (14 * safe);
   return `hsl(${hue.toFixed(0)} ${saturation}% ${lightness.toFixed(0)}%)`;
 }
-function buildHeatmapLayer(tracks) {
-  const group = L.layerGroup();
-  if (!tracks.length) return group;
-  const nodeCounts = new Map();
-  const segmentCounts = new Map();
-  tracks.forEach((track) => {
-    let previous = null;
-    for (const point of track.points || []) {
-      if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lng)) continue;
-      const snapped = snapHeatmapPoint(point.lat, point.lng);
-      nodeCounts.set(snapped.key, { ...snapped, count: (nodeCounts.get(snapped.key)?.count ?? 0) + 1 });
-      if (previous && previous.key !== snapped.key) {
-        const forward = `${previous.key}->${snapped.key}`;
-        const reverse = `${snapped.key}->${previous.key}`;
-        const key = forward < reverse ? forward : reverse;
-        const start = forward < reverse ? previous : snapped;
-        const end = forward < reverse ? snapped : previous;
+  function buildHeatmapLayer(tracks) {
+    const group = L.layerGroup();
+    if (!tracks.length) return group;
+    const nodeCounts = new Map();
+    const segmentCounts = new Map();
+    tracks.forEach((track) => {
+      let previous = null;
+      const trackNodes = new Map();
+      const trackSegments = new Map();
+      for (const point of track.points || []) {
+        if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lng)) continue;
+        const snapped = snapHeatmapPoint(point.lat, point.lng);
+        if (!trackNodes.has(snapped.key)) {
+          trackNodes.set(snapped.key, snapped);
+        }
+        if (previous && previous.key !== snapped.key) {
+          const forward = `${previous.key}->${snapped.key}`;
+          const reverse = `${snapped.key}->${previous.key}`;
+          const key = forward < reverse ? forward : reverse;
+          const start = forward < reverse ? previous : snapped;
+          const end = forward < reverse ? snapped : previous;
+          if (!trackSegments.has(key)) {
+            trackSegments.set(key, { start, end });
+          }
+        }
+        previous = snapped;
+      }
+      for (const entry of trackNodes.values()) {
+        nodeCounts.set(entry.key, { ...entry, count: (nodeCounts.get(entry.key)?.count ?? 0) + 1 });
+      }
+      for (const [key, entry] of trackSegments.entries()) {
         const existing = segmentCounts.get(key);
         if (existing) {
           existing.count += 1;
         } else {
-          segmentCounts.set(key, { start, end, count: 1 });
+          segmentCounts.set(key, { ...entry, count: 1 });
         }
       }
-      previous = snapped;
-    }
-  });
+    });
   const segmentEntries = [...segmentCounts.values()];
   const nodeEntries = [...nodeCounts.values()];
   const maxSegmentCount = Math.max(1, ...segmentEntries.map((entry) => entry.count));
@@ -2659,8 +3182,8 @@ function buildHeatmapLayer(tracks) {
         }
       ).addTo(group);
     });
-  nodeEntries
-    .filter((entry) => entry.count > 1)
+    nodeEntries
+      .filter((entry) => entry.count > 1)
     .sort((left, right) => left.count - right.count)
     .forEach((entry) => {
       const ratio = entry.count / maxNodeCount;
@@ -2672,10 +3195,15 @@ function buildHeatmapLayer(tracks) {
         fillColor: heatmapColor(ratio),
         fillOpacity: 0.16 + (ratio * 0.46),
         opacity: 0.8
-      }).addTo(group);
-    });
-  return group;
-}
+        }).addTo(group);
+      });
+    group.__heatmapStats = {
+      tracks: tracks.length,
+      segments: segmentEntries.length,
+      hotspots: nodeEntries.filter((entry) => entry.count > 1).length
+    };
+    return group;
+  }
 function exportTrackGpx(trackId) {
   const track = state.tracks.find((item) => item.id === trackId);
   if (!track?.gpxText) return;
@@ -2813,6 +3341,156 @@ function buildSelectedTracksMultiGpxXml(tracks) {
     '</gpx>'
   ].join('\n');
 }
+function buildSingleTrackGpxXml(track) {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<gpx version="1.1" creator="Trailthread" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">',
+    '  <metadata>',
+    `    <name>${escapeXml(track.name || t('unnamedTrack'))}</name>`,
+    `    <time>${escapeXml(isoNow())}</time>`,
+    '  </metadata>',
+    trackToGpxTrackXml(track),
+    '</gpx>'
+  ].join('\n');
+}
+function shiftRangeSegments(segments, offset) {
+  return normalizeRangeSegments(segments).map((segment) => ({
+    ...segment,
+    from: Number(segment.from) + offset,
+    to: Number(segment.to) + offset
+  }));
+}
+function uniqueTrackName(baseName, excludedIds = []) {
+  const normalizedBase = cleanText(baseName) || t('unnamedTrack');
+  const excluded = new Set(excludedIds);
+  const existingNames = new Set(
+    state.tracks
+      .filter((track) => !excluded.has(track.id))
+      .map((track) => cleanText(track.name).toLowerCase())
+      .filter(Boolean)
+  );
+  if (!existingNames.has(normalizedBase.toLowerCase())) return normalizedBase;
+  let suffix = 2;
+  let candidate = `${normalizedBase} (${suffix})`;
+  while (existingNames.has(candidate.toLowerCase())) {
+    suffix += 1;
+    candidate = `${normalizedBase} (${suffix})`;
+  }
+  return candidate;
+}
+function shiftedPointCopy(point, timeOffsetMs = 0) {
+  const copy = { ...point };
+  if (timeOffsetMs && point?.time) {
+    const parsed = parsePointTime(point.time);
+    copy.time = Number.isFinite(parsed) ? new Date(parsed + timeOffsetMs).toISOString() : point.time;
+  }
+  return copy;
+}
+async function cloneTrackPhotosForMerge(track) {
+  const serialized = await serializeTrackForBackup(track);
+  return normalizePhotos(serialized.photos).map((photo) => ({
+    ...photo,
+    blobId: null,
+    objectUrl: null
+  }));
+}
+async function mergeSelectedTracks(orderedTracks = selectedTracksForMerge()) {
+  const tracks = orderedTracks.filter((track) => track?.points?.length);
+  if (tracks.length !== 2) {
+    setStatus(t('mergeSelectedTracksNeedTwo'), true);
+    return;
+  }
+  const [firstTrack, secondTrack] = tracks;
+  const combinedPoints = [];
+  const mergedSurfaceSegments = [];
+  const mergedWayTypeSegments = [];
+  const mergedDirections = [];
+  const seamGapMeters = Math.max(0, Math.round(haversine(firstTrack.points[firstTrack.points.length - 1], secondTrack.points[0]) * 1000));
+  let secondTimeOffsetMs = 0;
+  const firstStartTime = parsePointTime(firstTrack.points?.[0]?.time);
+  const firstEndTime = parsePointTime(firstTrack.points?.[firstTrack.points.length - 1]?.time);
+  const secondStartTime = parsePointTime(secondTrack.points?.[0]?.time);
+  if (Number.isFinite(firstStartTime) && Number.isFinite(firstEndTime) && Number.isFinite(secondStartTime)) {
+    secondTimeOffsetMs = Math.max(1000, (firstEndTime - secondStartTime) + 1000);
+  }
+  for (const track of tracks) {
+    const pointOffset = combinedPoints.length;
+    const timeOffsetMs = track.id === secondTrack.id ? secondTimeOffsetMs : 0;
+    track.points.forEach((point) => combinedPoints.push(shiftedPointCopy(point, timeOffsetMs)));
+    mergedSurfaceSegments.push(...shiftRangeSegments(track.surfaceSegments, pointOffset));
+    mergedWayTypeSegments.push(...shiftRangeSegments(track.wayTypeSegments, pointOffset));
+    const trackDirections = normalizeDirections(track.directions).map((direction) => ({ ...direction }));
+    if (track.id === secondTrack.id && trackDirections[0] && seamGapMeters > 0) {
+      trackDirections[0].prefixDistanceM = (trackDirections[0].prefixDistanceM || 0) + seamGapMeters;
+    }
+    mergedDirections.push(...trackDirections);
+  }
+  const mergedPhotos = normalizePhotos((await Promise.all(tracks.map(cloneTrackPhotosForMerge))).flat());
+  const mergedTags = [...new Set(tracks.flatMap((track) => normalizeTagList(track.tags)))];
+  const descriptions = [...new Set(tracks.map((track) => cleanText(track.description)).filter(Boolean))];
+  const mergedTrackDraft = {
+    name: `${firstTrack.name || t('unnamedTrack')} + ${secondTrack.name || t('unnamedTrack')}`,
+    description: descriptions.join('\n\n'),
+    sport: firstTrack.sport && secondTrack.sport && firstTrack.sport === secondTrack.sport ? firstTrack.sport : firstTrack.sport || secondTrack.sport || null,
+    points: combinedPoints
+  };
+  const mergedTrack = buildTrackRecord({
+    gpxText: buildSingleTrackGpxXml(mergedTrackDraft),
+    fileName: sanitizeFileName(mergedTrackDraft.name) || 'merged-track',
+    source: 'local',
+    type: firstTrack.type === secondTrack.type ? firstTrack.type : 'unknown',
+    account: null,
+    description: mergedTrackDraft.description || null,
+    photos: mergedPhotos,
+    meta: {
+      dateStart: firstTrack.dateStart || null,
+      durationHours: (firstTrack.durationHours ?? 0) + (secondTrack.durationHours ?? 0) || null,
+      sport: mergedTrackDraft.sport,
+      surfaces: [...new Set(tracks.flatMap((track) => normalizeTagList(track.surfaces)))],
+      wayTypes: [...new Set(tracks.flatMap((track) => normalizeTagList(track.wayTypes)))],
+      surfaceSegments: mergedSurfaceSegments,
+      wayTypeSegments: mergedWayTypeSegments,
+      directions: mergedDirections
+    }
+  });
+  const finalizedTrack = touchTrack(mergedTrack, {
+    tags: mergedTags,
+    favorite: false,
+    color: defaultTrackColor(mergedTrack)
+  });
+  const conflictingTrack = state.tracks.find((track) => !tracks.some((selected) => selected.id === track.id) && cleanText(track.name).toLowerCase() === cleanText(finalizedTrack.name).toLowerCase());
+  let trackToSave = finalizedTrack;
+  if (conflictingTrack) {
+    const shouldOverwrite = await confirmAction(t('mergeSelectedTracksConflictMessage', { name: finalizedTrack.name || t('unnamedTrack') }), {
+      title: t('mergeSelectedTracksConflictTitle'),
+      confirmLabel: t('mergeSelectedTracksOverwrite'),
+      cancelLabel: t('mergeSelectedTracksCreateNew')
+    });
+    if (shouldOverwrite) {
+      await deleteTrackPhotoBlobs(conflictingTrack);
+      trackToSave = touchTrack({
+        ...trackToSave,
+        id: conflictingTrack.id,
+        importedAt: conflictingTrack.importedAt || trackToSave.importedAt
+      });
+    } else {
+      trackToSave = touchTrack({
+        ...trackToSave,
+        name: uniqueTrackName(trackToSave.name, tracks.map((track) => track.id))
+      });
+    }
+  }
+  const preparedTrack = await prepareTrackPhotosForStorage(trackToSave);
+  await put(STORES.tracks, preparedTrack);
+  const hydratedTrack = await hydrateTrackPhotos(preparedTrack);
+  if (conflictingTrack) revokeTrackPhotoUrls(conflictingTrack);
+  state.tracks = state.tracks.filter((track) => track.id !== hydratedTrack.id).concat(hydratedTrack).sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? ''));
+  state.selectedTrackIds = new Set([hydratedTrack.id]);
+  state.highlightedTrackId = hydratedTrack.id;
+  renderAll();
+  syncMapForSelectionChange();
+  setStatus(t('mergeSelectedTracksDone'));
+}
 async function exportSelectedTracksGpx() {
   const tracks = state.tracks.filter((track) => state.selectedTrackIds.has(track.id) && track.points?.length);
   if (!tracks.length) {
@@ -2854,7 +3532,7 @@ function exportSelectedTracksMultiGpx() {
 function setHighlightedTrack(trackId) { state.highlightedTrackId = trackId; syncMap(); renderProfile(); }
 function syncMapForSelectionChange() {
   syncMap();
-  const selectedTracks = state.tracks.filter((track) => state.selectedTrackIds.has(track.id));
+  const selectedTracks = visibleSelectedTracks();
   if (selectedTracks.length === 1) {
     const onlyTrack = selectedTracks[0];
     if (state.highlightedTrackId !== onlyTrack.id) {
@@ -2879,19 +3557,36 @@ function syncMap() {
   for (const entry of state.layers.values()) {
     entry.group.remove();
   }
-  state.layers.clear();
-  state.heatmapLayer?.remove();
-  state.heatmapLayer = null;
-  const active = new Set(state.selectedTrackIds);
-  const photoOnlyMode = !!state.settings.photoOverlayOnly;
-  const heatmapMode = !!state.settings.heatmapMode;
-  if (heatmapMode) {
-    const tracks = heatmapTrackSet();
-    if (tracks.length > 1) {
-      state.heatmapLayer = buildHeatmapLayer(tracks).addTo(state.map);
+    state.layers.clear();
+    state.heatmapLayer?.remove();
+    state.heatmapLayer = null;
+    state.heatmapStats = null;
+    const active = new Set(visibleSelectedTracks().map((track) => track.id));
+    const photoOnlyMode = !!state.settings.photoOverlayOnly;
+    const heatmapMode = !!state.settings.heatmapMode;
+    if (heatmapMode) {
+      const tracks = heatmapTrackSet();
+      if (tracks.length > 1) {
+        tracks.forEach((track) => {
+          const latLngs = track.points.map((point) => [point.lat, point.lng]);
+          const baseLine = L.polyline(latLngs, {
+            interactive: false,
+            color: 'rgba(210, 223, 219, 0.28)',
+            weight: Math.max(3, (state.settings.trackLineWeight ?? 6) - 1),
+            opacity: 0.55,
+            lineCap: 'round',
+            lineJoin: 'round'
+          });
+          const group = L.layerGroup([baseLine]).addTo(state.map);
+          state.layers.set(track.id, { track, group, casing: null, line: baseLine, kmLayer: null, arrowLayer: null, photoLayer: null, segmentLayer: null });
+        });
+        state.heatmapLayer = buildHeatmapLayer(tracks).addTo(state.map);
+        state.heatmapStats = state.heatmapLayer.__heatmapStats ?? null;
+      }
+      renderMapSegmentLegend();
+      renderMapSegmentButton();
+      return;
     }
-    return;
-  }
   state.tracks.forEach((track) => {
     if (!active.has(track.id)) return;
     const latLngs = track.points.map((point) => [point.lat, point.lng]);
@@ -2904,28 +3599,31 @@ function syncMap() {
     kmLayer = decorationLayers.kmLayer;
     arrowLayer = decorationLayers.arrowLayer;
     const photoLayer = buildTrackPhotoLayer(track);
+    const segmentLayer = state.settings.segmentOverlayMode && state.highlightedTrackId === track.id ? buildTrackSegmentLayers(track) : L.layerGroup();
     if (!photoOnlyMode) {
       casing = L.polyline(latLngs, layerStyleForTrack(track, true));
       line = L.polyline(latLngs, layerStyleForTrack(track, false)).bindPopup(`<strong>${track.name}</strong><br>${fmtKm(track.distanceKm)} km`);
       line.on('click', (event) => { L.DomEvent.stopPropagation(event); setHighlightedTrack(track.id); });
       casing.on('click', (event) => { L.DomEvent.stopPropagation(event); setHighlightedTrack(track.id); });
-      layers.push(casing, line, kmLayer, arrowLayer);
+      layers.push(casing, line, segmentLayer, kmLayer, arrowLayer);
       if (state.highlightedTrackId === track.id) layers.push(photoLayer);
     } else if (photoLayer.getLayers().length) {
       layers.push(photoLayer);
     }
     const group = L.layerGroup(layers).addTo(state.map);
-    state.layers.set(track.id, { group, casing, line, kmLayer, arrowLayer, photoLayer });
+    state.layers.set(track.id, { group, casing, line, kmLayer, arrowLayer, photoLayer, segmentLayer });
   });
+  renderMapSegmentLegend();
+  renderMapSegmentButton();
 }
 function fitSelection() {
-  const bounds = state.tracks.filter((track) => state.selectedTrackIds.has(track.id)).map(trackBounds).filter(Boolean);
+  const bounds = visibleSelectedTracks().map(trackBounds).filter(Boolean);
   if (!bounds.length) return;
   const merged = bounds.reduce((acc, current) => acc ? acc.extend(current) : current, null);
   if (merged) state.map.fitBounds(merged.pad(0.08));
 }
 function activeTrackNavigationOrder() {
-  return state.tracks.filter((track) => state.selectedTrackIds.has(track.id));
+  return visibleSelectedTracks();
 }
 function stepTrackSelection(offset) {
   const tracks = activeTrackNavigationOrder();
@@ -2950,8 +3648,15 @@ function focusTrack(trackId) {
   setHighlightedTrack(trackId);
   const entry = state.layers.get(trackId);
   if (entry) {
+    state.map?.invalidateSize?.(false);
     const bounds = entry.line?.getBounds?.() || trackBounds(state.tracks.find((track) => track.id === trackId));
-    if (bounds) state.map.fitBounds(bounds.pad(0.08));
+    if (bounds) {
+      state.map.fitBounds(bounds.pad(0.08));
+      window.requestAnimationFrame(() => {
+        state.map?.invalidateSize?.(false);
+        state.map?.fitBounds?.(bounds.pad(0.08));
+      });
+    }
     entry.line?.openPopup();
   }
   renderProfile();
@@ -2979,8 +3684,7 @@ async function importTrackRecords(records, replaceExisting = false) {
     const existingTrack = state.tracks.find((item) => item.id === track.id);
     if (replaceExisting && existingTrack) await deleteTrackPhotoBlobs(existingTrack);
   }
-  const prepared = [];
-  for (const track of incoming) prepared.push(await prepareTrackPhotosForStorage(track));
+  const prepared = await Promise.all(incoming.map((track) => prepareTrackPhotosForStorage(track)));
   await putMany(STORES.tracks, prepared);
   const hydrated = await hydrateTracksPhotos(prepared);
   const map = new Map(hydrated.map((track) => [track.id, track]));
@@ -2992,14 +3696,24 @@ async function importTrackRecords(records, replaceExisting = false) {
   renderAll(); syncMap(); fitSelection(); setStatus(duplicates ? `${t('statusImported')} · ${t('duplicateTracksSkipped', { count: duplicates })}` : t('statusImported')); return { imported: hydrated.length, duplicates };
 }
 function normalizeBackupTrack(track) {
+  const surfaceSegments = normalizeRangeSegments(track.surfaceSegments);
+  const wayTypeSegments = normalizeRangeSegments(track.wayTypeSegments);
   const normalized = {
     ...track,
     id: track.id || id('track'),
     importedAt: track.importedAt || isoNow(),
     lastChanged: trackLastChanged(track) || track.importedAt || isoNow(),
     signature: track.signature || signature(track),
+    komootUrl: track.komootUrl || komootTrackUrl(track),
     description: normalizeTrackDescription(track.description),
     dateStart: normalizeTrackDate(track.dateStart),
+    surfaces: normalizeTagList(track.surfaces).length ? normalizeTagList(track.surfaces) : segmentValues(surfaceSegments),
+    wayTypes: normalizeTagList(track.wayTypes).length ? normalizeTagList(track.wayTypes) : segmentValues(wayTypeSegments),
+    surfaceSegments,
+    wayTypeSegments,
+    favorite: !!track.favorite,
+    tags: normalizeTagList(track.tags),
+    directions: normalizeDirections(track.directions),
     photos: normalizePhotos(track.photos),
     color: track.color || defaultTrackColor(track)
   };
@@ -3044,8 +3758,7 @@ async function importTourBackupRecords(records) {
     const existingTrack = state.tracks.find((item) => item.id === track.id);
     if (existingTrack) await deleteTrackPhotoBlobs(existingTrack);
   }
-  const prepared = [];
-  for (const track of incoming) prepared.push(await prepareTrackPhotosForStorage(track));
+  const prepared = await Promise.all(incoming.map((track) => prepareTrackPhotosForStorage(track)));
   await putMany(STORES.tracks, prepared);
   const hydrated = await hydrateTracksPhotos(prepared);
   const map = new Map(hydrated.map((track) => [track.id, track]));
@@ -3078,10 +3791,23 @@ async function ensureProxyAccountLogin(account) { if (!account) throw new Error(
 async function checkProxy() { try { const payload = await proxyRequest('/health'); state.proxy = { ...state.proxy, online: true, mode: payload.mode ?? null, lastCheckAt: payload.serverTime || new Date().toISOString(), lastError: null }; renderProxy(); setKomootStatus(t('proxyOnline')); return true; } catch (error) { state.proxy = { ...state.proxy, online: false, lastCheckAt: new Date().toISOString(), lastError: error.message }; renderProxy(); setKomootStatus(t('proxyOffline'), true); return false; } }
 async function saveAccount() { const email = el.accountEmailInput.value.trim(); const password = el.accountPasswordInput.value; if (!email || !password) return; if (!await checkProxy()) return; try { const payload = await proxyRequest('/login', { method: 'POST', body: { email, password } }); const current = state.accounts.find((account) => account.email.toLowerCase() === email.toLowerCase()); const account = { id: current?.id ?? id('account'), email, password, label: payload.user?.name || email.split('@')[0] || t('accountLabelFallback'), remoteUserId: payload.user?.id ?? null, updatedAt: new Date().toISOString() }; await put(STORES.accounts, account); state.accounts = state.accounts.filter((item) => item.id !== account.id).concat(account).sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')); state.settings.activeAccountId = account.id; await saveSettings(); el.accountDialog.close(); el.accountEmailInput.value = ''; el.accountPasswordInput.value = ''; renderAll(); setStatus(t('accountStored')); setKomootStatus(t('connectedAs', { name: account.label })); } catch (error) { state.proxy.lastError = error.message; renderProxy(); setStatus(t('accountLoginFailed'), true); } }
 async function loadKomootTours() { const account = state.accounts.find((item) => item.id === (el.komootAccountSelect.value || state.settings.activeAccountId)); if (!account) { setKomootStatus(t('accountRequired'), true); return; } state.settings.activeAccountId = account.id; await saveSettings(); if (!await checkProxy()) return; try { const hadCache = !!komootCacheForAccount(account.id)?.tours?.length; const previousSelection = new Set(state.selectedKomootTourIds); setKomootProgress(komootProgressText().loadingTours, 20, false); await ensureProxyAccountLogin(account); setKomootProgress(komootProgressText().loadingTours, 55, false); const payload = await proxyRequest('/tours'); setKomootProgress(komootProgressText().loadingTours, 100, false); state.komootTours = (payload.tours ?? []).map((tour) => normalizeKomootTourSummary(tour, account)); const validIds = new Set(state.komootTours.map((tour) => tour.id)); state.selectedKomootTourIds = new Set([...previousSelection].filter((tourId) => validIds.has(tourId))); await persistKomootCache(account.id); renderKomoot(); setKomootStatus(t(hadCache ? 'komootRefreshedSummary' : 'komootLoadedSummary', { count: state.komootTours.length })); window.setTimeout(clearKomootProgress, 500); } catch (error) { clearKomootProgress(); state.proxy.lastError = error.message; renderProxy(); setKomootStatus(error.message, true); } }
-async function importKomootSelection() { if (!state.komootTours.length) { setKomootStatus(t('loadToursFirst'), true); return; } const ids = [...state.selectedKomootTourIds]; if (!ids.length) { setKomootStatus(t('selectToursFirst'), true); return; } const account = activeAccount(); if (!account) { setKomootStatus(t('accountRequired'), true); return; } if (!await checkProxy()) return; try { setKomootProgress(komootProgressText().importing, 15, false); await ensureProxyAccountLogin(account); setKomootProgress(komootProgressText().importing, 35, false); const payload = await proxyRequest('/import', { method: 'POST', body: { language: lang(), tourIds: ids } }); setKomootProgress(komootProgressText().importing, 80, false); const toursById = new Map(state.komootTours.map((tour) => [tour.id, tour])); const records = payload.items.map((item) => { const summary = toursById.get(item.id); return buildTrackRecord({ gpxText: item.gpx, fileName: item.fileName, source: 'komoot', type: summary?.type || 'unknown', account: { ...account, sourceTrackId: item.id }, description: item.description || null, photos: item.photos || null, meta: { dateStart: item.dateStart || summary?.dateStart || summary?.date || null, durationHours: item.durationHours ?? null, sport: item.sport || summary?.sport || null, surfaces: item.surfaces || null, wayTypes: item.wayTypes || null, directions: item.directions || null } }); }); const result = await importTrackRecords(records, true); setKomootProgress(komootProgressText().done, 100, false); setKomootStatus(t('komootImported', { count: result.imported })); window.setTimeout(clearKomootProgress, 500); } catch (error) { clearKomootProgress(); state.proxy.lastError = error.message; renderProxy(); setKomootStatus(error.message, true); } }
+async function importKomootSelection() { if (!state.komootTours.length) { setKomootStatus(t('loadToursFirst'), true); return; } const ids = [...state.selectedKomootTourIds]; if (!ids.length) { setKomootStatus(t('selectToursFirst'), true); return; } const account = activeAccount(); if (!account) { setKomootStatus(t('accountRequired'), true); return; } if (!await checkProxy()) return; try { setKomootProgress(komootProgressText().importing, 15, false); await ensureProxyAccountLogin(account); setKomootProgress(komootProgressText().importing, 35, false); const payload = await proxyRequest('/import', { method: 'POST', body: { language: lang(), tourIds: ids } }); setKomootProgress(komootProgressText().importing, 80, false); const toursById = new Map(state.komootTours.map((tour) => [tour.id, tour])); const records = payload.items.map((item) => { const summary = toursById.get(item.id); return buildTrackRecord({ gpxText: item.gpx, fileName: item.fileName, source: 'komoot', type: summary?.type || 'unknown', account: { ...account, sourceTrackId: item.id }, description: item.description || null, photos: item.photos || null, meta: { dateStart: item.dateStart || summary?.dateStart || summary?.date || null, durationHours: item.durationHours ?? null, sport: item.sport || summary?.sport || null, surfaces: item.surfaces || null, wayTypes: item.wayTypes || null, surfaceSegments: item.surfaceSegments || null, wayTypeSegments: item.wayTypeSegments || null, directions: item.directions || null } }); }); const result = await importTrackRecords(records, true); setKomootProgress(komootProgressText().done, 100, false); setKomootStatus(t('komootImported', { count: result.imported })); window.setTimeout(clearKomootProgress, 500); } catch (error) { clearKomootProgress(); state.proxy.lastError = error.message; renderProxy(); setKomootStatus(error.message, true); } }
 
 function downloadBlob(name, blob) { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); URL.revokeObjectURL(url); }
 function downloadJson(name, payload) { const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); downloadBlob(name, blob); }
+function timestampedBackupFileName(baseName) {
+  const stamp = new Date();
+  const yyyy = stamp.getFullYear();
+  const mm = `${stamp.getMonth() + 1}`.padStart(2, '0');
+  const dd = `${stamp.getDate()}`.padStart(2, '0');
+  const hh = `${stamp.getHours()}`.padStart(2, '0');
+  const min = `${stamp.getMinutes()}`.padStart(2, '0');
+  const ss = `${stamp.getSeconds()}`.padStart(2, '0');
+  const timestamp = `${yyyy}-${mm}-${dd}_${hh}-${min}-${ss}`;
+  const dot = baseName.indexOf('.');
+  if (dot < 0) return `${baseName}_${timestamp}`;
+  return `${baseName.slice(0, dot)}_${timestamp}${baseName.slice(dot)}`;
+}
 async function gzipJsonBlob(payload) {
   const json = JSON.stringify(payload, null, 2);
   if (typeof CompressionStream === 'undefined') {
@@ -3105,7 +3831,7 @@ async function exportTracksBackup(tracks, fileName) {
   downloadBlob(fileName, blob);
 }
 async function exportTourBackup() {
-  await exportTracksBackup(state.tracks, t('tourBackupFileName'));
+  await exportTracksBackup(state.tracks, timestampedBackupFileName(t('tourBackupFileName')));
 }
 async function exportSelectedTourBackup() {
   const tracks = state.tracks.filter((track) => state.selectedTrackIds.has(track.id));
@@ -3113,7 +3839,7 @@ async function exportSelectedTourBackup() {
     setStatus(t('exportSelectedTourBackupEmpty'), true);
     return;
   }
-  await exportTracksBackup(tracks, t('selectedTourBackupFileName'));
+  await exportTracksBackup(tracks, timestampedBackupFileName(t('selectedTourBackupFileName')));
   setStatus(t('exportSelectedTourBackupDone', { count: tracks.length }));
 }
 async function importAppBackup(file) { if (!await confirmAction(t('confirmImportBackup'))) return; const payload = await readJsonFile(file); if (payload.kind !== 'gpx-bibliothek-backup' || !Array.isArray(payload.accounts)) throw new Error(t('invalidBackup')); const merged = new Map(state.accounts.map((account) => [account.email.toLowerCase(), account])); payload.accounts.forEach((account) => merged.set(account.email.toLowerCase(), { ...account, id: account.id || id('account'), updatedAt: account.updatedAt || new Date().toISOString() })); state.accounts = [...merged.values()].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')); await putMany(STORES.accounts, state.accounts); state.settings = { ...state.settings, ...(payload.settings ?? {}) }; await saveSettings(); renderAll(); setStatus(t('backupImported')); }
@@ -3147,9 +3873,9 @@ async function shareApp() {
     setStatus(t('shareUnavailable'), true);
   }
 }
-function selectAllKomootTours(listName) { const ids = state.komootTours.filter((tour) => tour.type === listName).map((tour) => tour.id); const allSelected = ids.length > 0 && ids.every((tourId) => state.selectedKomootTourIds.has(tourId)); if (allSelected) { ids.forEach((tourId) => state.selectedKomootTourIds.delete(tourId)); state.komootUi.focusTourId = null; } else { ids.forEach((tourId) => state.selectedKomootTourIds.add(tourId)); state.komootUi.focusTourId = ids[0] ?? null; } state.komootUi.focusList = listName; state.komootUi.scrollTopByList[listName] = 0; renderKomoot(); void persistKomootCache(state.settings.activeAccountId); }
+function selectAllKomootTours(listName) { const ids = state.komootTours.filter((tour) => tour.type === listName).map((tour) => tour.id); const allSelected = ids.length > 0 && ids.every((tourId) => state.selectedKomootTourIds.has(tourId)); const container = listName === 'recorded' ? el.recordedList : el.plannedList; if (allSelected) { ids.forEach((tourId) => state.selectedKomootTourIds.delete(tourId)); } else { ids.forEach((tourId) => state.selectedKomootTourIds.add(tourId)); } container?.querySelectorAll('.tour-item').forEach((item) => { const tourId = item.getAttribute('data-tour-id') || ''; const checked = state.selectedKomootTourIds.has(tourId); item.classList.toggle('is-selected', checked); const checkbox = item.querySelector('.tour-checkbox'); if (checkbox) checkbox.checked = checked; }); renderKomootSelectionUi(); void persistKomootCache(state.settings.activeAccountId); }
 
-async function loadState() { state.db = await openDb(); const storedTracks = (await all(STORES.tracks)).map((track) => enrichTrackMetrics({ ...track, description: normalizeTrackDescription(track.description), dateStart: normalizeTrackDate(track.dateStart), photos: normalizePhotos(track.photos), color: track.color || defaultTrackColor(track), lastChanged: trackLastChanged(track) || track.importedAt || isoNow(), favorite: !!track.favorite, tags: normalizeTagList(track.tags), directions: normalizeDirections(track.directions) })).sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? '')); state.tracks = await hydrateTracksPhotos(storedTracks); state.accounts = (await all(STORES.accounts)).sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')); const settings = await all(STORES.settings); state.settings = { ...state.settings, ...(settings[0] ?? {}), komootCaches: { ...(settings[0]?.komootCaches ?? {}) } }; if (!['library', 'komoot', 'replay'].includes(state.settings.activeWorkspace)) state.settings.activeWorkspace = 'library'; applyPaneWidths(); if (!state.settings.activeAccountId && state.accounts[0]) { state.settings.activeAccountId = state.accounts[0].id; await saveSettings(); } const activeKomootAccount = state.accounts.find((account) => account.id === state.settings.activeAccountId) ?? state.accounts[0] ?? null; if (activeKomootAccount) restoreKomootCache(activeKomootAccount); }
+async function loadState() { state.db = await openDb(); const storedTracks = (await all(STORES.tracks)).map((track) => { const surfaceSegments = normalizeRangeSegments(track.surfaceSegments); const wayTypeSegments = normalizeRangeSegments(track.wayTypeSegments); return enrichTrackMetrics({ ...track, description: normalizeTrackDescription(track.description), dateStart: normalizeTrackDate(track.dateStart), surfaces: normalizeTagList(track.surfaces).length ? normalizeTagList(track.surfaces) : segmentValues(surfaceSegments), wayTypes: normalizeTagList(track.wayTypes).length ? normalizeTagList(track.wayTypes) : segmentValues(wayTypeSegments), surfaceSegments, wayTypeSegments, photos: normalizePhotos(track.photos), color: track.color || defaultTrackColor(track), lastChanged: trackLastChanged(track) || track.importedAt || isoNow(), favorite: !!track.favorite, tags: normalizeTagList(track.tags), directions: normalizeDirections(track.directions) }); }).sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? '')); state.tracks = await hydrateTracksPhotos(storedTracks); state.accounts = (await all(STORES.accounts)).sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')); const settings = await all(STORES.settings); state.settings = { ...state.settings, ...(settings[0] ?? {}), komootCaches: { ...(settings[0]?.komootCaches ?? {}) } }; if (!['library', 'komoot', 'replay'].includes(state.settings.activeWorkspace)) state.settings.activeWorkspace = 'library'; applyPaneWidths(); if (!state.settings.activeAccountId && state.accounts[0]) { state.settings.activeAccountId = state.accounts[0].id; await saveSettings(); } const activeKomootAccount = state.accounts.find((account) => account.id === state.settings.activeAccountId) ?? state.accounts[0] ?? null; if (activeKomootAccount) restoreKomootCache(activeKomootAccount); }
 function bindEvents() {
   el.workspaceButtons.forEach((button) => button.addEventListener('click', async () => {
     state.settings.activeWorkspace = button.dataset.workspace;
@@ -3245,15 +3971,28 @@ function bindEvents() {
     if (files.length) await importLocalFiles(files);
     event.target.value = '';
   });
-  el.librarySearchInput.addEventListener('input', renderLibrary);
-  el.libraryTypeFilter.addEventListener('change', renderLibrary);
-  el.libraryFavoriteFilter.addEventListener('change', renderLibrary);
-  el.librarySportFilter.addEventListener('change', renderLibrary);
-  el.libraryTagFilter.addEventListener('change', renderLibrary);
-  el.libraryMetaFilter.addEventListener('change', renderLibrary);
-  el.librarySortSelect.addEventListener('change', renderLibrary);
+  el.librarySearchInput.addEventListener('input', refreshLibraryFilterView);
+  el.libraryTypeFilter.addEventListener('change', refreshLibraryFilterView);
+  el.libraryFavoriteFilter.addEventListener('change', refreshLibraryFilterView);
+  el.librarySportFilter.addEventListener('change', refreshLibraryFilterView);
+  el.libraryTagFilter.addEventListener('change', refreshLibraryFilterView);
+  el.libraryMetaFilter.addEventListener('change', refreshLibraryFilterView);
+  el.librarySortSelect.addEventListener('change', refreshLibraryFilterView);
   el.exportSelectedGpxButton.addEventListener('click', exportSelectedTracksGpx);
   el.exportSelectedMultiTrackGpxButton?.addEventListener('click', exportSelectedTracksMultiGpx);
+  el.mergeSelectedTracksButton?.addEventListener('click', openMergeDialog);
+  el.mergeDialogSwapButton?.addEventListener('click', () => {
+    if (state.mergeUi.orderedTrackIds.length !== 2) return;
+    state.mergeUi.orderedTrackIds.reverse();
+    renderMergeDialog();
+  });
+  el.mergeDialog?.addEventListener('close', () => {
+    if (el.mergeDialog.returnValue === 'confirm') {
+      const orderedTracks = mergeDialogTracks();
+      void mergeSelectedTracks(orderedTracks);
+    }
+    state.mergeUi.orderedTrackIds = [];
+  });
   el.fitAllButton.addEventListener('click', fitSelection);
   el.mapPhotoModeButton?.addEventListener('click', async () => {
     if (state.settings.heatmapMode) return;
@@ -3263,16 +4002,38 @@ function bindEvents() {
     syncMap();
   });
   el.mapHeatmapButton?.addEventListener('click', async () => {
-    if (!state.settings.heatmapMode && !canRenderHeatmap()) {
-      setStatus(t('heatmapNeedsMultipleTracks'), true);
+      if (!state.settings.heatmapMode && !canRenderHeatmap()) {
+        setStatus(t('heatmapNeedsMultipleTracks'), true);
+        return;
+      }
+      state.settings.heatmapMode = !state.settings.heatmapMode;
+      if (state.settings.heatmapMode) state.settings.photoOverlayOnly = false;
+      await saveSettings();
+      renderMapPhotoModeButton();
+      renderMapHeatmapButton();
+      syncMap();
+      if (state.settings.heatmapMode) {
+        const stats = state.heatmapStats;
+        if (stats) {
+          setStatus(`Heatmap: ${stats.tracks} Tracks, ${stats.segments} Segmente, ${stats.hotspots} Hotspots`);
+        } else {
+          setStatus(t('heatmapNeedsMultipleTracks'), true);
+        }
+      } else {
+        setStatus(t('statusReady'));
+      }
+    });
+  el.mapSegmentButton?.addEventListener('click', async () => {
+    if (!state.settings.segmentOverlayMode && !highlightedTrackWithSegments()) {
+      setStatus(t('segmentOverlayNeedsTrack'), true);
       return;
     }
-    state.settings.heatmapMode = !state.settings.heatmapMode;
-    if (state.settings.heatmapMode) state.settings.photoOverlayOnly = false;
+    state.settings.segmentOverlayMode = !state.settings.segmentOverlayMode;
     await saveSettings();
-    renderMapPhotoModeButton();
-    renderMapHeatmapButton();
+    renderMapSegmentButton();
     syncMap();
+    renderProfile();
+    setStatus(state.settings.segmentOverlayMode ? t('mapSegments') : t('statusReady'));
   });
   el.prevTrackButton?.addEventListener('click', () => stepTrackSelection(-1));
   el.nextTrackButton?.addEventListener('click', () => stepTrackSelection(1));
@@ -3347,6 +4108,13 @@ function bindEvents() {
     renderReplayWorkspace();
     scheduleMapLayoutRefresh();
   });
+  const toggleReplayDirectionOverlay = async (collapsed) => {
+    state.settings.replayDirectionOverlayCollapsed = collapsed;
+    await saveSettings();
+    renderReplayWorkspace();
+  };
+  el.replayDirectionOverlayToggle?.addEventListener('click', () => void toggleReplayDirectionOverlay(true));
+  el.replayDirectionOverlayIcon?.addEventListener('click', () => void toggleReplayDirectionOverlay(false));
   window.addEventListener('pointerdown', (event) => {
     const replayOptionsMenu = document.querySelector('.replay-options-menu');
     if (!replayOptionsMenu?.hasAttribute('open')) return;

@@ -30,6 +30,16 @@ function log_debug(string $message, string $level = 'INFO'): void
     error_log(sprintf('[%s] [%s] %s', $timestamp, $level, $message));
 }
 
+function debug_json_sample(array $items): string
+{
+    $sample = array_slice($items, 0, 2);
+    if ($sample === []) {
+        return '[]';
+    }
+    $json = json_encode($sample, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    return $json !== false ? $json : '[unserializable sample]';
+}
+
 function json_response(array $payload, int $status = 200): void
 {
     http_response_code($status);
@@ -184,12 +194,55 @@ function first_text(...$values): ?string
         if ($value === null) {
             continue;
         }
+        if (is_array($value) || is_object($value)) {
+            continue;
+        }
         $text = trim((string) $value);
         if ($text !== '') {
             return $text;
         }
     }
     return null;
+}
+
+function komoot_object_property($value, string $key): mixed
+{
+    if (!is_array($value)) {
+        return null;
+    }
+    return $value[$key] ?? null;
+}
+
+function komoot_embedded_items(mixed $value): array
+{
+    if ($value === null) {
+        return [];
+    }
+    if (is_string($value)) {
+        $text = trim($value);
+        return $text === '' ? [] : [$text];
+    }
+    if (is_array($value)) {
+        foreach (['items', 'segments', 'elements', 'results', 'values', 'data', 'collection'] as $key) {
+            if (array_key_exists($key, $value)) {
+                return komoot_embedded_items($value[$key]);
+            }
+        }
+        $looksLikeItem = array_key_exists('name', $value)
+            || array_key_exists('type', $value)
+            || array_key_exists('instruction', $value)
+            || array_key_exists('distance', $value)
+            || array_key_exists('segment_length', $value);
+        if ($looksLikeItem) {
+            return [$value];
+        }
+        $items = [];
+        foreach ($value as $entry) {
+            $items = array_merge($items, komoot_embedded_items($entry));
+        }
+        return $items;
+    }
+    return [$value];
 }
 
 function normalize_photo_url(?string $url): ?string
@@ -508,6 +561,9 @@ try {
                 $tour = real_tour_detail($session, $tourId, $language);
                 $coverImages = real_cover_images($session, $tourId);
                 $photoCandidates = cover_image_candidates($coverImages);
+                $surfaceItems = komoot_embedded_items($tour['_embedded']['surfaces'] ?? null);
+                $wayTypeItems = komoot_embedded_items($tour['_embedded']['way_types'] ?? null);
+                $directionItems = komoot_embedded_items($tour['_embedded']['directions'] ?? null);
                 $photos = [];
                 $seen = [];
                 foreach ($photoCandidates as $candidate) {
@@ -534,9 +590,68 @@ try {
                     'dateStart' => !empty($tour['date']) ? (new DateTimeImmutable($tour['date']))->format('Y-m-d') : null,
                     'durationHours' => !empty($tour['duration']) ? round(((float) $tour['duration']) / 3600, 1) : null,
                     'sport' => $tour['sport'] ?? null,
-                    'surfaces' => array_values(array_filter(array_map(static fn($item) => is_array($item) ? ($item['name'] ?? $item['type'] ?? null) : $item, $tour['_embedded']['surfaces'] ?? []))),
-                    'wayTypes' => array_values(array_filter(array_map(static fn($item) => is_array($item) ? ($item['name'] ?? $item['type'] ?? null) : $item, $tour['_embedded']['way_types'] ?? []))),
+                    'surfaces' => array_values(array_unique(array_filter(array_map(static fn($item) => is_array($item) ? ($item['name'] ?? $item['type'] ?? $item['label'] ?? $item['surface'] ?? $item['surface_type'] ?? (!empty($item['element']) ? preg_replace('/^[a-z]+#/', '', (string) $item['element']) : null) ?? $item['slug'] ?? $item['value'] ?? null) : $item, $surfaceItems)))),
+                    'surfaceSegments' => array_values(array_filter(array_map(static function ($item) {
+                        if (!is_array($item)) {
+                            return null;
+                        }
+                        $value = $item['name'] ?? $item['type'] ?? $item['label'] ?? $item['surface'] ?? $item['surface_type'] ?? (!empty($item['element']) ? preg_replace('/^[a-z]+#/', '', (string) $item['element']) : null) ?? $item['slug'] ?? $item['value'] ?? null;
+                        if (!isset($item['from'], $item['to']) || $value === null || $value === '') {
+                            return null;
+                        }
+                        return [
+                            'from' => (int) $item['from'],
+                            'to' => (int) $item['to'],
+                            'value' => (string) $value,
+                            'raw' => !empty($item['element']) ? (string) $item['element'] : (string) $value,
+                        ];
+                    }, $surfaceItems))),
+                    'wayTypes' => array_values(array_unique(array_filter(array_map(static fn($item) => is_array($item) ? ($item['name'] ?? $item['type'] ?? $item['label'] ?? $item['way_type'] ?? $item['wayType'] ?? (!empty($item['element']) ? preg_replace('/^[a-z]+#/', '', (string) $item['element']) : null) ?? $item['slug'] ?? $item['value'] ?? null) : $item, $wayTypeItems)))),
+                    'wayTypeSegments' => array_values(array_filter(array_map(static function ($item) {
+                        if (!is_array($item)) {
+                            return null;
+                        }
+                        $value = $item['name'] ?? $item['type'] ?? $item['label'] ?? $item['way_type'] ?? $item['wayType'] ?? (!empty($item['element']) ? preg_replace('/^[a-z]+#/', '', (string) $item['element']) : null) ?? $item['slug'] ?? $item['value'] ?? null;
+                        if (!isset($item['from'], $item['to']) || $value === null || $value === '') {
+                            return null;
+                        }
+                        return [
+                            'from' => (int) $item['from'],
+                            'to' => (int) $item['to'],
+                            'value' => (string) $value,
+                            'raw' => !empty($item['element']) ? (string) $item['element'] : (string) $value,
+                        ];
+                    }, $wayTypeItems))),
+                    'directions' => array_values(array_filter(array_map(static function ($item) {
+                        if (!is_array($item)) {
+                            return null;
+                        }
+                        return [
+                            'instruction' => $item['instruction'] ?? $item['text'] ?? $item['name'] ?? $item['title'] ?? null,
+                            'distanceM' => isset($item['distance']) ? (float) $item['distance'] : (isset($item['segment_length']) ? (float) $item['segment_length'] : (isset($item['length']) ? (float) $item['length'] : null)),
+                            'type' => $item['type'] ?? $item['_type'] ?? $item['icon'] ?? null,
+                        ];
+                    }, $directionItems))),
                 ];
+                if (!$surfaceItems) {
+                    log_debug('Tour ' . ($tour['id'] ?? $tourId) . ' returned no surfaces from Komoot', 'INFO');
+                } else {
+                    log_debug('Tour ' . ($tour['id'] ?? $tourId) . ' surfaces: ' . count($surfaceItems) . ' item(s)', 'INFO');
+                    log_debug('Tour ' . ($tour['id'] ?? $tourId) . ' surfaces raw sample: ' . debug_json_sample($surfaceItems), 'INFO');
+                    log_debug('Tour ' . ($tour['id'] ?? $tourId) . ' surfaces mapped sample: ' . debug_json_sample($items[array_key_last($items)]['surfaces'] ?? []), 'INFO');
+                }
+                if (!$wayTypeItems) {
+                    log_debug('Tour ' . ($tour['id'] ?? $tourId) . ' returned no way_types from Komoot', 'INFO');
+                } else {
+                    log_debug('Tour ' . ($tour['id'] ?? $tourId) . ' way_types: ' . count($wayTypeItems) . ' item(s)', 'INFO');
+                    log_debug('Tour ' . ($tour['id'] ?? $tourId) . ' way_types raw sample: ' . debug_json_sample($wayTypeItems), 'INFO');
+                    log_debug('Tour ' . ($tour['id'] ?? $tourId) . ' way_types mapped sample: ' . debug_json_sample($items[array_key_last($items)]['wayTypes'] ?? []), 'INFO');
+                }
+                if (!$directionItems) {
+                    log_debug('Tour ' . ($tour['id'] ?? $tourId) . ' returned no directions from Komoot', 'INFO');
+                } else {
+                    log_debug('Tour ' . ($tour['id'] ?? $tourId) . ' directions: ' . count($directionItems) . ' item(s)', 'INFO');
+                }
             }
 
             log_debug('Import generated ' . count($items) . ' GPX item(s)', 'OK');

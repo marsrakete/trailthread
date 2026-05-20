@@ -82,6 +82,18 @@ function ConvertTo-JsonBytes($Object) {
   [System.Text.Encoding]::UTF8.GetBytes(($Object | ConvertTo-Json -Depth 12))
 }
 
+function Format-DebugJsonSample($Items) {
+  $sample = @($Items | Select-Object -First 2)
+  if (-not $sample.Count) {
+    return "[]"
+  }
+  try {
+    return ($sample | ConvertTo-Json -Depth 8 -Compress)
+  } catch {
+    return "[unserializable sample]"
+  }
+}
+
 function Read-BodyText($Request) {
   $reader = [System.IO.StreamReader]::new($Request.InputStream, $Request.ContentEncoding)
   try {
@@ -829,8 +841,66 @@ try {
                 dateStart = if ($tour.date) { ([datetimeoffset]$tour.date).ToString("yyyy-MM-dd") } else { $null }
                 durationHours = if ($tour.duration) { [math]::Round(([double]$tour.duration / 3600), 1) } else { $null }
                 sport = $tour.sport
-                surfaces = @($surfaceItems | ForEach-Object { if ($_ -is [string]) { $_ } elseif ($_.name) { $_.name } elseif ($_.type) { $_.type } })
-                wayTypes = @($wayTypeItems | ForEach-Object { if ($_ -is [string]) { $_ } elseif ($_.name) { $_.name } elseif ($_.type) { $_.type } })
+                surfaces = @($surfaceItems | ForEach-Object {
+                  if ($_ -is [string]) { $_ }
+                  elseif ($_.name) { $_.name }
+                  elseif ($_.type) { $_.type }
+                  elseif ($_.label) { $_.label }
+                  elseif ($_.surface) { $_.surface }
+                  elseif ($_.surface_type) { $_.surface_type }
+                  elseif ($_.element) { ([string]$_.element) -replace '^[a-z]+#', '' }
+                  elseif ($_.slug) { $_.slug }
+                  elseif ($_.value) { $_.value }
+                } | Where-Object { $_ } | Select-Object -Unique)
+                surfaceSegments = @($surfaceItems | ForEach-Object {
+                  $value = if ($_ -is [string]) { $_ }
+                    elseif ($_.name) { $_.name }
+                    elseif ($_.type) { $_.type }
+                    elseif ($_.label) { $_.label }
+                    elseif ($_.surface) { $_.surface }
+                    elseif ($_.surface_type) { $_.surface_type }
+                    elseif ($_.element) { ([string]$_.element) -replace '^[a-z]+#', '' }
+                    elseif ($_.slug) { $_.slug }
+                    elseif ($_.value) { $_.value }
+                    else { $null }
+                  if ($null -eq $_.from -or $null -eq $_.to -or -not $value) { return }
+                  @{
+                    from = [int]$_.from
+                    to = [int]$_.to
+                    value = [string]$value
+                    raw = if ($_.element) { [string]$_.element } else { [string]$value }
+                  }
+                })
+                wayTypes = @($wayTypeItems | ForEach-Object {
+                  if ($_ -is [string]) { $_ }
+                  elseif ($_.name) { $_.name }
+                  elseif ($_.type) { $_.type }
+                  elseif ($_.label) { $_.label }
+                  elseif ($_.way_type) { $_.way_type }
+                  elseif ($_.wayType) { $_.wayType }
+                  elseif ($_.element) { ([string]$_.element) -replace '^[a-z]+#', '' }
+                  elseif ($_.slug) { $_.slug }
+                  elseif ($_.value) { $_.value }
+                } | Where-Object { $_ } | Select-Object -Unique)
+                wayTypeSegments = @($wayTypeItems | ForEach-Object {
+                  $value = if ($_ -is [string]) { $_ }
+                    elseif ($_.name) { $_.name }
+                    elseif ($_.type) { $_.type }
+                    elseif ($_.label) { $_.label }
+                    elseif ($_.way_type) { $_.way_type }
+                    elseif ($_.wayType) { $_.wayType }
+                    elseif ($_.element) { ([string]$_.element) -replace '^[a-z]+#', '' }
+                    elseif ($_.slug) { $_.slug }
+                    elseif ($_.value) { $_.value }
+                    else { $null }
+                  if ($null -eq $_.from -or $null -eq $_.to -or -not $value) { return }
+                  @{
+                    from = [int]$_.from
+                    to = [int]$_.to
+                    value = [string]$value
+                    raw = if ($_.element) { [string]$_.element } else { [string]$value }
+                  }
+                })
                 directions = @($directionItems | ForEach-Object {
                   @{
                     instruction = if ($_.instruction) { [string]$_.instruction } elseif ($_.text) { [string]$_.text } elseif ($_.name) { [string]$_.name } elseif ($_.title) { [string]$_.title } else { $null }
@@ -843,11 +913,15 @@ try {
                 Write-DebugLog "Tour $($tour.id) returned no surfaces from Komoot" "INFO"
               } else {
                 Write-DebugLog "Tour $($tour.id) surfaces: $($surfaceItems.Count) item(s)" "INFO"
+                Write-DebugLog "Tour $($tour.id) surfaces raw sample: $(Format-DebugJsonSample $surfaceItems)" "INFO"
+                Write-DebugLog "Tour $($tour.id) surfaces mapped sample: $(Format-DebugJsonSample $items[-1].surfaces)" "INFO"
               }
               if (-not $wayTypeItems.Count) {
                 Write-DebugLog "Tour $($tour.id) returned no way_types from Komoot" "INFO"
               } else {
                 Write-DebugLog "Tour $($tour.id) way_types: $($wayTypeItems.Count) item(s)" "INFO"
+                Write-DebugLog "Tour $($tour.id) way_types raw sample: $(Format-DebugJsonSample $wayTypeItems)" "INFO"
+                Write-DebugLog "Tour $($tour.id) way_types mapped sample: $(Format-DebugJsonSample $items[-1].wayTypes)" "INFO"
               }
               if (-not $directionItems.Count) {
                 Write-DebugLog "Tour $($tour.id) returned no directions from Komoot" "INFO"

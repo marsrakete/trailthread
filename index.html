@@ -10,11 +10,11 @@
   <meta property="og:title" content="Trailthread">
   <meta property="og:description" content="Tracks, Karten, Erinnerungen. Lokale Outdoor-App mit Bibliothek, Komoot-Import und Replay.">
   <meta property="og:url" content="https://marsrakete.github.io/trailthread/">
-  <meta property="og:image" content="https://marsrakete.github.io/trailthread/icons/icon-512.png">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://marsrakete.github.io/trailthread/icons/trailthread-og-workspaces.png">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Trailthread">
   <meta name="twitter:description" content="Tracks, Karten, Erinnerungen. Lokale Outdoor-App mit Bibliothek, Komoot-Import und Replay.">
-  <meta name="twitter:image" content="https://marsrakete.github.io/trailthread/icons/icon-512.png">
+  <meta name="twitter:image" content="https://marsrakete.github.io/trailthread/icons/trailthread-og-workspaces.png">
   <title>Trailthread</title>
   <link rel="canonical" href="https://marsrakete.github.io/trailthread/">
   <link rel="manifest" href="manifest.json">
@@ -140,6 +140,7 @@
               </div>
             </details>
           </div>
+          <button id="merge-selected-tracks-button" class="button button-subtle" type="button" data-i18n="mergeSelectedTracks"></button>
           <button id="library-toggle-selection-button" class="button button-subtle" type="button" data-i18n="selectAll"></button>
           <button id="export-tour-backup-button" class="button button-ghost" type="button" data-i18n="exportTours"></button>
           <button id="export-selected-tour-backup-button" class="button button-ghost" type="button" data-i18n="exportSelectedTours"></button>
@@ -152,35 +153,54 @@
 
     <main class="main-pane">
       <section id="library-workspace" class="workspace-view">
-        <header class="workspace-header">
-          <p class="status-kicker" data-i18n="mapKicker"></p>
-          <div id="status-pill" class="status-pill" data-i18n="statusReady"></div>
-        </header>
+        <div id="status-toast" class="status-toast" hidden></div>
         <div class="map-toolbar">
           <button id="prev-track-button" class="button button-subtle toolbar-nav-button" type="button" data-i18n="prevTrack" aria-label="Vorheriger Track">←</button>
           <button id="fit-all-button" class="button button-ghost" type="button" data-i18n="fitSelection"></button>
           <button id="next-track-button" class="button button-subtle toolbar-nav-button" type="button" data-i18n="nextTrack" aria-label="Naechster Track">→</button>
-          <button id="map-photo-mode-button" class="button button-subtle" type="button"></button>
-          <div class="heatmap-help">
-            <button id="map-heatmap-button" class="button button-subtle" type="button" data-i18n="mapHeatmap"></button>
-            <button class="icon-button heatmap-help-button" type="button" aria-label="Heatmap-Hilfe" title="Heatmap-Hilfe">?</button>
-            <div class="heatmap-help-popover" role="note">
-              <strong data-i18n="heatmapHelpTitle"></strong>
-              <p data-i18n="heatmapHelpText"></p>
-              <div class="heatmap-help-legend">
-                <span class="heatmap-help-dot heatmap-help-dot-low"></span>
-                <span data-i18n="heatmapHelpLow"></span>
-              </div>
-              <div class="heatmap-help-legend">
-                <span class="heatmap-help-dot heatmap-help-dot-mid"></span>
-                <span data-i18n="heatmapHelpMid"></span>
-              </div>
-              <div class="heatmap-help-legend">
-                <span class="heatmap-help-dot heatmap-help-dot-high"></span>
-                <span data-i18n="heatmapHelpHigh"></span>
+            <button id="map-photo-mode-button" class="button button-subtle" type="button"></button>
+            <div class="heatmap-tools">
+              <button id="map-heatmap-button" class="button button-subtle" type="button" data-i18n="mapHeatmap"></button>
+              <div class="heatmap-help">
+                <button class="icon-button heatmap-help-button" type="button" aria-label="Heatmap-Hilfe" title="Heatmap-Hilfe">?</button>
+                <div class="heatmap-help-popover" role="note">
+                  <strong data-i18n="heatmapHelpTitle"></strong>
+                  <p data-i18n="heatmapHelpText"></p>
+                  <div class="heatmap-help-legend">
+                    <span class="heatmap-help-dot heatmap-help-dot-low"></span>
+                    <span data-i18n="heatmapHelpLow"></span>
+                  </div>
+                  <div class="heatmap-help-legend">
+                    <span class="heatmap-help-dot heatmap-help-dot-mid"></span>
+                    <span data-i18n="heatmapHelpMid"></span>
+                  </div>
+                  <div class="heatmap-help-legend">
+                    <span class="heatmap-help-dot heatmap-help-dot-high"></span>
+                    <span data-i18n="heatmapHelpHigh"></span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+            <div class="segment-tools">
+              <button id="map-segment-button" class="button button-subtle" type="button" data-i18n="mapSegments"></button>
+              <div class="heatmap-help">
+                <button class="icon-button heatmap-help-button" type="button" aria-label="Segment-Hilfe" title="Segment-Hilfe">?</button>
+                <div class="heatmap-help-popover segment-help-popover" role="note">
+                  <strong data-i18n="segmentHelpTitle"></strong>
+                  <p data-i18n="segmentHelpText"></p>
+                  <div class="map-segment-legend-grid">
+                    <div class="map-segment-legend-section">
+                      <span class="map-segment-legend-label" data-i18n="labelSurface"></span>
+                      <div id="segment-help-surface-items" class="map-segment-legend-items"></div>
+                    </div>
+                    <div class="map-segment-legend-section">
+                      <span class="map-segment-legend-label" data-i18n="labelWayType"></span>
+                      <div id="segment-help-waytype-items" class="map-segment-legend-items"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
         </div>
         <section id="onboarding-panel" class="panel onboarding-panel" hidden>
           <div class="panel-heading">
@@ -217,6 +237,16 @@
             <div>
               <p class="status-kicker" data-i18n="profileTitle"></p>
               <strong id="profile-track-name">-</strong>
+            </div>
+            <div id="profile-segment-summary" class="profile-segment-summary profile-segment-summary-inline" hidden>
+              <div class="profile-segment-row">
+                <span class="profile-segment-label" data-i18n="analysisSurfaceTitle"></span>
+                <div id="profile-surface-breakdown" class="profile-segment-items"></div>
+              </div>
+              <div class="profile-segment-row">
+                <span class="profile-segment-label" data-i18n="analysisWayTypeTitle"></span>
+                <div id="profile-waytype-breakdown" class="profile-segment-items"></div>
+              </div>
             </div>
             <div class="profile-stats">
               <div class="profile-stat">
@@ -458,6 +488,14 @@
           <div id="replay-map-shell" class="replay-map-shell">
             <div id="replay-map-2d" class="replay-map-surface"></div>
             <div id="replay-map-3d" class="replay-map-surface" hidden></div>
+            <div id="replay-direction-overlay" class="replay-direction-overlay">
+              <button id="replay-direction-overlay-toggle" class="icon-button replay-direction-overlay-toggle" type="button" aria-label="Abbiegung einklappen" title="Abbiegung einklappen">–</button>
+              <div class="replay-direction-overlay-copy">
+                <span data-i18n="replayNextDirection"></span>
+                <strong id="replay-direction-value">-</strong>
+              </div>
+            </div>
+            <button id="replay-direction-overlay-icon" class="icon-button replay-direction-overlay-icon" type="button" aria-label="Abbiegung anzeigen" title="Abbiegung anzeigen" hidden>➤</button>
           </div>
           <div class="replay-map-overlay replay-map-readouts">
             <div class="overlay-block">
@@ -491,10 +529,6 @@
             <div class="overlay-block">
               <span data-i18n="pointsTitle"></span>
               <strong id="replay-point-value">-</strong>
-            </div>
-            <div class="overlay-block overlay-block-direction">
-              <span data-i18n="replayNextDirection"></span>
-              <strong id="replay-direction-value">-</strong>
             </div>
           </div>
         </section>
@@ -640,6 +674,34 @@
     </form>
   </dialog>
 
+  <dialog id="merge-dialog" class="modal-dialog">
+    <form method="dialog" class="modal-sheet modal-sheet-confirm merge-sheet">
+      <div class="panel-heading">
+        <h2 data-i18n="mergeDialogTitle"></h2>
+        <p data-i18n="mergeDialogDescription"></p>
+      </div>
+      <div class="merge-preview">
+        <section class="merge-track-card">
+          <span class="merge-track-kicker" data-i18n="mergeDialogFirst"></span>
+          <strong id="merge-track-first-name"></strong>
+          <span id="merge-track-first-meta" class="track-submeta"></span>
+        </section>
+        <div class="merge-swap-row">
+          <button id="merge-dialog-swap-button" class="button button-ghost" type="button" data-i18n="mergeDialogSwap"></button>
+        </div>
+        <section class="merge-track-card">
+          <span class="merge-track-kicker" data-i18n="mergeDialogSecond"></span>
+          <strong id="merge-track-second-name"></strong>
+          <span id="merge-track-second-meta" class="track-submeta"></span>
+        </section>
+      </div>
+      <div class="button-row">
+        <button id="merge-dialog-confirm" class="button button-primary" type="submit" value="confirm" data-i18n="mergeDialogConfirm"></button>
+        <button class="button button-ghost" type="submit" value="cancel" data-i18n="cancelButton"></button>
+      </div>
+    </form>
+  </dialog>
+
   <template id="track-item-template">
     <li class="track-item">
       <div class="track-card-top">
@@ -647,6 +709,8 @@
         <div class="track-actions">
           <input class="track-checkbox" type="checkbox" hidden>
           <input class="track-color-input" type="color" value="#ff0000" aria-label="Track color">
+          <button class="icon-button komoot-link-button" type="button" title="Komoot">↗</button>
+          <button class="icon-button edit-button" type="button" title="Edit">✎</button>
           <button class="icon-button export-button" type="button" title="Export GPX">⇩</button>
           <button class="icon-button focus-button" type="button" title="Focus">⌖</button>
           <button class="icon-button replay-button" type="button" title="Replay">▶</button>
