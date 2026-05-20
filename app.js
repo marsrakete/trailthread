@@ -4,7 +4,8 @@ const DB_NAME = "gpx-bibliothek";
 const DB_VERSION = 4;
 const STORES = { tracks: "tracks", photos: "photos", accounts: "accounts", settings: "settings" };
 const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const PROXY_URL = "http://localhost:8787/api/komoot";
+const LOCAL_PROXY_ORIGIN = "http://localhost:8787";
+const PROXY_PATH = "/api/komoot";
 const RECORDED_COLORS = ["#0050ff", "#006dff", "#0077cc", "#00a86b", "#3a86ff", "#6d28d9"];
 const PLANNED_COLORS = ["#ff6b00", "#ff3d00", "#e11d48", "#c026d3", "#a21caf", "#f97316"];
 const HIGHLIGHT_COLOR = "#ff2a1a";
@@ -115,6 +116,30 @@ function touchTrack(track, changes = {}) {
 }
 const komootProgressText = () => lang() === 'fr' ? { loadingTours: 'Chargement des tours...', importing: 'Import des tours...', done: 'Termine' } : lang() === 'en' ? { loadingTours: 'Loading tours...', importing: 'Importing tours...', done: 'Done' } : { loadingTours: 'Touren werden geladen...', importing: 'Touren werden importiert...', done: 'Fertig' };
 const hashString = (value) => [...`${value ?? ''}`].reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 7);
+const LOOPBACK_HOST_PATTERN = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\]|::1)$/i;
+function isLoopbackHost(hostname = "") {
+  return LOOPBACK_HOST_PATTERN.test(`${hostname ?? ""}`.trim());
+}
+function appRunsOnLoopbackOrigin() {
+  return isLoopbackHost(globalThis.location?.hostname || "");
+}
+function proxyBaseUrl() {
+  return appRunsOnLoopbackOrigin() ? PROXY_PATH : `${LOCAL_PROXY_ORIGIN}${PROXY_PATH}`;
+}
+function shouldRequestLocalNetworkAccess() {
+  return !appRunsOnLoopbackOrigin() && /^https?:$/i.test(globalThis.location?.protocol || "");
+}
+function proxyBlockedByHostedLoopbackPolicy(message = "") {
+  const normalized = `${message ?? ""}`.toLowerCase();
+  return normalized.includes("loopback address space")
+    || normalized.includes("private network access")
+    || (normalized.includes("failed to fetch") && shouldRequestLocalNetworkAccess());
+}
+function normalizeProxyError(error) {
+  const message = `${error?.message ?? error ?? ""}`.trim();
+  if (proxyBlockedByHostedLoopbackPolicy(message)) return t("proxyHostedLoopbackBlocked");
+  return message || t("proxyOffline");
+}
 const SPORT_LABELS = {
   cycling: { de: 'Radfahren', en: 'Cycling', fr: 'Cyclisme', icon: '🚴', aliases: ['cycling', 'bike', 'bicycle', 'touring_bike', 'cycle_touring', 'commute', 'commuting', 'city_bike', 'fiets'] },
   road_cycling: { de: 'Rennradfahren', en: 'Road cycling', fr: 'Cyclisme sur route', icon: '🚴', aliases: ['road_cycling', 'road_bike', 'racebike', 'roadbike', 'racing_bike'] },
@@ -2082,7 +2107,12 @@ function renderKomoot() {
   const recorded = state.komootTours.filter((tour) => tour.type === 'recorded').sort(byNewest); const planned = state.komootTours.filter((tour) => tour.type === 'planned').sort(byNewest); renderList(el.recordedList, recorded, 'recorded'); renderList(el.plannedList, planned, 'planned'); restoreKomootListState(); el.recordedSummary.textContent = recorded.length ? t('komootLoadedSummary', { count: recorded.length }) : t('recordedEmpty'); el.plannedSummary.textContent = planned.length ? t('komootLoadedSummary', { count: planned.length }) : t('plannedEmpty'); renderKomootSelectionUi(); if (komootRestoreRaf) window.cancelAnimationFrame(komootRestoreRaf); komootRestoreRaf = window.requestAnimationFrame(() => { restoreKomootListState(); komootRestoreRaf = 0; });
   renderKomootLoadButton();
 }
-function renderProxy() { el.diagProxy.textContent = state.proxy.online ? t('proxyOnline') : t('proxyUnknown'); el.diagMode.textContent = state.proxy.mode ? t(state.proxy.mode === 'stub' ? 'proxyModeStub' : 'proxyModeReal') : t('proxyModeUnknown'); el.diagChecked.textContent = state.proxy.lastCheckAt ? new Date(state.proxy.lastCheckAt).toLocaleString(lang()) : t('lastCheckNever'); el.diagError.textContent = state.proxy.lastError || t('noError'); }
+function renderProxy() {
+  el.diagProxy.textContent = state.proxy.online ? t('proxyOnline') : state.proxy.lastCheckAt ? t('proxyOffline') : t('proxyUnknown');
+  el.diagMode.textContent = state.proxy.mode ? t(state.proxy.mode === 'stub' ? 'proxyModeStub' : 'proxyModeReal') : t('proxyModeUnknown');
+  el.diagChecked.textContent = state.proxy.lastCheckAt ? new Date(state.proxy.lastCheckAt).toLocaleString(lang()) : t('lastCheckNever');
+  el.diagError.textContent = state.proxy.lastError || t('noError');
+}
 function renderKomootProgress() { const progress = state.komootUi.progress; el.komootProgress.hidden = !progress.active; el.komootProgressLabel.textContent = progress.label || ''; el.komootProgressValue.textContent = progress.indeterminate ? '...' : `${Math.round(progress.value)}%`; if (progress.indeterminate) { el.komootProgressBar.removeAttribute('value'); } else { el.komootProgressBar.value = progress.value; } }
 function setKomootProgress(label, value = 0, indeterminate = false) { state.komootUi.progress = { active: true, label, value, indeterminate }; renderKomootProgress(); }
 function clearKomootProgress() { state.komootUi.progress = { active: false, label: '', value: 0, indeterminate: false }; renderKomootProgress(); }
@@ -3786,9 +3816,39 @@ async function importTourBackupRecords(records) {
 }
 async function importLocalFiles(files) { const records = []; for (const file of files) records.push(buildTrackRecord({ gpxText: await file.text(), fileName: file.name, source: 'local', type: 'unknown', account: null })); await importTrackRecords(records); }
 
-async function proxyRequest(path, options = {}) { const response = await fetch(`${PROXY_URL}${path}`, { method: options.method ?? 'GET', headers: options.body ? { 'Content-Type': 'application/json' } : {}, body: options.body ? JSON.stringify(options.body) : undefined }); const payload = await response.json().catch(() => null); if (!response.ok || !payload?.ok) throw new Error(payload?.error || `HTTP ${response.status}`); return payload; }
+async function proxyRequest(path, options = {}) {
+  const url = `${proxyBaseUrl()}${path}`;
+  let response;
+  try {
+    response = await fetch(url, {
+      method: options.method ?? 'GET',
+      headers: options.body ? { 'Content-Type': 'application/json' } : {},
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      targetAddressSpace: shouldRequestLocalNetworkAccess() ? 'local' : undefined
+    });
+  } catch (error) {
+    throw new Error(normalizeProxyError(error));
+  }
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.ok) throw new Error(payload?.error || `HTTP ${response.status}`);
+  return payload;
+}
 async function ensureProxyAccountLogin(account) { if (!account) throw new Error(t('accountRequired')); await proxyRequest('/login', { method: 'POST', body: { email: account.email, password: account.password } }); }
-async function checkProxy() { try { const payload = await proxyRequest('/health'); state.proxy = { ...state.proxy, online: true, mode: payload.mode ?? null, lastCheckAt: payload.serverTime || new Date().toISOString(), lastError: null }; renderProxy(); setKomootStatus(t('proxyOnline')); return true; } catch (error) { state.proxy = { ...state.proxy, online: false, lastCheckAt: new Date().toISOString(), lastError: error.message }; renderProxy(); setKomootStatus(t('proxyOffline'), true); return false; } }
+async function checkProxy() {
+  try {
+    const payload = await proxyRequest('/health');
+    state.proxy = { ...state.proxy, online: true, mode: payload.mode ?? null, lastCheckAt: payload.serverTime || new Date().toISOString(), lastError: null };
+    renderProxy();
+    setKomootStatus(t('proxyOnline'));
+    return true;
+  } catch (error) {
+    const message = normalizeProxyError(error);
+    state.proxy = { ...state.proxy, online: false, lastCheckAt: new Date().toISOString(), lastError: message };
+    renderProxy();
+    setKomootStatus(message, true);
+    return false;
+  }
+}
 async function saveAccount() { const email = el.accountEmailInput.value.trim(); const password = el.accountPasswordInput.value; if (!email || !password) return; if (!await checkProxy()) return; try { const payload = await proxyRequest('/login', { method: 'POST', body: { email, password } }); const current = state.accounts.find((account) => account.email.toLowerCase() === email.toLowerCase()); const account = { id: current?.id ?? id('account'), email, password, label: payload.user?.name || email.split('@')[0] || t('accountLabelFallback'), remoteUserId: payload.user?.id ?? null, updatedAt: new Date().toISOString() }; await put(STORES.accounts, account); state.accounts = state.accounts.filter((item) => item.id !== account.id).concat(account).sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')); state.settings.activeAccountId = account.id; await saveSettings(); el.accountDialog.close(); el.accountEmailInput.value = ''; el.accountPasswordInput.value = ''; renderAll(); setStatus(t('accountStored')); setKomootStatus(t('connectedAs', { name: account.label })); } catch (error) { state.proxy.lastError = error.message; renderProxy(); setStatus(t('accountLoginFailed'), true); } }
 async function loadKomootTours() { const account = state.accounts.find((item) => item.id === (el.komootAccountSelect.value || state.settings.activeAccountId)); if (!account) { setKomootStatus(t('accountRequired'), true); return; } state.settings.activeAccountId = account.id; await saveSettings(); if (!await checkProxy()) return; try { const hadCache = !!komootCacheForAccount(account.id)?.tours?.length; const previousSelection = new Set(state.selectedKomootTourIds); setKomootProgress(komootProgressText().loadingTours, 20, false); await ensureProxyAccountLogin(account); setKomootProgress(komootProgressText().loadingTours, 55, false); const payload = await proxyRequest('/tours'); setKomootProgress(komootProgressText().loadingTours, 100, false); state.komootTours = (payload.tours ?? []).map((tour) => normalizeKomootTourSummary(tour, account)); const validIds = new Set(state.komootTours.map((tour) => tour.id)); state.selectedKomootTourIds = new Set([...previousSelection].filter((tourId) => validIds.has(tourId))); await persistKomootCache(account.id); renderKomoot(); setKomootStatus(t(hadCache ? 'komootRefreshedSummary' : 'komootLoadedSummary', { count: state.komootTours.length })); window.setTimeout(clearKomootProgress, 500); } catch (error) { clearKomootProgress(); state.proxy.lastError = error.message; renderProxy(); setKomootStatus(error.message, true); } }
 async function importKomootSelection() { if (!state.komootTours.length) { setKomootStatus(t('loadToursFirst'), true); return; } const ids = [...state.selectedKomootTourIds]; if (!ids.length) { setKomootStatus(t('selectToursFirst'), true); return; } const account = activeAccount(); if (!account) { setKomootStatus(t('accountRequired'), true); return; } if (!await checkProxy()) return; try { setKomootProgress(komootProgressText().importing, 15, false); await ensureProxyAccountLogin(account); setKomootProgress(komootProgressText().importing, 35, false); const payload = await proxyRequest('/import', { method: 'POST', body: { language: lang(), tourIds: ids } }); setKomootProgress(komootProgressText().importing, 80, false); const toursById = new Map(state.komootTours.map((tour) => [tour.id, tour])); const records = payload.items.map((item) => { const summary = toursById.get(item.id); return buildTrackRecord({ gpxText: item.gpx, fileName: item.fileName, source: 'komoot', type: summary?.type || 'unknown', account: { ...account, sourceTrackId: item.id }, description: item.description || null, photos: item.photos || null, meta: { dateStart: item.dateStart || summary?.dateStart || summary?.date || null, durationHours: item.durationHours ?? null, sport: item.sport || summary?.sport || null, surfaces: item.surfaces || null, wayTypes: item.wayTypes || null, surfaceSegments: item.surfaceSegments || null, wayTypeSegments: item.wayTypeSegments || null, directions: item.directions || null } }); }); const result = await importTrackRecords(records, true); setKomootProgress(komootProgressText().done, 100, false); setKomootStatus(t('komootImported', { count: result.imported })); window.setTimeout(clearKomootProgress, 500); } catch (error) { clearKomootProgress(); state.proxy.lastError = error.message; renderProxy(); setKomootStatus(error.message, true); } }

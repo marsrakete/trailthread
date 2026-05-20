@@ -12,7 +12,7 @@ $debug = in_array(strtolower((string) env_value('KOMOOT_PROXY_DEBUG', '0')), ['1
 $timezone = (string) env_value('KOMOOT_PROXY_TIMEZONE', 'Europe/Berlin');
 $rootDir = __DIR__;
 $sessionFile = (string) env_value('KOMOOT_PROXY_SESSION_FILE', $rootDir . DIRECTORY_SEPARATOR . 'artifacts' . DIRECTORY_SEPARATOR . 'komoot-proxy-session.json');
-$allowedOrigins = array_values(array_filter(array_map('trim', explode(',', (string) env_value('KOMOOT_PROXY_ALLOWED_ORIGINS', 'http://localhost:5000,http://127.0.0.1:5000')))));
+$allowedOrigins = array_values(array_filter(array_map('trim', explode(',', (string) env_value('KOMOOT_PROXY_ALLOWED_ORIGINS', 'http://localhost:5000,http://127.0.0.1:5000,https://marsrakete.github.io')))));
 
 date_default_timezone_set($timezone);
 

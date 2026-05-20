@@ -95,6 +95,11 @@ Unter Windows ist der Start einfach:
 4. Dort den lokalen Proxy starten mit `.\start-komoot-proxy.ps1 -Mode real`.
 5. Danach Trailthread im Browser oeffnen und im Komoot-Bereich dein Konto verbinden.
 
+Wichtig fuer GitHub Pages:
+- Die gehostete App unter `https://marsrakete.github.io/trailthread/` kann je nach Browser den lokalen Proxy auf `http://localhost:8787` trotz CORS-Headern durch Private-Network-Access-Regeln blockieren.
+- Wenn im Browser ein Fehler mit `loopback address space` oder `Private Network Access` erscheint, starte Trailthread lokal mit `.\start-server.ps1` und oeffne `http://localhost:5000`.
+- Der lokale Proxy erlaubt zwar jetzt auch `https://marsrakete.github.io` als Origin, aber einige Browser verweigern den Zugriff auf `localhost` trotzdem schon vor dem eigentlichen API-Aufruf.
+
 Wenn du nur ausprobieren willst, kannst du statt echter Komoot-Daten auch den Demo-Modus nutzen:
 - `.\start-komoot-proxy.ps1 -Mode stub`
 

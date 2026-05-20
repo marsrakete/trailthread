@@ -48,7 +48,7 @@ function Write-DebugLog([string]$Message, [string]$Level = "INFO") {
 
 function Set-CorsHeaders($Response, $Request) {
   $origin = $Request.Headers["Origin"]
-  if ($origin -match '^https?://(localhost|127\.0\.0\.1)(:\d+)?$') {
+  if ($origin -match '^https?://(localhost|127\.0\.0\.1)(:\d+)?$' -or $origin -eq 'https://marsrakete.github.io') {
     $Response.Headers["Access-Control-Allow-Origin"] = $origin
   } else {
     $Response.Headers["Access-Control-Allow-Origin"] = "http://localhost:5000"
