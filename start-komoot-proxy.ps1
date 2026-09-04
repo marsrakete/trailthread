@@ -462,7 +462,7 @@ function Get-InlineTourPhotosFromCandidates($Candidates, [hashtable]$Headers = @
 
 function Get-DescriptionLocale([string]$Language = "en") {
   switch -Regex ($Language) {
-    '^de' { return @{ Culture = 'de-DE'; Distance = 'Distanz'; Duration = 'Geschaetzte Dauer'; Up = 'Hoehenmeter bergauf'; Down = 'Hoehenmeter bergab' } }
+    '^de' { return @{ Culture = 'de-DE'; Distance = 'Distanz'; Duration = 'Geschätzte Dauer'; Up = 'Höhenmeter bergauf'; Down = 'Höhenmeter bergab' } }
     '^fr' { return @{ Culture = 'fr-FR'; Distance = 'Distance'; Duration = 'Duree estimee'; Up = 'Denivele positif'; Down = 'Denivele negatif' } }
     default { return @{ Culture = 'en-US'; Distance = 'Distance'; Duration = 'Estimated duration'; Up = 'Elevation up'; Down = 'Elevation down' } }
   }
@@ -682,8 +682,8 @@ function Ensure-LoggedIn {
   }
 }
 
-Write-Host "TrailCanvas Komoot Proxy laeuft auf http://localhost:$Port/ (mode: $Mode)"
-Write-Host "Zum Beenden Strg+C druecken."
+Write-Host "TrailCanvas Komoot Proxy läuft auf http://localhost:$Port/ (mode: $Mode)"
+Write-Host "Zum Beenden Strg+C drücken."
 if ($DebugLog) {
   Write-Host "Debug-Logging ist aktiviert." -ForegroundColor Yellow
 }
@@ -981,7 +981,12 @@ try {
       }
     } catch {
       $message = $_.Exception.Message
-      $statusCode = if ($message -eq "Not logged in") { 401 } else { 500 }
+      $statusCode = 500
+      if ($message -eq "Not logged in") {
+        $statusCode = 401
+      } elseif ($message -match '^HTTP (4\d\d)$') {
+        $statusCode = [int]$Matches[1]
+      }
       Write-DebugLog "Request failed on $path :: $message" "ERROR"
       if ($DebugLog -and $_.ScriptStackTrace) {
         Write-Host $_.ScriptStackTrace -ForegroundColor DarkRed

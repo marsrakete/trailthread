@@ -1,9 +1,9 @@
 # Trailthread
 
-Desktop-orientierte PWA fuer grosse Displays mit drei klar getrennten Bereichen fuer Touren, Karte und Replay:
-- links: Workspaces und Konten
+Desktop-orientierte PWA für große Displays mit Bibliothek, Karte und Replay:
+- links: Navigation und Komoot-Erweiterung
 - mitte: Trail-Bibliothek
-- rechts: Karte sowie aktive Workspaces wie Komoot-Download und Replay
+- rechts: Karte und Replay
 
 ## Projektlinks
 - GitHub Pages: [https://marsrakete.github.io/trailthread/](https://marsrakete.github.io/trailthread/)
@@ -17,36 +17,35 @@ Desktop-orientierte PWA fuer grosse Displays mit drei klar getrennten Bereichen 
 - GPX-Einzelexport pro Track aus der Bibliothek
 - lokale Speicherung in IndexedDB, reload-sicher
 - mehrere Tracks gleichzeitig auf Leaflet/OpenStreetMap
-- mehrere gespeicherte Komoot-Konten
-- separater Komoot-Workspace mit Proxy-Diagnose
+- Komoot-Erweiterung mit konfigurierbarem Paket-Download
+- Komoot-Timeline mit Highlights, Tipps und Empfehlungen in Detailansicht und Karte
+- kompakte Bibliothekskarten mit begrenzter Beschreibung, Aufklappen und Timeline-Zähler
+- bedarfsgesteuerte OSM-Wegtypanalyse pro Track mit lokal gespeicherten Segmenten
 - Replay-Workspace mit 2D- und 3D-Ansicht
 - Wiedergabe nach Zeit oder Distanz mit Profil-, Timeline- und Fotokopplung
 - Trennung von gemachten und geplanten Komoot-Touren
-- App-Backup fuer Konten und Einstellungen
-- separates Touren-Backup fuer alle gespeicherten Tracks
-- intelligenter Touren-Backup-Import mit Konfliktabfrage ueber `lastChanged`
+- App-Backup für Einstellungen
+- separates Touren-Backup für alle gespeicherten Tracks
+- intelligenter Touren-Backup-Import mit Konfliktabfrage über `lastChanged`
 - Doubletten-Erkennung beim Backup-Import
-- versionierte Offline-App mit zentraler `version.js`, Service Worker und Update-Pruefung in den Einstellungen
-- Deutsch, Englisch und Franzoesisch
+- versionierte Offline-App mit zentraler `version.js`, Service Worker und Update-Prüfung in den Einstellungen
+- Deutsch, Englisch und Französisch
 
-## Wichtiger Sicherheitshinweis
-Die App speichert Komoot-Konten lokal inklusive Passwort, weil der lokale Proxy damit arbeiten soll.
-Das App-Backup enthaelt diese Passwoerter ebenfalls.
-Diese Datei deshalb nur verschluesselt oder an vertrauenswuerdigen Orten aufbewahren.
+## Sicherheit
+Trailthread arbeitet lokal und speichert keine Komoot-Passwörter. Der frühere passwortbasierte Proxy ist deaktiviert. App-Backups enthalten keine Konten.
 
 ## Backup-Formate
-Wichtig fuer den Unterschied zwischen normalem GPX-Export und Trailthread-Backup:
-- Ein GPX-Export ist fuer den Datenaustausch mit anderen Tools gedacht.
-- Ein GPX enthaelt ueblicherweise Trackpunkte, Zeit, Hoehe und einfache Metadaten.
+Wichtig für den Unterschied zwischen normalem GPX-Export und Trailthread-Backup:
+- Ein GPX-Export ist für den Datenaustausch mit anderen Tools gedacht.
+- Ein GPX enthält üblicherweise Trackpunkte, Zeit, Höhe und einfache Metadaten.
 - Fotos werden dabei normalerweise nicht in die GPX-Datei eingebettet.
 - Eigene Tags haben in GPX ebenfalls keinen einheitlichen Standardplatz pro Track.
-- Genau deshalb gibt es in Trailthread zusaetzlich das Touren-Backup: Es bewahrt auch Fotos, Beschreibungen, eigene Tags und weitere App-Daten eines Tracks.
+- Genau deshalb gibt es in Trailthread zusätzlich das Touren-Backup: Es bewahrt auch Fotos, Beschreibungen, eigene Tags und weitere App-Daten eines Tracks.
+- Bei Komoot-Importen bleiben auch die rohen Timeline-Daten erhalten. Trailthread zeigt daraus lesbare Hinweise und setzt Marker nur für Einträge mit Koordinate oder eindeutigem Distanzbezug zum Track.
 
 App-Backup:
-- Konten inklusive Passwort
 - Sprache
 - aktiver Workspace
-- aktives Konto
 - linke und mittlere Spaltenbreite
 - kompakter Zustand der linken und mittleren Spalte
 - Kartenmodus wie Foto-Overlay-only
@@ -63,97 +62,62 @@ Touren-Backup:
 - Fotos inklusive gespeicherter Foto-Metadaten
 - Trackpunkte und daraus abgeleitete Werte wie Distanz, Bergauf und Bergab
 - importbezogene Metadaten wie Quelle, Datum, Sportart, Komoot-Infos und Farbauswahl
-- `lastChanged` je Track fuer spaetere Merge-Entscheidungen beim Reimport
+- lokal abgeleitete Wegtypsegmente aus einer auf Klick gestarteten OpenStreetMap-Analyse
+- `lastChanged` je Track für spätere Merge-Entscheidungen beim Reimport
 - Exportzeitpunkt
 - `appVersion` und `cacheVersion`
 
 Wichtig:
-- Das App-Backup enthaelt keine Touren oder GPX-Dateien.
-- Das Touren-Backup enthaelt keine Konten, Passwoerter oder App-Einstellungen.
-- Ein Touren-Backup kann komplett oder nur fuer die aktuell ausgewaehlten Tracks erstellt werden.
-- Auch Teil-Backups bleiben spaeter wieder importierbar und laufen durch denselben Merge mit `lastChanged`.
+- Das App-Backup enthält keine Touren oder GPX-Dateien.
+- Das Touren-Backup enthält keine Passwörter oder App-Einstellungen.
+- Ein Touren-Backup kann komplett oder nur für die aktuell ausgewählten Tracks erstellt werden.
+- Auch Teil-Backups bleiben später wieder importierbar und laufen durch denselben Merge mit `lastChanged`.
 - Dadurch lassen sich einzelne Tracks inklusive Fotos, Beschreibungen, Tags und Metadaten gezielt mit anderen Nutzern teilen.
-- Beim Reimport von Touren-Backups werden Tracks mit gleicher ID anhand von `lastChanged` verglichen und bei Bedarf einzeln zur Ueberschreibung bestaetigt.
+- Beim Reimport von Touren-Backups werden Tracks mit gleicher ID anhand von `lastChanged` verglichen und bei Bedarf einzeln zur Überschreibung bestätigt.
+
+## OSM-Wegtypen
+
+Der Bibliotheksbutton `Wegtypen aus OSM analysieren` fragt bei Bedarf nur Wege mit einem OSM-`highway`-Tag nahe gleichmäßig verteilter Trackpunkte ab. Trailthread ordnet dem jeweils nächstgelegenen Weg den Wegetyp zu und speichert daraus abgeleitete Segmentdaten direkt am lokalen Track. GPX, Timeline, Fotos und Untergrunddaten bleiben unverändert. Die öffentliche OSM-Abfrage erfolgt nur nach ausdrücklichem Klick; die OSM-Rohantwort wird nicht gespeichert. Die Qualität hängt von der aktuellen OSM-Datenpflege und der räumlichen Nähe paralleler Wege ab.
 
 ## Update-Mechanismus
-- Die PWA fuehrt ihre sichtbare Version zentral in [version.js](/C:/Users/millenseer/OneDrive%20-%20conet.de/Projekte/GPX/version.js:1).
+- Die PWA führt ihre sichtbare Version zentral in [version.js](/C:/Projekte/trailthread/version.js:1).
 - `app.js` und `sw.js` lesen `appVersion`, `cacheVersion` und Label aus dieser einen Datei.
-- In den Einstellungen zeigt der Bereich `Aktualisierungen` die lokale Version an und kann eine neuere `version.js` per `cache: "no-cache"` pruefen.
+- In den Einstellungen zeigt der Bereich `Aktualisierungen` die lokale Version an und kann eine neuere `version.js` per `cache: "no-cache"` prüfen.
 - Wenn `appVersion` oder `cacheVersion` abweichen, wird ein Reload angeboten, damit die neue Offline-Version aktiv wird.
 
-## Komoot-Import Und Lokaler Proxy
-Trailthread laedt Komoot-Tracks bewusst ohne eigene Cloud und ohne fremden Server. Die App spricht also nicht erst mit einem Online-Dienst von Trailthread, sondern arbeitet lokal auf deinem Rechner. Deine Touren, Fotos und Backups bleiben damit bei dir.
+## UTF-8-Prüfung
 
-Damit Komoot-Touren geladen werden koennen, musst du dich trotzdem mit deinem Komoot-Konto anmelden. Der Grund ist einfach: Komoot gibt persoenliche Touren nur fuer dein angemeldetes Konto frei. Trailthread braucht diese Anmeldung also nicht fuer Werbung oder eine eigene Cloud, sondern nur, damit dein lokaler Proxy Komoot in deinem Namen nach deinen Touren fragen kann.
+`node scripts/check-encoding.js` prüft alle gepflegten Quelltextdateien auf typische UTF-8-/Windows-1252-Schäden und beendet sich bei einem Fund mit Fehlerstatus. Die Prüfung lässt generierte Downloads, Schnappschüsse und Git-Metadaten aus.
 
-Warum ist dafuer ein lokaler Proxy noetig? Ein normaler Browser darf sich nicht einfach wie eine andere App bei Komoot anmelden und danach geschuetzte Tourdaten laden. Sitzungen, Weiterleitungen, Login-Antworten und Schutzmechanismen der Website lassen sich auf diese Weise im Browser allein nicht sauber und zuverlaessig abbilden. Deshalb laeuft daneben ein kleiner lokaler Helfer. Er nimmt nur die Anfragen deiner lokalen Trailthread-App entgegen, meldet sich bei Komoot an und liefert die geladenen Daten wieder an die App zurueck.
+`node scripts/repair-mojibake.js <datei>` zeigt bekannte Reparaturen nur an. Erst `node scripts/repair-mojibake.js --write <datei>` schreibt sie in die ausdrücklich angegebene Datei. Damit bleibt eine Korrektur nachvollziehbar und verändert nie stillschweigend den Bestand.
 
-Unter Windows ist der Start einfach:
-1. Ein PowerShell-Fenster im Projektordner oeffnen.
-2. Die App starten mit `.\start-server.ps1`.
-3. Fuer Komoot ein zweites PowerShell-Fenster oeffnen.
-4. Dort den lokalen Proxy starten mit `.\start-komoot-proxy.ps1 -Mode real`.
-5. Danach Trailthread im Browser oeffnen und im Komoot-Bereich dein Konto verbinden.
+## Historischer Komoot-Proxy
 
-Wichtig fuer GitHub Pages:
-- Die gehostete App unter `https://marsrakete.github.io/trailthread/` kann je nach Browser den lokalen Proxy auf `http://localhost:8787` trotz CORS-Headern durch Private-Network-Access-Regeln blockieren.
-- Wenn im Browser ein Fehler mit `loopback address space` oder `Private Network Access` erscheint, starte Trailthread lokal mit `.\start-server.ps1` und oeffne `http://localhost:5000`.
-- Der lokale Proxy erlaubt zwar jetzt auch `https://marsrakete.github.io` als Origin, aber einige Browser verweigern den Zugriff auf `localhost` trotzdem schon vor dem eigentlichen API-Aufruf.
+Der PHP-Proxy und die beiden PowerShell-Skripte bleiben als historische Referenz im Repository. Sie sind **obsolet** und werden von Trailthread nicht mehr gestartet, angesprochen oder mit Zugangsdaten versorgt. Die aktive Komoot-Integration ist ausschließlich die Browser-Erweiterung.
 
-Wenn du nur ausprobieren willst, kannst du statt echter Komoot-Daten auch den Demo-Modus nutzen:
-- `.\start-komoot-proxy.ps1 -Mode stub`
+Das frühere Proxy-Konzept basierte auf lokal gespeicherten Komoot-Passwörtern. Wenn künftig eine offizielle Komoot- oder Strava-Schnittstelle verfügbar ist, soll sie als neuer OAuth-basierter Connector entstehen, nicht durch Reaktivierung des Passwort-Proxys.
 
-Zusätzlich wichtig:
-- GPX-Dateien koennen direkt in die Bibliothek importiert werden.
-- Gespeicherte Tracks koennen einzeln wieder als GPX exportiert werden.
-- Mehrere ausgewaehlte Tracks koennen als ZIP mit einzelnen GPX-Dateien exportiert werden.
-- Optional koennen mehrere ausgewaehlte Tracks auch als eine gemeinsame Multi-Track-GPX exportiert werden.
-- Fuer komplette Sicherungen gibt es ausserdem App-Backup und Touren-Backup.
-- Das Touren-Backup gibt es auch fuer nur ausgewaehlte Tracks, damit sich komplette Trailthread-Tracks samt Fotos teilen lassen.
+## Browser-Erweiterung Für Komoot
 
-## Technischer Hintergrund
-Trailthread selbst ist eine lokale Web-App. Sie speichert ihre Daten im Browser, zeigt Karte und Replay an und verwaltet Tracks, Fotos, Beschreibungen, Backups und Einstellungen. Die App kann GPX-Dateien direkt importieren und einzelne Tracks wieder als GPX exportieren.
+Der aktive Komoot-Weg liegt unter `browser-extension/`: der **Trailthread Komoot Exporthelfer**. Die Erweiterung wird in Chrome oder Edge über die Erweiterungsverwaltung im Entwicklermodus aus diesem Ordner entpackt geladen. Sie arbeitet auf `komoot.com` und `komoot.de` und setzt eine bereits im Browser bestehende Komoot-Anmeldung voraus.
 
-Ein wichtiger Punkt dabei: GPX ist bewusst nur das Austauschformat fuer Strecken. Wenn du einen Track als GPX exportierst, nimmst du vor allem Geometrie, Zeit, Hoehe und einfache Metadaten mit. Die Fotos eines Tracks sind dagegen ein bewusstes Mehrwert-Merkmal von Trailthread und bleiben deshalb im gespeicherten Track sowie im Touren-Backup erhalten. Dasselbe gilt fuer eigene Tags und den Favoritenstatus. Genau das unterscheidet den einfachen GPX-Export von einer echten Trailthread-Sicherung.
+Die App bietet dafür in der linken Seitenleiste ein fertiges ZIP-Paket unter `downloads/trailthread-komoot-exporthelfer.zip` an. Die URL des Download-Buttons steht zentral in `config.js` als `komootExtensionDownloadUrl`; für eine Release- oder externe Download-Adresse muss nur dieser Wert angepasst werden. Das Paket wird nach Änderungen mit `./package-browser-extension.ps1` neu erstellt.
 
-Der Komoot-Teil ist davon getrennt: Dafuer gibt es den lokalen Proxy. Die App prueft im Komoot-Bereich zuerst, ob dieser Proxy erreichbar ist, und zeigt den Zustand auch in der Diagnose an. Erst wenn der Proxy laeuft, kann sich Trailthread ueber ihn bei Komoot anmelden, Tourenlisten abrufen und ausgewaehlte Touren importieren.
+Auf Tourlisten fügt sie eine Auswahl je Tour und zwei Exportaktionen ein. `Ausgewählte GPX-Dateien herunterladen` lädt jede Auswahl nacheinander als einzelne GPX-Datei. `Als Trailthread-Datei mit Bildern exportieren` ruft jede Auswahl über die von Komoot selbst verwendete GPX-Download-Route in der bereits eingeloggten Browser-Sitzung ab, lädt die verfügbaren Tourbilder und erstellt daraus eine gemeinsame Datei `trailthread-komoot-touren.json.gz`. Dafür werden keine einzelnen Tour-Unterseiten geöffnet. Die Datei kann direkt über den Touren-Backup-Import von Trailthread eingelesen werden.
 
-```mermaid
-flowchart LR
-    A["Trailthread App im Browser"] -->|"prueft Proxy-Verbindung"| B["Lokaler Komoot-Proxy"]
-    A -->|"GPX-Import / Export / Replay / Karte"| A
-    B -->|"Login mit lokal gespeichertem Konto"| C["Komoot"]
-    B -->|"laedt Tourenlisten, Details und Fotos"| C
-    C -->|"liefert geschuetzte Tourdaten nur fuer angemeldete Nutzer"| B
-    B -->|"gibt Trackdaten an die App zurueck"| A
-    A -->|"speichert Tracks, Fotos, Beschreibungen und Metadaten lokal"| D["Lokale Speicherung im Browser"]
-    D -->|"Touren-Backup enthaelt auch Fotos, Tags und App-Metadaten"| A
-    A -->|"GPX-Export gibt nur Strecken-Daten weiter"| E["Andere GPX-Tools"]
+Das Paket verwendet Trailthreads bestehendes Sicherungsformat `gpx-bibliothek-touren` in Version `1`. Es enthält den GPX-Text, Komoot-Tour-ID, URL, Titel und Beschreibung aus den Tourdetails, eingebettete Bilddaten und vorhandene Bildpositionen auf der Route. Einzelne nicht verfügbare Bilder bleiben als Referenz mit einer Fehlermeldung im Paket erhalten; der übrige Export bleibt nutzbar.
 
-    F["Warum nicht direkt im Browser?"] -->|"Login, Sitzungen, Weiterleitungen und Schutzmechanismen sind fuer reine Browser-Requests unzuverlaessig"| B
-```
+Die Erweiterung speichert weder Passwort noch Cookies noch Tokens. Komoot-Freigaben und die sichtbare GPX-Exportfunktion bleiben maßgeblich. Da die Erweiterung auf der sichtbaren Komoot-Oberfläche arbeitet, kann eine Änderung des Seitendesigns einzelne Schritte beeinträchtigen. Das Popup selbst enthält bewusst keine eigene Export-Aktion mehr, sondern verweist nur noch auf die Leiste direkt in der Komoot-Seite.
 
-Der Proxy uebernimmt dabei vor allem:
-- Anmeldung bei Komoot
-- Laden von Tourenlisten
-- Laden von Tour-Details
-- Laden von Tour-Fotos
-- Umwandlung der geladenen Trackdaten in das Format, das Trailthread intern speichert
+Beim Export fragt die Erweiterung alle Seiten von Komoots Tour-Bildreferenzen ab und lädt die Bilder in die Sicherungsdatei. Der GPX-Export bleibt erfolgreich, falls einzelne Bilder nicht verfügbar sind; die Sicherung enthält dann den entsprechenden Bildfehler.
 
-Die App selbst uebernimmt danach:
-- Anzeige in Bibliothek, Karte und Replay
-- lokale Speicherung aller importierten Daten
-- GPX-Einzelexport
-- GPX-Export fuer mehrere ausgewaehlte Tracks als ZIP oder als Multi-Track-GPX
-- App-Backup und Touren-Backup
+## KML Und KMZ
 
-Die beiden Backup-Arten sind bewusst getrennt:
-- Das App-Backup enthaelt Konten, Sprache, Layout- und Anzeigeeinstellungen sowie Versionsangaben.
-- Das Touren-Backup enthaelt die gespeicherten Tracks mit GPX-Inhalt, Beschreibungen, eigenen Tags, Favoritenstatus, Fotos, Trackpunkten, abgeleiteten Werten und `lastChanged` fuer spaetere Merge-Entscheidungen.
-- Das App-Backup enthaelt keine Touren.
-- Das Touren-Backup enthaelt keine Konten oder App-Einstellungen.
+`Tracks importieren` akzeptiert neben GPX und Trailthread-Sicherungen auch `.kml` und `.kmz`. Eine normale KML-Datei wird als Track mit Name, Beschreibung und Linienpunkten importiert. Eine KMZ-Datei darf ihre KML und Bilder komprimiert bündeln; Trailthread liest sowohl unkomprimierte als auch Deflate-komprimierte ZIP-Einträge.
 
-Fuer den Komoot-Import nutzt der Proxy beobachtete Komoot-Web/API-Endpunkte unter `api.komoot.de`, zum Beispiel fuer Login, Tourenlisten, Tour-Details und Tour-Fotos. In diesem Projekt wird kein separates Komoot-SDK verwendet. Als Referenz fuer die Struktur einzelner inoffizieller Endpunkte diente unter anderem der inoffizielle Client [janthomas89/komoot-api-client](https://github.com/janthomas89/komoot-api-client). Diese Referenz ist keine Laufzeit-Abhaengigkeit von Trailthread. Wenn Komoot diese Endpunkte aendert, muss der Import gegebenenfalls angepasst werden.
+Im Ausklappmenü neben `Ausgewählte GPX exportieren` gibt es zwei KMZ-Ziele. `Als kompatible KMZ mit Foto-Pins` nutzt Track- und Foto-`Placemark`-Einträge mit lokalen Bild-Icons; diese Variante ist für Google Earth Web und KMZView gedacht. `Als KMZ mit Foto-Overlays (Google Earth Pro)` exportiert lokal gespeicherte Fotos als KML-`PhotoOverlay`. Die Kamerarichtung folgt dem nächstgelegenen Track-Segment; dadurch wird jedes Foto als Rechteck senkrecht zur Route projiziert. In Google Earth Pro zeigt der Informationsballon dabei das Foto, nicht die interne Trailthread-JSON. Beide Varianten exportieren die Trailthread-Trackfarbe als KML-`LineStyle` mit Breite `4`. Beide Varianten enthalten die Bilddateien unter `photos/`, den Track und die Trailthread-Metadaten. Externe, nicht lokal gespeicherte HTTPS-Bildadressen bleiben in Beschreibungen als Referenz erhalten.
+
+Für den verlustfreien Rückweg nutzt Trailthread das dokumentierte `ExtendedData`-Profil `trailthread-kmz-v1`: Jeder Track-`Placemark` enthält `Data name="trailthread:track-json"` mit allen Trailthread-Metadaten und Foto-Metadaten. Bilddateien werden darin durch ihren Pfad im KMZ referenziert. Andere KML-Programme können die normalen Linien und Foto-`Placemark`-Einträge anzeigen; unbekannte Trailthread-Felder dürfen sie ignorieren.
 
 ## Lizenz
 Dieses Projekt steht unter `GPL-3.0-only`.

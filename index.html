@@ -54,12 +54,27 @@
         </div>
         <div class="workspace-switcher">
           <button id="workspace-library-button" class="workspace-button is-active" type="button" data-workspace="library" data-i18n="workspaceLibrary"></button>
-          <button id="workspace-komoot-button" class="workspace-button" type="button" data-workspace="komoot" data-i18n="workspaceKomoot"></button>
           <button id="workspace-replay-button" class="workspace-button" type="button" data-workspace="replay" data-i18n="workspaceReplay"></button>
         </div>
       </section>
 
-      <section class="panel account-panel">
+      <section id="komoot-extension-card" class="panel komoot-extension-card">
+        <div class="panel-heading">
+          <h2 data-i18n="komootExtensionCardTitle"></h2>
+          <p data-i18n="komootExtensionCardDescription"></p>
+        </div>
+        <a id="komoot-extension-download-link" class="button button-primary" href="#" download data-i18n="komootExtensionDownload"></a>
+        <details class="komoot-extension-guide">
+          <summary data-i18n="komootExtensionGuideTitle"></summary>
+          <ol>
+            <li data-i18n="komootExtensionStepDownload"></li>
+            <li data-i18n="komootExtensionStepInstall"></li>
+            <li data-i18n="komootExtensionStepUse"></li>
+          </ol>
+        </details>
+      </section>
+
+      <section class="panel account-panel" hidden aria-hidden="true">
         <div class="panel-heading">
           <h2 data-i18n="accountsTitle"></h2>
           <p data-i18n="accountsDescription"></p>
@@ -128,7 +143,7 @@
         </div>
         <div class="button-row compact-row library-toolbar library-toolbar-grid">
           <label class="button button-primary" for="file-input" data-i18n="addFiles"></label>
-          <input id="file-input" type="file" accept=".gpx" multiple hidden>
+          <input id="file-input" type="file" accept=".gpx,.kml,.kmz,.json,.gz,application/gpx+xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/json,application/gzip" multiple hidden>
           <div class="library-export-split">
             <button id="export-selected-gpx-button" class="button button-subtle" type="button" data-i18n="exportSelectedGpx"></button>
             <details id="export-selected-gpx-menu" class="library-export-menu">
@@ -137,6 +152,8 @@
               </summary>
               <div class="library-export-popover">
                 <button id="export-selected-multitrack-gpx-button" class="button button-ghost" type="button" data-i18n="exportSelectedMultiTrackGpx"></button>
+                <button id="export-selected-kmz-button" class="button button-ghost" type="button" data-i18n="exportSelectedKmz"></button>
+                <button id="export-selected-kmz-pro-button" class="button button-ghost" type="button" data-i18n="exportSelectedKmzPro"></button>
               </div>
             </details>
           </div>
@@ -157,7 +174,7 @@
         <div class="map-toolbar">
           <button id="prev-track-button" class="button button-subtle toolbar-nav-button" type="button" data-i18n="prevTrack" aria-label="Vorheriger Track">←</button>
           <button id="fit-all-button" class="button button-ghost" type="button" data-i18n="fitSelection"></button>
-          <button id="next-track-button" class="button button-subtle toolbar-nav-button" type="button" data-i18n="nextTrack" aria-label="Naechster Track">→</button>
+          <button id="next-track-button" class="button button-subtle toolbar-nav-button" type="button" data-i18n="nextTrack" aria-label="Nächster Track">→</button>
             <button id="map-photo-mode-button" class="button button-subtle" type="button"></button>
             <div class="heatmap-tools">
               <button id="map-heatmap-button" class="button button-subtle" type="button" data-i18n="mapHeatmap"></button>
@@ -202,19 +219,6 @@
               </div>
             </div>
         </div>
-        <section id="onboarding-panel" class="panel onboarding-panel" hidden>
-          <div class="panel-heading">
-            <h2 data-i18n="onboardingTitle"></h2>
-            <p data-i18n="onboardingDescription"></p>
-          </div>
-          <div id="onboarding-steps" class="onboarding-steps"></div>
-          <div class="button-row compact-row">
-            <label class="button button-primary" for="file-input" data-i18n="onboardingImport"></label>
-            <button id="onboarding-komoot-button" class="button button-subtle" type="button" data-i18n="onboardingKomoot"></button>
-            <button id="onboarding-replay-button" class="button button-ghost" type="button" data-i18n="onboardingReplay"></button>
-          </div>
-          <p id="onboarding-hint" class="field-hint" data-i18n="onboardingHint"></p>
-        </section>
         <section class="map-panel">
           <div id="map" aria-label="OpenStreetMap track canvas"></div>
           <div class="map-overlay">
@@ -283,7 +287,8 @@
         </section>
       </section>
 
-      <section id="komoot-workspace" class="workspace-view" hidden>
+      <section id="komoot-workspace" class="workspace-view" hidden aria-hidden="true">
+        <div hidden>
         <header class="workspace-header">
           <div>
             <p class="status-kicker" data-i18n="komootWorkspaceKicker"></p>
@@ -352,6 +357,7 @@
             <ul id="planned-tour-list" class="track-list tour-list" aria-live="polite"></ul>
           </section>
         </section>
+        </div>
       </section>
 
       <section id="replay-workspace" class="workspace-view replay-workspace" hidden>
@@ -543,7 +549,7 @@
     </main>
   </div>
 
-  <dialog id="account-dialog" class="modal-dialog">
+  <dialog id="account-dialog" class="modal-dialog" hidden aria-hidden="true">
     <form method="dialog" class="modal-sheet">
       <div class="panel-heading">
         <h2 data-i18n="accountDialogTitle"></h2>
@@ -557,6 +563,7 @@
         <span data-i18n="komootPasswordLabel"></span>
         <input id="account-password-input" type="password" autocomplete="current-password">
       </label>
+      <p id="account-status" class="account-status" role="status" aria-live="polite" hidden></p>
       <div class="button-row">
         <button id="save-account-button" class="button button-primary" type="button" data-i18n="saveAccount"></button>
         <button class="button button-ghost" type="button" data-close-dialog="account-dialog" data-i18n="cancelButton"></button>
@@ -664,7 +671,7 @@
   <dialog id="confirm-dialog" class="modal-dialog">
     <form method="dialog" class="modal-sheet modal-sheet-confirm">
       <div class="panel-heading">
-        <h2 id="confirm-dialog-title">Bestaetigung</h2>
+        <h2 id="confirm-dialog-title">Bestätigung</h2>
         <p id="confirm-dialog-message"></p>
       </div>
       <div class="button-row">
@@ -724,13 +731,21 @@
             <strong class="track-name"></strong>
             <div class="track-quick-badges"></div>
           </div>
-          <p class="track-description" hidden></p>
+          <div class="track-description" hidden>
+            <span class="track-description-text"></span>
+            <button class="track-description-toggle" type="button" hidden></button>
+          </div>
           <div class="track-facts"></div>
+          <button class="button button-subtle track-osm-waytype-button" type="button" hidden></button>
           <span class="track-submeta"></span>
           <div class="track-photo-strip" hidden></div>
         </div>
       </div>
     </li>
+  </template>
+
+  <template id="track-quick-badge-template">
+    <span class="track-quick-badge"></span>
   </template>
 
   <template id="account-item-template">
@@ -767,6 +782,105 @@
         <span class="track-submeta"></span>
       </div>
     </li>
+  </template>
+
+  <template id="photo-dialog-thumb-template">
+    <button class="photo-dialog-thumb" type="button">
+      <img>
+    </button>
+  </template>
+
+  <template id="track-photo-thumb-template">
+    <img class="track-photo-thumb" loading="lazy" decoding="async">
+  </template>
+
+  <template id="track-fact-template">
+    <span class="track-fact">
+      <span class="track-fact-icon"></span>
+      <span class="track-fact-label"></span>
+      <strong class="track-fact-value"></strong>
+    </span>
+  </template>
+
+  <template id="track-analysis-grid-template">
+    <div class="track-analysis-grid"></div>
+  </template>
+
+  <template id="track-analysis-card-template">
+    <article class="track-analysis-card">
+      <h3 class="track-analysis-card-title"></h3>
+      <p class="track-analysis-card-copy" hidden></p>
+      <div class="analysis-list" hidden></div>
+    </article>
+  </template>
+
+  <template id="analysis-pill-template">
+    <span class="analysis-pill"></span>
+  </template>
+
+  <template id="track-timeline-template">
+    <section class="track-timeline">
+      <div class="track-timeline-heading">
+        <h3 class="track-timeline-title"></h3>
+        <p class="track-timeline-description"></p>
+      </div>
+      <ol class="track-timeline-list"></ol>
+    </section>
+  </template>
+
+  <template id="track-timeline-item-template">
+    <li class="track-timeline-item">
+      <div class="track-timeline-item-copy">
+        <strong class="track-timeline-item-title"></strong>
+        <p class="track-timeline-item-text" hidden></p>
+        <span class="track-timeline-item-meta" hidden></span>
+      </div>
+      <button class="button button-subtle track-timeline-map-button" type="button" hidden></button>
+    </li>
+  </template>
+
+  <template id="timeline-map-marker-template">
+    <span class="timeline-map-marker">●</span>
+  </template>
+
+  <template id="timeline-map-popup-template">
+    <div class="timeline-map-popup">
+      <strong class="timeline-map-popup-title"></strong>
+      <p class="timeline-map-popup-text" hidden></p>
+      <span class="timeline-map-popup-meta" hidden></span>
+    </div>
+  </template>
+
+  <template id="replay-profile-chart-template">
+    <svg aria-hidden="true">
+      <line class="profile-grid-line"></line>
+      <polyline class="profile-line"></polyline>
+      <line class="profile-hover-line"></line>
+      <circle class="profile-hover-dot" r="7"></circle>
+    </svg>
+  </template>
+
+  <template id="profile-segment-chip-template">
+    <span class="profile-segment-chip">
+      <svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true">
+        <line class="profile-segment-swatch-line" x1="1" y1="4" x2="31" y2="4"></line>
+      </svg>
+      <span class="profile-segment-chip-label"></span>
+      <strong class="profile-segment-chip-percent"></strong>
+    </span>
+  </template>
+
+  <template id="map-segment-legend-item-template">
+    <div class="map-segment-legend-item">
+      <svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true">
+        <line class="map-segment-legend-line" x1="1" y1="4" x2="31" y2="4"></line>
+      </svg>
+      <span class="map-segment-legend-label"></span>
+    </div>
+  </template>
+
+  <template id="replay-3d-placeholder-template">
+    <div class="replay-placeholder-note"></div>
   </template>
 
   <dialog id="track-detail-dialog" class="modal-dialog">
@@ -807,8 +921,9 @@
   </dialog>
 
   <dialog id="photo-dialog" class="modal-dialog">
-    <form method="dialog" class="modal-sheet modal-sheet-wide photo-dialog">
-      <button id="photo-dialog-close" class="icon-button photo-dialog-close" type="button" aria-label="Schliessen">×</button>
+    <form id="photo-dialog-sheet" method="dialog" class="modal-sheet modal-sheet-wide photo-dialog">
+      <button id="photo-dialog-fullscreen" class="icon-button photo-dialog-fullscreen" type="button" aria-label="Vollbildansicht anzeigen" title="Vollbildansicht anzeigen">&#x26F6;</button>
+      <button id="photo-dialog-close" class="icon-button photo-dialog-close" type="button" aria-label="Schließen">×</button>
       <div class="panel-heading photo-dialog-heading">
         <h2 id="photo-dialog-title">Foto</h2>
         <p id="photo-dialog-subtitle"></p>
@@ -826,6 +941,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="config.js"></script>
   <script src="version.js"></script>
   <script src="app.js" type="module"></script>
 </body>

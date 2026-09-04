@@ -7,8 +7,8 @@ $listener = [System.Net.HttpListener]::new()
 $listener.Prefixes.Add("http://localhost:$Port/")
 $listener.Start()
 
-Write-Host "TrailCanvas GPX laeuft auf http://localhost:$Port/"
-Write-Host "Zum Beenden Strg+C druecken."
+Write-Host "TrailCanvas GPX läuft auf http://localhost:$Port/"
+Write-Host "Zum Beenden Strg+C drücken."
 
 $contentTypes = @{
   ".html" = "text/html; charset=utf-8"

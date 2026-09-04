@@ -19,9 +19,18 @@ const CURRENT_VERSION_INFO = Object.freeze(globalThis.APP_VERSION_INFO || {
   cacheVersion: "v0",
   label: "",
 });
+const TRAILTHREAD_CONFIG = Object.freeze(globalThis.TRAILTHREAD_CONFIG || {});
 const REPLAY_TIME_SCALE = 1;
+const LIBRARY_DESCRIPTION_PREVIEW_LENGTH = 300;
+const LIBRARY_DESCRIPTION_MAX_LENGTH = 5000;
 const REPLAY_DISTANCE_SECONDS = 1200;
 const APP_SHARE_URL = "https://marsrakete.github.io/trailthread/";
+const OSM_OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
+const OSM_ANALYSIS_SAMPLE_DISTANCE_M = 160;
+const OSM_ANALYSIS_MAX_SAMPLES = 300;
+const OSM_ANALYSIS_QUERY_CHUNK_SIZE = 60;
+const OSM_ANALYSIS_MATCH_DISTANCE_M = 55;
+const OSM_ANALYSIS_RETRY_DELAY_MS = 30000;
 
 const state = { db: null, map: null, replayMap2d: null, replayMap3d: null, replayMap3dReady: false, layers: new Map(), heatmapLayer: null, heatmapStats: null, tracks: [], accounts: [], settings: { id: "app", language: "auto", activeWorkspace: "library", activeAccountId: null, leftPaneWidth: 180, middlePaneWidth: 400, sidebarCompact: false, libraryCompact: false, photoOverlayOnly: false, heatmapMode: false, segmentOverlayMode: false, replayDirectionOverlayCollapsed: false, trackLineWeight: 6, komootCaches: {} }, selectedTrackIds: new Set(), highlightedTrackId: null, libraryUi: { focusTrackId: null, scrollTop: 0 }, mergeUi: { orderedTrackIds: [] }, profileUi: { trackId: null, samples: [], plot: null, hoverMarker: null }, photoDialogUi: { trackId: null, photos: [], index: 0, swipeStartX: null }, trackDetailUi: { trackId: null, editing: false }, resizeUi: { handle: null, startX: 0, leftPaneWidth: 180, middlePaneWidth: 400, rafId: null }, komootTours: [], selectedKomootTourIds: new Set(), komootUi: { focusTourId: null, focusList: null, scrollTopByList: { recorded: 0, planned: 0 }, focusOffsetByList: { recorded: null, planned: null }, progress: { active: false, label: '', value: 0, indeterminate: false } }, replay: { activeTrackId: null, replayTrack: null, view: '2d', mode: 'distance', playing: false, speed: 4, cursor: 0, followCamera: true, showPhotos: true, showProfile: true, cameraMode2d: 'center', cameraMode3d: 'orbit', rafId: null, lastFrameAt: 0, layers2d: { route: null, played: null, marker: null, photos: null }, sources3dReady: false, marker3d: null, lastApplied2DMode: null, last2DCameraAppliedAt: 0, profileRender: { key: null, geometry: null } }, proxy: { online: false, mode: null, lastCheckAt: null, lastError: null } };
 
@@ -38,12 +47,14 @@ const libraryDerivedCache = {
 };
 
 const el = {
-workspaceButtons: [...document.querySelectorAll('.workspace-button[data-workspace]')], settingsButton: document.querySelector('#open-settings-button'), helpButton: document.querySelector('#open-help-button'), toggleSidebarCompactButton: document.querySelector('#toggle-sidebar-compact-button'), toggleLibraryCompactButton: document.querySelector('#toggle-library-compact-button'), libraryWorkspace: document.querySelector('#library-workspace'), komootWorkspace: document.querySelector('#komoot-workspace'), replayWorkspace: document.querySelector('#replay-workspace'), statusToast: document.querySelector('#status-toast'), komootStatusPill: document.querySelector('#komoot-status-pill'), addAccountButton: document.querySelector('#add-account-button'), accountsList: document.querySelector('#accounts-list'), fileInput: document.querySelector('#file-input'), exportSelectedGpxButton: document.querySelector('#export-selected-gpx-button'), exportSelectedGpxMenu: document.querySelector('#export-selected-gpx-menu'), exportSelectedMultiTrackGpxButton: document.querySelector('#export-selected-multitrack-gpx-button'), mergeSelectedTracksButton: document.querySelector('#merge-selected-tracks-button'), trackList: document.querySelector('#track-list'), onboardingPanel: document.querySelector('#onboarding-panel'), onboardingSteps: document.querySelector('#onboarding-steps'), onboardingKomootButton: document.querySelector('#onboarding-komoot-button'), onboardingReplayButton: document.querySelector('#onboarding-replay-button'), onboardingHint: document.querySelector('#onboarding-hint'), librarySearchInput: document.querySelector('#library-search-input'), libraryTypeFilter: document.querySelector('#library-type-filter'), libraryFavoriteFilter: document.querySelector('#library-favorite-filter'), librarySportFilter: document.querySelector('#library-sport-filter'), libraryTagFilter: document.querySelector('#library-tag-filter'), libraryMetaFilter: document.querySelector('#library-meta-filter'), librarySortSelect: document.querySelector('#library-sort-select'), fitAllButton: document.querySelector('#fit-all-button'), mapPhotoModeButton: document.querySelector('#map-photo-mode-button'), prevTrackButton: document.querySelector('#prev-track-button'), nextTrackButton: document.querySelector('#next-track-button'), resizeHandles: [...document.querySelectorAll('[data-resize-handle]')], toggleSelectionButton: document.querySelector('#toggle-selection-button'), libraryToggleSelectionButton: document.querySelector('#library-toggle-selection-button'), selectionStats: document.querySelector('#selection-stats'), distanceStats: document.querySelector('#distance-stats'), pointStats: document.querySelector('#point-stats'), profileTrackName: document.querySelector('#profile-track-name'), profileDistance: document.querySelector('#profile-distance'), profileElevationRange: document.querySelector('#profile-elevation-range'), profileAscent: document.querySelector('#profile-ascent'), profileDescent: document.querySelector('#profile-descent'), profileAvgSpeed: document.querySelector('#profile-avg-speed'), profileSegmentSummary: document.querySelector('#profile-segment-summary'), profileSurfaceBreakdown: document.querySelector('#profile-surface-breakdown'), profileWaytypeBreakdown: document.querySelector('#profile-waytype-breakdown'), profileEmpty: document.querySelector('#profile-empty'), profileChartShell: document.querySelector('#profile-chart-shell'), profileChart: document.querySelector('#profile-chart'), profileCursorInfo: document.querySelector('#profile-cursor-info'), profileCursorAfter: document.querySelector('#profile-cursor-after'), profileCursorAltitude: document.querySelector('#profile-cursor-altitude'), profileCursorGrade: document.querySelector('#profile-cursor-grade'), selectionList: document.querySelector('#selection-list'), recentList: document.querySelector('#staging-list'), recentSummary: document.querySelector('#staging-summary'), librarySummary: document.querySelector('#library-summary'), komootAccountSelect: document.querySelector('#komoot-account-select'), komootLoadButton: document.querySelector('#komoot-load-button'), komootImportButton: document.querySelector('#komoot-import-button'), komootProgress: document.querySelector('#komoot-progress'), komootProgressLabel: document.querySelector('#komoot-progress-label'), komootProgressValue: document.querySelector('#komoot-progress-value'), komootProgressBar: document.querySelector('#komoot-progress-bar'), recordedList: document.querySelector('#recorded-tour-list'), plannedList: document.querySelector('#planned-tour-list'), recordedSummary: document.querySelector('#recorded-summary'), plannedSummary: document.querySelector('#planned-summary'), recordedSelectAllButton: document.querySelector('#recorded-select-all-button'), plannedSelectAllButton: document.querySelector('#planned-select-all-button'), diagProxy: document.querySelector('#komoot-diag-proxy'), diagMode: document.querySelector('#komoot-diag-mode'), diagChecked: document.querySelector('#komoot-diag-checked'), diagError: document.querySelector('#komoot-diag-error'), replayTrackTitle: document.querySelector('#replay-track-title'), replayTrackSubtitle: document.querySelector('#replay-track-subtitle'), replayViewButtons: [...document.querySelectorAll('[data-replay-view]')], replayRestartButton: document.querySelector('#replay-restart-button'), replayPlayButton: document.querySelector('#replay-play-button'), replayPauseButton: document.querySelector('#replay-pause-button'), replayBackButton: document.querySelector('#replay-back-button'), replayForwardButton: document.querySelector('#replay-forward-button'), replayJumpStartButton: document.querySelector('#replay-jump-start-button'), replayJumpHighButton: document.querySelector('#replay-jump-high-button'), replayJumpPhotoButton: document.querySelector('#replay-jump-photo-button'), replayJumpEndButton: document.querySelector('#replay-jump-end-button'), replaySpeedSelect: document.querySelector('#replay-speed-select'), replayModeButtons: [...document.querySelectorAll('[data-replay-mode]')], replayCamera2dRow: document.querySelector('#replay-camera-2d-row'), replayCamera3dRow: document.querySelector('#replay-camera-3d-row'), replayCamera2dButtons: [...document.querySelectorAll('[data-replay-camera-2d]')], replayCameraButtons: [...document.querySelectorAll('[data-replay-camera]')], replayFollowCameraInput: document.querySelector('#replay-follow-camera-input'), replayShowPhotosInput: document.querySelector('#replay-show-photos-input'), replayShowProfileInput: document.querySelector('#replay-show-profile-input'), replayMap2d: document.querySelector('#replay-map-2d'), replayMap3d: document.querySelector('#replay-map-3d'), replayDirectionOverlay: document.querySelector('#replay-direction-overlay'), replayDirectionOverlayToggle: document.querySelector('#replay-direction-overlay-toggle'), replayDirectionOverlayIcon: document.querySelector('#replay-direction-overlay-icon'), replayDistanceValue: document.querySelector('#replay-distance-value'), replayAltitudeValue: document.querySelector('#replay-altitude-value'), replayGradeValue: document.querySelector('#replay-grade-value'), replayTimeValue: document.querySelector('#replay-time-value'), replayProfilePanel: document.querySelector('#replay-profile-panel'), replayProfileTrackName: document.querySelector('#replay-profile-track-name'), replayAscentValue: document.querySelector('#replay-ascent-value'), replayDescentValue: document.querySelector('#replay-descent-value'), replaySpeedValue: document.querySelector('#replay-speed-value'), replayPointValue: document.querySelector('#replay-point-value'), replayDirectionValue: document.querySelector('#replay-direction-value'), replayProfileEmpty: document.querySelector('#replay-profile-empty'), replayProfileChartShell: document.querySelector('#replay-profile-chart-shell'), replayProfileChart: document.querySelector('#replay-profile-chart'), accountDialog: document.querySelector('#account-dialog'), accountEmailInput: document.querySelector('#account-email-input'), accountPasswordInput: document.querySelector('#account-password-input'), saveAccountButton: document.querySelector('#save-account-button'), settingsDialog: document.querySelector('#settings-dialog'), helpDialog: document.querySelector('#help-dialog'), helpStatus: document.querySelector('#help-status'), helpContent: document.querySelector('#help-content'), exportBackupButton: document.querySelector('#export-backup-button'), backupInput: document.querySelector('#backup-input'), exportTourBackupButton: document.querySelector('#export-tour-backup-button'), settingsExportTourBackupButton: document.querySelector('#settings-export-tour-backup-button'), tourBackupInput: document.querySelector('#tour-backup-input'), languageSelect: document.querySelector('#language-select'), trackWidthInput: document.querySelector('#track-width-input'), trackWidthValue: document.querySelector('#track-width-value'), trackItemTemplate: document.querySelector('#track-item-template'), accountItemTemplate: document.querySelector('#account-item-template'), tourItemTemplate: document.querySelector('#tour-item-template'), stagingItemTemplate: document.querySelector('#staging-item-template'), trackDetailDialog: document.querySelector('#track-detail-dialog'), trackDetailTitle: document.querySelector('#track-detail-title'), trackDetailSubtitle: document.querySelector('#track-detail-subtitle'), trackDetailEditBlock: document.querySelector('#track-detail-edit-block'), trackDetailNameInput: document.querySelector('#track-detail-name-input'), trackDetailFavoriteInput: document.querySelector('#track-detail-favorite-input'), trackDetailTagsInput: document.querySelector('#track-detail-tags-input'), trackDetailDescriptionInput: document.querySelector('#track-detail-description-input'), trackDetailFacts: document.querySelector('#track-detail-facts'), trackDetailDescription: document.querySelector('#track-detail-description'), trackDetailAnalysis: document.querySelector('#track-detail-analysis'), trackDetailPhotos: document.querySelector('#track-detail-photos'), trackDetailEditButton: document.querySelector('#track-detail-edit-button'), trackDetailSaveButton: document.querySelector('#track-detail-save-button'), trackDetailCancelButton: document.querySelector('#track-detail-cancel-button'),
-  photoDialog: document.querySelector('#photo-dialog'), photoDialogTitle: document.querySelector('#photo-dialog-title'), photoDialogSubtitle: document.querySelector('#photo-dialog-subtitle'), photoDialogStage: document.querySelector('#photo-dialog-stage'), photoDialogImage: document.querySelector('#photo-dialog-image'), photoDialogCaption: document.querySelector('#photo-dialog-caption'), photoDialogMeta: document.querySelector('#photo-dialog-meta'), photoDialogThumbs: document.querySelector('#photo-dialog-thumbs'), photoDialogPrev: document.querySelector('#photo-dialog-prev'), photoDialogNext: document.querySelector('#photo-dialog-next'), photoDialogClose: document.querySelector('#photo-dialog-close'),
+workspaceButtons: [...document.querySelectorAll('.workspace-button[data-workspace]')], settingsButton: document.querySelector('#open-settings-button'), helpButton: document.querySelector('#open-help-button'), toggleSidebarCompactButton: document.querySelector('#toggle-sidebar-compact-button'), toggleLibraryCompactButton: document.querySelector('#toggle-library-compact-button'), libraryWorkspace: document.querySelector('#library-workspace'), komootWorkspace: document.querySelector('#komoot-workspace'), replayWorkspace: document.querySelector('#replay-workspace'), statusToast: document.querySelector('#status-toast'), komootStatusPill: document.querySelector('#komoot-status-pill'), addAccountButton: document.querySelector('#add-account-button'), accountsList: document.querySelector('#accounts-list'), fileInput: document.querySelector('#file-input'), exportSelectedGpxButton: document.querySelector('#export-selected-gpx-button'), exportSelectedGpxMenu: document.querySelector('#export-selected-gpx-menu'), exportSelectedMultiTrackGpxButton: document.querySelector('#export-selected-multitrack-gpx-button'), mergeSelectedTracksButton: document.querySelector('#merge-selected-tracks-button'), trackList: document.querySelector('#track-list'), librarySearchInput: document.querySelector('#library-search-input'), libraryTypeFilter: document.querySelector('#library-type-filter'), libraryFavoriteFilter: document.querySelector('#library-favorite-filter'), librarySportFilter: document.querySelector('#library-sport-filter'), libraryTagFilter: document.querySelector('#library-tag-filter'), libraryMetaFilter: document.querySelector('#library-meta-filter'), librarySortSelect: document.querySelector('#library-sort-select'), fitAllButton: document.querySelector('#fit-all-button'), mapPhotoModeButton: document.querySelector('#map-photo-mode-button'), prevTrackButton: document.querySelector('#prev-track-button'), nextTrackButton: document.querySelector('#next-track-button'), resizeHandles: [...document.querySelectorAll('[data-resize-handle]')], toggleSelectionButton: document.querySelector('#toggle-selection-button'), libraryToggleSelectionButton: document.querySelector('#library-toggle-selection-button'), selectionStats: document.querySelector('#selection-stats'), distanceStats: document.querySelector('#distance-stats'), pointStats: document.querySelector('#point-stats'), profileTrackName: document.querySelector('#profile-track-name'), profileDistance: document.querySelector('#profile-distance'), profileElevationRange: document.querySelector('#profile-elevation-range'), profileAscent: document.querySelector('#profile-ascent'), profileDescent: document.querySelector('#profile-descent'), profileAvgSpeed: document.querySelector('#profile-avg-speed'), profileSegmentSummary: document.querySelector('#profile-segment-summary'), profileSurfaceBreakdown: document.querySelector('#profile-surface-breakdown'), profileWaytypeBreakdown: document.querySelector('#profile-waytype-breakdown'), profileEmpty: document.querySelector('#profile-empty'), profileChartShell: document.querySelector('#profile-chart-shell'), profileChart: document.querySelector('#profile-chart'), profileCursorInfo: document.querySelector('#profile-cursor-info'), profileCursorAfter: document.querySelector('#profile-cursor-after'), profileCursorAltitude: document.querySelector('#profile-cursor-altitude'), profileCursorGrade: document.querySelector('#profile-cursor-grade'), selectionList: document.querySelector('#selection-list'), recentList: document.querySelector('#staging-list'), recentSummary: document.querySelector('#staging-summary'), librarySummary: document.querySelector('#library-summary'), komootAccountSelect: document.querySelector('#komoot-account-select'), komootLoadButton: document.querySelector('#komoot-load-button'), komootImportButton: document.querySelector('#komoot-import-button'), komootProgress: document.querySelector('#komoot-progress'), komootProgressLabel: document.querySelector('#komoot-progress-label'), komootProgressValue: document.querySelector('#komoot-progress-value'), komootProgressBar: document.querySelector('#komoot-progress-bar'), recordedList: document.querySelector('#recorded-tour-list'), plannedList: document.querySelector('#planned-tour-list'), recordedSummary: document.querySelector('#recorded-summary'), plannedSummary: document.querySelector('#planned-summary'), recordedSelectAllButton: document.querySelector('#recorded-select-all-button'), plannedSelectAllButton: document.querySelector('#planned-select-all-button'), diagProxy: document.querySelector('#komoot-diag-proxy'), diagMode: document.querySelector('#komoot-diag-mode'), diagChecked: document.querySelector('#komoot-diag-checked'), diagError: document.querySelector('#komoot-diag-error'), replayTrackTitle: document.querySelector('#replay-track-title'), replayTrackSubtitle: document.querySelector('#replay-track-subtitle'), replayViewButtons: [...document.querySelectorAll('[data-replay-view]')], replayRestartButton: document.querySelector('#replay-restart-button'), replayPlayButton: document.querySelector('#replay-play-button'), replayPauseButton: document.querySelector('#replay-pause-button'), replayBackButton: document.querySelector('#replay-back-button'), replayForwardButton: document.querySelector('#replay-forward-button'), replayJumpStartButton: document.querySelector('#replay-jump-start-button'), replayJumpHighButton: document.querySelector('#replay-jump-high-button'), replayJumpPhotoButton: document.querySelector('#replay-jump-photo-button'), replayJumpEndButton: document.querySelector('#replay-jump-end-button'), replaySpeedSelect: document.querySelector('#replay-speed-select'), replayModeButtons: [...document.querySelectorAll('[data-replay-mode]')], replayCamera2dRow: document.querySelector('#replay-camera-2d-row'), replayCamera3dRow: document.querySelector('#replay-camera-3d-row'), replayCamera2dButtons: [...document.querySelectorAll('[data-replay-camera-2d]')], replayCameraButtons: [...document.querySelectorAll('[data-replay-camera]')], replayFollowCameraInput: document.querySelector('#replay-follow-camera-input'), replayShowPhotosInput: document.querySelector('#replay-show-photos-input'), replayShowProfileInput: document.querySelector('#replay-show-profile-input'), replayMap2d: document.querySelector('#replay-map-2d'), replayMap3d: document.querySelector('#replay-map-3d'), replayDirectionOverlay: document.querySelector('#replay-direction-overlay'), replayDirectionOverlayToggle: document.querySelector('#replay-direction-overlay-toggle'), replayDirectionOverlayIcon: document.querySelector('#replay-direction-overlay-icon'), replayDistanceValue: document.querySelector('#replay-distance-value'), replayAltitudeValue: document.querySelector('#replay-altitude-value'), replayGradeValue: document.querySelector('#replay-grade-value'), replayTimeValue: document.querySelector('#replay-time-value'), replayProfilePanel: document.querySelector('#replay-profile-panel'), replayProfileTrackName: document.querySelector('#replay-profile-track-name'), replayAscentValue: document.querySelector('#replay-ascent-value'), replayDescentValue: document.querySelector('#replay-descent-value'), replaySpeedValue: document.querySelector('#replay-speed-value'), replayPointValue: document.querySelector('#replay-point-value'), replayDirectionValue: document.querySelector('#replay-direction-value'), replayProfileEmpty: document.querySelector('#replay-profile-empty'), replayProfileChartShell: document.querySelector('#replay-profile-chart-shell'), replayProfileChart: document.querySelector('#replay-profile-chart'), accountDialog: document.querySelector('#account-dialog'), accountEmailInput: document.querySelector('#account-email-input'), accountPasswordInput: document.querySelector('#account-password-input'), saveAccountButton: document.querySelector('#save-account-button'), settingsDialog: document.querySelector('#settings-dialog'), helpDialog: document.querySelector('#help-dialog'), helpStatus: document.querySelector('#help-status'), helpContent: document.querySelector('#help-content'), exportBackupButton: document.querySelector('#export-backup-button'), backupInput: document.querySelector('#backup-input'), exportTourBackupButton: document.querySelector('#export-tour-backup-button'), settingsExportTourBackupButton: document.querySelector('#settings-export-tour-backup-button'), tourBackupInput: document.querySelector('#tour-backup-input'), languageSelect: document.querySelector('#language-select'), trackWidthInput: document.querySelector('#track-width-input'), trackWidthValue: document.querySelector('#track-width-value'), trackItemTemplate: document.querySelector('#track-item-template'), accountItemTemplate: document.querySelector('#account-item-template'), tourItemTemplate: document.querySelector('#tour-item-template'), stagingItemTemplate: document.querySelector('#staging-item-template'), trackDetailDialog: document.querySelector('#track-detail-dialog'), trackDetailTitle: document.querySelector('#track-detail-title'), trackDetailSubtitle: document.querySelector('#track-detail-subtitle'), trackDetailEditBlock: document.querySelector('#track-detail-edit-block'), trackDetailNameInput: document.querySelector('#track-detail-name-input'), trackDetailFavoriteInput: document.querySelector('#track-detail-favorite-input'), trackDetailTagsInput: document.querySelector('#track-detail-tags-input'), trackDetailDescriptionInput: document.querySelector('#track-detail-description-input'), trackDetailFacts: document.querySelector('#track-detail-facts'), trackDetailDescription: document.querySelector('#track-detail-description'), trackDetailAnalysis: document.querySelector('#track-detail-analysis'), trackDetailPhotos: document.querySelector('#track-detail-photos'), trackDetailEditButton: document.querySelector('#track-detail-edit-button'), trackDetailSaveButton: document.querySelector('#track-detail-save-button'), trackDetailCancelButton: document.querySelector('#track-detail-cancel-button'),
+  photoDialog: document.querySelector('#photo-dialog'), photoDialogTitle: document.querySelector('#photo-dialog-title'), photoDialogSubtitle: document.querySelector('#photo-dialog-subtitle'), photoDialogStage: document.querySelector('#photo-dialog-stage'), photoDialogImage: document.querySelector('#photo-dialog-image'), photoDialogCaption: document.querySelector('#photo-dialog-caption'), photoDialogMeta: document.querySelector('#photo-dialog-meta'), photoDialogThumbs: document.querySelector('#photo-dialog-thumbs'), photoDialogPrev: document.querySelector('#photo-dialog-prev'), photoDialogNext: document.querySelector('#photo-dialog-next'), photoDialogClose: document.querySelector('#photo-dialog-close'), photoDialogThumbTemplate: document.querySelector('#photo-dialog-thumb-template'), trackPhotoThumbTemplate: document.querySelector('#track-photo-thumb-template'), trackFactTemplate: document.querySelector('#track-fact-template'), trackQuickBadgeTemplate: document.querySelector('#track-quick-badge-template'), trackAnalysisGridTemplate: document.querySelector('#track-analysis-grid-template'), trackAnalysisCardTemplate: document.querySelector('#track-analysis-card-template'), analysisPillTemplate: document.querySelector('#analysis-pill-template'), trackTimelineTemplate: document.querySelector('#track-timeline-template'), trackTimelineItemTemplate: document.querySelector('#track-timeline-item-template'), timelineMapMarkerTemplate: document.querySelector('#timeline-map-marker-template'), timelineMapPopupTemplate: document.querySelector('#timeline-map-popup-template'), replayProfileChartTemplate: document.querySelector('#replay-profile-chart-template'), profileSegmentChipTemplate: document.querySelector('#profile-segment-chip-template'), accountStatus: document.querySelector('#account-status'),
   confirmDialog: document.querySelector('#confirm-dialog'), confirmDialogTitle: document.querySelector('#confirm-dialog-title'), confirmDialogMessage: document.querySelector('#confirm-dialog-message'), confirmDialogConfirm: document.querySelector('#confirm-dialog-confirm'), confirmDialogCancel: document.querySelector('#confirm-dialog-cancel'), mergeDialog: document.querySelector('#merge-dialog'), mergeDialogFirstName: document.querySelector('#merge-track-first-name'), mergeDialogFirstMeta: document.querySelector('#merge-track-first-meta'), mergeDialogSecondName: document.querySelector('#merge-track-second-name'), mergeDialogSecondMeta: document.querySelector('#merge-track-second-meta'), mergeDialogSwapButton: document.querySelector('#merge-dialog-swap-button'), mergeDialogConfirm: document.querySelector('#merge-dialog-confirm')
 };
 
 Object.assign(el, {
+  photoDialogSheet: document.querySelector('#photo-dialog-sheet'),
+  photoDialogFullscreenButton: document.querySelector('#photo-dialog-fullscreen'),
   versionLabel: document.querySelector('#version-label'),
   checkUpdatesButton: document.querySelector('#check-updates-button'),
   reloadAppButton: document.querySelector('#reload-app-button'),
@@ -54,6 +65,8 @@ Object.assign(el, {
   segmentHelpWaytypeItems: document.querySelector('#segment-help-waytype-items'),
   shareAppButton: document.querySelector('#share-app-button'),
   exportSelectedTourBackupButton: document.querySelector('#export-selected-tour-backup-button'),
+  exportSelectedKmzButton: document.querySelector('#export-selected-kmz-button'),
+  exportSelectedKmzProButton: document.querySelector('#export-selected-kmz-pro-button'),
   settingsExportSelectedTourBackupButton: document.querySelector('#settings-export-selected-tour-backup-button')
 });
 
@@ -66,14 +79,81 @@ let reloadInProgress = false;
 let lastAutoUpdateCheckAt = 0;
 let komootRestoreRaf = 0;
 let statusToastTimer = 0;
+let osmAnalysisTrackId = null;
 
-const lang = () => (state.settings.language && state.settings.language !== 'auto' ? state.settings.language : (translations[navigator.language.slice(0, 2)] ? navigator.language.slice(0, 2) : 'de'));
-const t = (key, params = {}) => Object.entries(params).reduce((v, [k, r]) => v.replaceAll(`{${k}}`, String(r)), (translations[lang()][key] ?? translations.de[key] ?? key));
-const fmtDate = (value) => value ? new Date(value).toLocaleDateString(lang()) : '-';
-const fmtNum = (value) => new Intl.NumberFormat(lang()).format(value ?? 0);
-const fmtKm = (value) => (value ?? 0).toFixed(1);
-const fmtMeters = (value) => `${fmtNum(Math.round(value ?? 0))} m`;
-const fmtHours = (value) => value == null || !Number.isFinite(value) ? '-' : `${value.toFixed(1)} km/h`;
+/**
+ * Resolves the currently active application language with a browser-language fallback.
+ * @returns {string} Supported language code.
+ */
+function lang() {
+  if (state.settings.language && state.settings.language !== 'auto') return state.settings.language;
+  const browserLanguage = navigator.language.slice(0, 2);
+  if (translations[browserLanguage]) return browserLanguage;
+  return 'de';
+}
+
+/**
+ * Resolves a translated UI text and replaces its named parameters.
+ * @param {string} key Translation key.
+ * @param {Record<string, unknown>} params Values for placeholders in the translation.
+ * @returns {string} Localized text or the key when no translation exists.
+ */
+function t(key, params = {}) {
+  let value = translations[lang()][key];
+  if (value == null) value = translations.de[key];
+  if (value == null) value = key;
+  for (const [parameter, replacement] of Object.entries(params)) {
+    value = value.replaceAll(`{${parameter}}`, String(replacement));
+  }
+  return value;
+}
+
+/**
+ * Formats a date for the active application language.
+ * @param {string|null|undefined} value ISO date value.
+ * @returns {string} Localized date or a placeholder.
+ */
+function fmtDate(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString(lang());
+}
+
+/**
+ * Formats a numeric value for the active application language.
+ * @param {number|null|undefined} value Numeric value.
+ * @returns {string} Localized number.
+ */
+function fmtNum(value) {
+  return new Intl.NumberFormat(lang()).format(value ?? 0);
+}
+
+/**
+ * Formats a distance value with one decimal place.
+ * @param {number|null|undefined} value Distance in kilometers.
+ * @returns {string} Formatted numeric distance.
+ */
+function fmtKm(value) {
+  return (value ?? 0).toFixed(1);
+}
+
+/**
+ * Formats a height value in meters.
+ * @param {number|null|undefined} value Height in meters.
+ * @returns {string} Localized meter label.
+ */
+function fmtMeters(value) {
+  return `${fmtNum(Math.round(value ?? 0))} m`;
+}
+
+/**
+ * Formats a speed value in kilometers per hour.
+ * @param {number|null|undefined} value Speed in kilometers per hour.
+ * @returns {string} Formatted speed or a placeholder.
+ */
+function fmtHours(value) {
+  if (value == null || !Number.isFinite(value)) return '-';
+  return `${value.toFixed(1)} km/h`;
+}
 function fmtElapsedShort(totalSeconds) {
   if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '--:--:--';
   const hours = Math.floor(totalSeconds / 3600);
@@ -81,15 +161,28 @@ function fmtElapsedShort(totalSeconds) {
   const seconds = Math.floor(totalSeconds % 60);
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
+/**
+ * Returns the initial replay speed for a replay mode.
+ * @param {string} view Active replay view, retained for future view-specific speeds.
+ * @param {string} mode Active replay mode.
+ * @returns {number} Default playback multiplier.
+ */
 function replayDefaultSpeed(view = state.replay.view, mode = state.replay.mode) {
-  return mode === 'time' ? 2 : 1;
+  if (mode === 'time') return 2;
+  return 1;
 }
 function applyReplayModeDefaults(mode, view = state.replay.view) {
   state.replay.speed = replayDefaultSpeed(view, mode);
 }
+/**
+ * Returns the directional symbol for a route gradient.
+ * @param {number} gradePercent Gradient in percent.
+ * @returns {string} Upward, downward or level symbol.
+ */
 function gradeArrow(gradePercent) {
   if (!Number.isFinite(gradePercent) || Math.abs(gradePercent) < 0.2) return '~';
-  return gradePercent > 0 ? '↗' : '↘';
+  if (gradePercent > 0) return '↗';
+  return '↘';
 }
 function fmtGrade(gradePercent) {
   if (!Number.isFinite(gradePercent)) return '~ 0 %';
@@ -98,12 +191,59 @@ function fmtGrade(gradePercent) {
   return `${gradeArrow(gradePercent)} ${rounded} %`;
 }
 const id = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-const trackType = (value) => value === 'tour_planned' || value === 'planned' ? 'planned' : value === 'tour_recorded' || value === 'recorded' ? 'recorded' : 'unknown';
-const trackTypeLabel = (value) => value === 'planned' ? t('typePlanned') : value === 'recorded' ? t('typeRecorded') : t('typeUnknown');
-const trackSourceLabel = (value) => value === 'komoot' ? t('trackSourceKomoot') : value === 'backup' ? t('trackSourceBackup') : t('trackSourceLocal');
+/**
+ * Converts known source-specific tour types to Trailthread's internal type values.
+ * @param {string|null|undefined} value Source type value.
+ * @returns {'planned'|'recorded'|'unknown'} Normalized track type.
+ */
+function trackType(value) {
+  if (value === 'tour_planned' || value === 'planned') return 'planned';
+  if (value === 'tour_recorded' || value === 'recorded') return 'recorded';
+  return 'unknown';
+}
+
+/**
+ * Returns the translated label for an internal track type.
+ * @param {string|null|undefined} value Track type.
+ * @returns {string} Localized type label.
+ */
+function trackTypeLabel(value) {
+  if (value === 'planned') return t('typePlanned');
+  if (value === 'recorded') return t('typeRecorded');
+  return t('typeUnknown');
+}
+
+/**
+ * Returns the translated label for a track source.
+ * @param {string|null|undefined} value Track source.
+ * @returns {string} Localized source label.
+ */
+function trackSourceLabel(value) {
+  if (value === 'komoot') return t('trackSourceKomoot');
+  if (value === 'backup') return t('trackSourceBackup');
+  return t('trackSourceLocal');
+}
 const signature = (track) => `${track.source}|${track.accountEmail ?? ''}|${track.sourceTrackId ?? ''}|${track.name}|${track.dateStart ?? ''}|${track.pointCount ?? 0}`;
-const remoteTrackKey = (track) => track?.source && track?.accountEmail && track?.sourceTrackId ? `${track.source}|${track.accountEmail}|${track.sourceTrackId}` : null;
-const komootTrackUrl = (track) => track?.source === 'komoot' && track?.sourceTrackId ? `https://www.komoot.de/tour/${track.sourceTrackId}` : null;
+
+/**
+ * Builds an identifier for a track that belongs to a remote source account.
+ * @param {object|null|undefined} track Candidate track record.
+ * @returns {string|null} Stable remote identifier or null for local tracks.
+ */
+function remoteTrackKey(track) {
+  if (!track?.source || !track?.accountEmail || !track?.sourceTrackId) return null;
+  return `${track.source}|${track.accountEmail}|${track.sourceTrackId}`;
+}
+
+/**
+ * Returns the Komoot website URL for a Komoot-originated track.
+ * @param {object|null|undefined} track Candidate track record.
+ * @returns {string|null} Original Komoot URL or null when not applicable.
+ */
+function komootTrackUrl(track) {
+  if (track?.source !== 'komoot' || !track?.sourceTrackId) return null;
+  return `https://www.komoot.de/tour/${track.sourceTrackId}`;
+}
 const isoNow = () => new Date().toISOString();
 function trackLastChanged(track) {
   return track?.lastChanged || track?.updatedAt || track?.importedAt || null;
@@ -114,7 +254,11 @@ function sanitizeFileName(value) {
 function touchTrack(track, changes = {}) {
   return enrichTrackMetrics({ ...track, ...changes, lastChanged: isoNow(), signature: signature({ ...track, ...changes }) });
 }
-const komootProgressText = () => lang() === 'fr' ? { loadingTours: 'Chargement des tours...', importing: 'Import des tours...', done: 'Termine' } : lang() === 'en' ? { loadingTours: 'Loading tours...', importing: 'Importing tours...', done: 'Done' } : { loadingTours: 'Touren werden geladen...', importing: 'Touren werden importiert...', done: 'Fertig' };
+function komootProgressText() {
+  if (lang() === 'fr') return { loadingTours: 'Chargement des tours...', importing: 'Import des tours...', done: 'Termine' };
+  if (lang() === 'en') return { loadingTours: 'Loading tours...', importing: 'Importing tours...', done: 'Done' };
+  return { loadingTours: 'Touren werden geladen...', importing: 'Touren werden importiert...', done: 'Fertig' };
+}
 const hashString = (value) => [...`${value ?? ''}`].reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 7);
 const LOOPBACK_HOST_PATTERN = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\]|::1)$/i;
 function isLoopbackHost(hostname = "") {
@@ -123,8 +267,12 @@ function isLoopbackHost(hostname = "") {
 function appRunsOnLoopbackOrigin() {
   return isLoopbackHost(globalThis.location?.hostname || "");
 }
+/**
+ * Returns the separate local Komoot proxy endpoint.
+ * @returns {string} The proxy base URL including its API path.
+ */
 function proxyBaseUrl() {
-  return appRunsOnLoopbackOrigin() ? PROXY_PATH : `${LOCAL_PROXY_ORIGIN}${PROXY_PATH}`;
+  return `${LOCAL_PROXY_ORIGIN}${PROXY_PATH}`;
 }
 function shouldRequestLoopbackAccess() {
   return !appRunsOnLoopbackOrigin() && /^https?:$/i.test(globalThis.location?.protocol || "");
@@ -166,14 +314,20 @@ const SPORT_LABELS = {
   snowboarding: { de: 'Snowboarden', en: 'Snowboarding', fr: 'Snowboard', icon: '🏂', aliases: ['snowboarding', 'snowboard'] },
   sledding: { de: 'Schlittenfahren', en: 'Sledding', fr: 'Luge', icon: '🛷', aliases: ['sledding', 'sled', 'luge'] },
   skating: { de: 'Skaten', en: 'Skating', fr: 'Skating', icon: '⛸', aliases: ['skating', 'inline_skating', 'roller_skating'] },
-  other_activities: { de: 'Andere Aktivitaeten', en: 'Other activities', fr: 'Autres activites', icon: '•', aliases: ['other', 'other_activities', 'misc', 'unknown'] }
+  other_activities: { de: 'Andere Aktivitäten', en: 'Other activities', fr: 'Autres activites', icon: '•', aliases: ['other', 'other_activities', 'misc', 'unknown'] }
 };
 const SPORT_ALIAS_LOOKUP = Object.fromEntries(Object.entries(SPORT_LABELS).flatMap(([key, config]) => config.aliases.map((alias) => [alias, key])));
-const defaultTrackColor = (trackLike) => {
+/**
+ * Selects a stable default color for a track from its status-specific palette.
+ * @param {object} trackLike Track data used to build a stable color key.
+ * @returns {string} CSS color value.
+ */
+function defaultTrackColor(trackLike) {
   const baseKey = [trackLike.accountEmail, trackType(trackLike.type), trackLike.sourceTrackId, trackLike.id, trackLike.name].filter(Boolean).join('|') || signature(trackLike);
-  const palette = trackType(trackLike.type) === 'planned' ? PLANNED_COLORS : RECORDED_COLORS;
+  let palette = RECORDED_COLORS;
+  if (trackType(trackLike.type) === 'planned') palette = PLANNED_COLORS;
   return palette[hashString(baseKey) % palette.length];
-};
+}
 function normalizeTrackDate(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -191,8 +345,9 @@ function looksLikeGeneratedMetricText(value) {
     text.startsWith('distanz:') ||
     text.startsWith('duree estimee:') ||
     text.includes('estimated duration:') ||
-    text.includes('geschaetzte dauer:') ||
+    text.includes('geschätzte dauer:') ||
     text.includes('elevation up:') ||
+    text.includes('höhenmeter bergauf:') ||
     text.includes('hoehenmeter bergauf:') ||
     text.includes('denivele positif:')
   );
@@ -203,7 +358,8 @@ function normalizeTrackDescription(value, fallback = null) {
   if (preferred && !looksLikeGeneratedMetricText(preferred)) return preferred;
   const secondary = cleanText(fallback);
   if (secondary && /^@\{.+\}$/.test(secondary)) return null;
-  return secondary && !looksLikeGeneratedMetricText(secondary) ? secondary : null;
+  if (secondary && !looksLikeGeneratedMetricText(secondary)) return secondary;
+  return null;
 }
 function reqToPromise(request) { return new Promise((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
 function openDb() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onerror = () => reject(request.error); request.onupgradeneeded = () => { const db = request.result; if (request.transaction && request.oldVersion < 4 && db.objectStoreNames.contains(STORES.tracks)) db.deleteObjectStore(STORES.tracks); if (!db.objectStoreNames.contains(STORES.tracks)) db.createObjectStore(STORES.tracks, { keyPath: 'id' }); if (!db.objectStoreNames.contains(STORES.photos)) db.createObjectStore(STORES.photos, { keyPath: 'id' }); if (!db.objectStoreNames.contains(STORES.accounts)) db.createObjectStore(STORES.accounts, { keyPath: 'id' }); if (!db.objectStoreNames.contains(STORES.settings)) db.createObjectStore(STORES.settings, { keyPath: 'id' }); }; request.onsuccess = () => resolve(request.result); }); }
@@ -212,6 +368,19 @@ async function get(store, key) { return reqToPromise(state.db.transaction(store,
 async function put(store, value) { const tx = state.db.transaction(store, 'readwrite'); tx.objectStore(store).put(value); return new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
 async function putMany(store, values) { const tx = state.db.transaction(store, 'readwrite'); values.forEach((value) => tx.objectStore(store).put(value)); return new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
 async function del(store, key) { const tx = state.db.transaction(store, 'readwrite'); tx.objectStore(store).delete(key); return new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+/**
+ * Deletes every record in one IndexedDB object store.
+ * @param {string} store Name of the object store to clear.
+ * @returns {Promise<void>} Resolves after IndexedDB has committed the deletion.
+ */
+async function clearStore(store) {
+  const tx = state.db.transaction(store, 'readwrite');
+  tx.objectStore(store).clear();
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
 async function getMany(store, keys) {
   const uniqueKeys = [...new Set((keys || []).filter(Boolean))];
   if (!uniqueKeys.length) return [];
@@ -222,8 +391,20 @@ async function getMany(store, keys) {
   return values.filter(Boolean);
 }
 async function saveSettings() { await put(STORES.settings, { ...state.settings, id: 'app' }); }
+/**
+ * Removes the retired password-based proxy connector data from local storage and app state.
+ * @returns {Promise<void>} Resolves after all stored accounts and related settings are cleared.
+ */
+async function deactivateLegacyProxyConnector() {
+  await clearStore(STORES.accounts);
+  state.accounts = [];
+  state.settings.activeAccountId = null;
+  state.settings.komootCaches = {};
+  state.komootTours = [];
+  state.selectedKomootTourIds = new Set();
+}
 function normalizeKomootTourSummary(tour, account) {
-  return {
+  const replayTrack = {
     ...tour,
     id: `${tour.id ?? ''}`,
     type: trackType(tour.type),
@@ -274,7 +455,11 @@ function restoreKomootCache(account, { announce = false } = {}) {
 function renderKomootLoadButton() {
   const accountId = el.komootAccountSelect?.value || state.settings.activeAccountId;
   const hasCachedTours = !!komootCacheForAccount(accountId)?.tours?.length;
-  el.komootLoadButton.textContent = hasCachedTours ? t('komootRefreshTours') : t('komootLoadTours');
+  if (hasCachedTours) {
+    el.komootLoadButton.textContent = t('komootRefreshTours');
+  } else {
+    el.komootLoadButton.textContent = t('komootLoadTours');
+  }
 }
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 function applyPaneWidths() {
@@ -322,7 +507,14 @@ function endPaneResize() {
   saveSettings().catch(() => {});
 }
 
-function setStatus(message, error = false) {
+/**
+ * Shows a short status toast and optionally keeps it visible until a later status replaces it.
+ * @param {string} message Visible status text.
+ * @param {boolean} error Whether the toast should use its error styling and longer default duration.
+ * @param {boolean} persistent Whether the toast must remain open until replaced explicitly.
+ * @returns {void}
+ */
+function setStatus(message, error = false, persistent = false) {
   if (!el.statusToast) return;
   if (statusToastTimer) {
     window.clearTimeout(statusToastTimer);
@@ -332,19 +524,35 @@ function setStatus(message, error = false) {
   el.statusToast.hidden = false;
   el.statusToast.classList.toggle('is-error', !!error);
   el.statusToast.classList.add('is-visible');
+  if (persistent) return;
+  let visibleDuration = 2600;
+  if (error) visibleDuration = 4200;
   statusToastTimer = window.setTimeout(() => {
     el.statusToast.classList.remove('is-visible');
     window.setTimeout(() => {
       if (!el.statusToast.classList.contains('is-visible')) el.statusToast.hidden = true;
     }, 180);
-  }, error ? 4200 : 2600);
+  }, visibleDuration);
 }
-function setKomootStatus(message, error = false) { el.komootStatusPill.textContent = message; el.komootStatusPill.style.color = error ? 'var(--danger)' : 'var(--muted)'; }
+function setKomootStatus(message, error = false) {
+  el.komootStatusPill.textContent = message;
+  if (error) {
+    el.komootStatusPill.style.color = 'var(--danger)';
+  } else {
+    el.komootStatusPill.style.color = 'var(--muted)';
+  }
+}
 function confirmAction(message, { title = null, confirmLabel = null, cancelLabel = null } = {}) {
   return new Promise((resolve) => {
-    el.confirmDialogTitle.textContent = title || (lang() === 'en' ? 'Confirm' : lang() === 'fr' ? 'Confirmation' : 'Bestaetigung');
+    let defaultTitle = 'Bestätigung';
+    if (lang() === 'en') defaultTitle = 'Confirm';
+    if (lang() === 'fr') defaultTitle = 'Confirmation';
+    let defaultConfirmLabel = 'Bestätigen';
+    if (lang() === 'en') defaultConfirmLabel = 'Confirm';
+    if (lang() === 'fr') defaultConfirmLabel = 'Confirmer';
+    el.confirmDialogTitle.textContent = title || defaultTitle;
     el.confirmDialogMessage.textContent = message;
-    el.confirmDialogConfirm.textContent = confirmLabel || (lang() === 'en' ? 'Confirm' : lang() === 'fr' ? 'Confirmer' : 'Bestaetigen');
+    el.confirmDialogConfirm.textContent = confirmLabel || defaultConfirmLabel;
     el.confirmDialogCancel.textContent = cancelLabel || t('cancelButton');
     const handleClose = () => {
       el.confirmDialog.removeEventListener('close', handleClose);
@@ -490,7 +698,8 @@ function renderMarkdownAsHtml(markdown) {
     const unordered = line.match(/^-\s+(.*)$/);
     if (ordered || unordered) {
       flushParagraph();
-      const nextTag = ordered ? "ol" : "ul";
+      let nextTag = "ul";
+      if (ordered) nextTag = "ol";
       if (!inList || listTag !== nextTag) {
         flushList();
         inList = true;
@@ -530,7 +739,13 @@ function renderVersionLabel() {
 function setUpdateStatus(message, showReload = false, error = false) {
   if (!el.updateStatus || !el.reloadAppButton) return;
   el.updateStatus.textContent = message || "";
-  el.updateStatus.dataset.state = error ? 'error' : (message ? 'info' : '');
+  let statusState = '';
+  if (error) {
+    statusState = 'error';
+  } else if (message) {
+    statusState = 'info';
+  }
+  el.updateStatus.dataset.state = statusState;
   el.reloadAppButton.disabled = Boolean(reloadInProgress);
   el.reloadAppButton.hidden = false;
   el.reloadAppButton.classList.toggle('button-primary', Boolean(showReload));
@@ -545,7 +760,7 @@ async function loadReadmeContent() {
     return;
   }
   el.helpStatus.textContent = t('helpLoading');
-  el.helpContent.innerHTML = "";
+  el.helpContent.replaceChildren();
   try {
     const response = await fetch(path, { cache: "no-cache" });
     if (!response.ok) throw new Error("README unavailable");
@@ -557,7 +772,7 @@ async function loadReadmeContent() {
   } catch (error) {
     console.error(error);
     el.helpStatus.textContent = t('helpFailed');
-    if (!(helpCache.path === path && helpCache.text)) el.helpContent.innerHTML = "";
+    if (!(helpCache.path === path && helpCache.text)) el.helpContent.replaceChildren();
   }
 }
 async function fetchVersionInfo() {
@@ -609,7 +824,8 @@ async function checkForUpdates(options = {}) {
       if (!silentNoChange) setUpdateStatus(t('updateNoChange'), false);
       return;
     }
-    const remoteLabel = remoteVersion.label ? ` · ${remoteVersion.label}` : '';
+    let remoteLabel = '';
+    if (remoteVersion.label) remoteLabel = ` · ${remoteVersion.label}`;
     setUpdateStatus(`${t('updateAvailablePrefix')}: ${remoteVersion.appVersion} · ${remoteVersion.cacheVersion}${remoteLabel}. ${t('updateAvailableAction')}`, true);
   } catch (error) {
     console.error(error);
@@ -636,9 +852,11 @@ function normalizePhotoLocation(value) {
   const lat = Number(value.lat ?? value.latitude);
   const lng = Number(value.lng ?? value.lon ?? value.longitude);
   const altValue = value.alt ?? value.altitude ?? value.ele;
-  const alt = altValue == null ? null : Number(altValue);
+  let alt = null;
+  if (altValue != null) alt = Number(altValue);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { lat, lng, alt: Number.isFinite(alt) ? alt : null };
+  if (!Number.isFinite(alt)) alt = null;
+  return { lat, lng, alt };
 }
 function isDataImageUrl(url) {
   return /^data:image\//i.test(url || '');
@@ -651,7 +869,8 @@ function isRenderablePhotoUrl(url) {
   return true;
 }
 function blobToObjectUrl(blob) {
-  return blob instanceof Blob ? URL.createObjectURL(blob) : null;
+  if (blob instanceof Blob) return URL.createObjectURL(blob);
+  return null;
 }
 function revokeTrackPhotoUrls(track) {
   for (const photo of track?.photos ?? []) {
@@ -671,9 +890,13 @@ async function dataUrlToBlob(dataUrl) {
 function normalizePhotos(photos) {
   if (!Array.isArray(photos)) return [];
   const seen = new Set();
-  return photos.map((photo) => typeof photo === 'string' ? { url: photo, title: null } : { ...photo }).filter((photo) => {
+  return photos.map((photo) => {
+    if (typeof photo === 'string') return { url: photo, title: null };
+    return { ...photo };
+  }).filter((photo) => {
     const url = cleanText(photo?.url);
-    const externalUrl = cleanText(photo?.externalUrl) || (isRenderablePhotoUrl(url) && !isDataImageUrl(url) ? url : null);
+    let externalUrl = cleanText(photo?.externalUrl);
+    if (!externalUrl && isRenderablePhotoUrl(url) && !isDataImageUrl(url)) externalUrl = url;
     const sourceUrl = cleanText(photo?.sourceUrl) || externalUrl || url;
     const blobId = cleanText(photo?.blobId) || null;
     if (!blobId && !externalUrl && !sourceUrl && !isDataImageUrl(url)) return false;
@@ -694,11 +917,211 @@ function normalizePhotos(photos) {
     photo.id = cleanText(photo.id) || null;
     photo.loadError = cleanText(photo.loadError) || null;
     photo.inlineLoaded = photo.inlineLoaded === true;
-    photo.widthPx = Number.isFinite(Number(photo.widthPx)) ? Number(photo.widthPx) : null;
-    photo.heightPx = Number.isFinite(Number(photo.heightPx)) ? Number(photo.heightPx) : null;
+    const widthPx = Number(photo.widthPx);
+    const heightPx = Number(photo.heightPx);
+    photo.widthPx = null;
+    photo.heightPx = null;
+    if (Number.isFinite(widthPx)) photo.widthPx = widthPx;
+    if (Number.isFinite(heightPx)) photo.heightPx = heightPx;
     photo.location = normalizePhotoLocation(photo.location);
     photo.lineLocation = normalizePhotoLocation(photo.lineLocation);
     return true;
+  });
+}
+
+/**
+ * Reads one WGS84 location from a Komoot object or coordinate array.
+ * @param {unknown} value Potential location object or [longitude, latitude] coordinate array.
+ * @returns {{lat: number, lng: number, alt: number|null}|null} Normalized location, or null when invalid.
+ */
+function normalizeTimelineLocation(value) {
+  const objectLocation = normalizePhotoLocation(value);
+  if (objectLocation) return objectLocation;
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const lng = Number(value[0]);
+  const lat = Number(value[1]);
+  let alt = null;
+  if (value.length > 2 && Number.isFinite(Number(value[2]))) alt = Number(value[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng, alt };
+}
+
+/**
+ * Finds the first usable location among common Komoot timeline field variants.
+ * @param {object} item Raw timeline event or embedded Komoot highlight.
+ * @param {string} kind Either "start" or "end" to select a segment endpoint.
+ * @returns {{lat: number, lng: number, alt: number|null}|null} Usable location, or null without one.
+ */
+function findTimelineLocation(item, kind = 'start') {
+  if (!item || typeof item !== 'object') return null;
+  const embeddedHighlight = item._embedded?.highlight || item.highlight || null;
+  let candidates = [];
+  if (kind === 'end') {
+    candidates = [item.end_point, item.endPoint, item.end, embeddedHighlight?.end_point, embeddedHighlight?.endPoint, embeddedHighlight?.end];
+  } else {
+    candidates = [item.location, item.position, item.point, item.start_point, item.startPoint, item.start, item.coordinates, item.geometry?.coordinates, embeddedHighlight?.location, embeddedHighlight?.position, embeddedHighlight?.point, embeddedHighlight?.start_point, embeddedHighlight?.startPoint, embeddedHighlight?.start, embeddedHighlight?.coordinates, embeddedHighlight?.geometry?.coordinates];
+  }
+  for (const candidate of candidates) {
+    const location = normalizeTimelineLocation(candidate);
+    if (location) return location;
+  }
+  return null;
+}
+
+/**
+ * Extracts the first readable community tip from common Komoot timeline nesting variants.
+ * @param {object} item Raw timeline event returned by Komoot.
+ * @param {object} highlight Highlight embedded in the timeline event.
+ * @returns {string|null} Tip text, or null when no embedded tip contains text.
+ */
+function findTimelineTipText(item, highlight) {
+  const candidates = [item?._embedded?.tips, item?.tips, highlight?._embedded?.tips, highlight?.tips];
+  for (const candidate of candidates) {
+    let tips = [];
+    if (Array.isArray(candidate)) tips = candidate;
+    if (Array.isArray(candidate?.items)) tips = candidate.items;
+    for (const tip of tips) {
+      const text = cleanText(tip?.text || tip?.content || tip?.description || tip?.body);
+      if (text) return text;
+    }
+  }
+  return null;
+}
+
+/**
+ * Converts a raw Komoot timeline event into display-safe Trailthread data.
+ * @param {object} item Raw event returned by Komoot's timeline endpoint.
+ * @param {number} index Position of the event in the source timeline.
+ * @returns {object|null} Normalized event, or null when it has no readable content.
+ */
+function normalizeTimelineEntry(item, index) {
+  if (!item || typeof item !== 'object') return null;
+  const highlight = item._embedded?.highlight || item.highlight || {};
+  const title = cleanText(item.name || item.title || item.label || highlight.name || highlight.title || highlight.label);
+  let text = cleanText(item.description || item.text || item.content || item.subtitle || highlight.description || highlight.text || highlight.content || highlight.subtitle);
+  if (!text) text = findTimelineTipText(item, highlight);
+  const rawType = cleanText(item.type || item._type || highlight.type || highlight._type).toLowerCase();
+  const startLocation = findTimelineLocation(item, 'start');
+  const endLocation = findTimelineLocation(item, 'end');
+  const distanceValue = item.distanceM ?? item.distance_m ?? item.distance ?? item.position_m ?? item.positionM ?? highlight.distanceM ?? highlight.distance_m ?? highlight.distance;
+  let distanceM = null;
+  if (Number.isFinite(Number(distanceValue)) && Number(distanceValue) >= 0) distanceM = Number(distanceValue);
+  if (!title && !text && !rawType && !startLocation && distanceM == null) return null;
+  let type = rawType;
+  if (!type) type = 'timeline';
+  let location = startLocation;
+  if (!location && distanceM != null) location = null;
+  let segment = null;
+  if (rawType.includes('segment') && startLocation && endLocation) segment = [startLocation, endLocation];
+  return {
+    id: `${item.id || highlight.id || type}-${index}`,
+    title: title || t('timelineEntryFallback'),
+    text: text || null,
+    type,
+    distanceM,
+    location,
+    segment
+  };
+}
+
+/**
+ * Normalizes all readable timeline events stored on a track.
+ * @param {object} track Track whose raw Komoot timeline should be read.
+ * @returns {Array<object>} Chronologically ordered normalized timeline entries.
+ */
+function normalizeTrackTimeline(track) {
+  let sourceItems = [];
+  if (Array.isArray(track?.timeline)) sourceItems = track.timeline;
+  if (Array.isArray(track?.timeline?.items)) sourceItems = track.timeline.items;
+  if (Array.isArray(track?.timeline?._embedded?.items)) sourceItems = track.timeline._embedded.items;
+  return sourceItems.map((item, index) => normalizeTimelineEntry(item, index)).filter(Boolean);
+}
+
+/**
+ * Assigns a track location to a timeline entry that only has a distance reference.
+ * @param {object} track Track used as the spatial reference.
+ * @param {object} entry Normalized timeline entry.
+ * @returns {object} Timeline entry with a location when the track can supply one.
+ */
+function locateTimelineEntryOnTrack(track, entry) {
+  if (entry.location || entry.distanceM == null) return entry;
+  const location = sampleAlongTrack(track.points, entry.distanceM / 1000);
+  if (!location) return entry;
+  return { ...entry, location };
+}
+
+/**
+ * Creates a Leaflet-compatible DOM marker from the shared timeline template.
+ * @param {object} entry Normalized timeline entry to represent.
+ * @returns {HTMLElement} Marker element carrying the entry type for CSS styling.
+ */
+function createTimelineMapMarkerElement(entry) {
+  const fragment = el.timelineMapMarkerTemplate.content.cloneNode(true);
+  const marker = fragment.querySelector('.timeline-map-marker');
+  marker.dataset.timelineType = entry.type;
+  return marker;
+}
+
+/**
+ * Builds the popup DOM for one timeline marker without interpolating raw Komoot text as HTML.
+ * @param {object} entry Normalized timeline entry to display.
+ * @returns {HTMLElement} Popup element ready for Leaflet.
+ */
+function createTimelineMapPopup(entry) {
+  const fragment = el.timelineMapPopupTemplate.content.cloneNode(true);
+  const popup = fragment.querySelector('.timeline-map-popup');
+  const title = fragment.querySelector('.timeline-map-popup-title');
+  const text = fragment.querySelector('.timeline-map-popup-text');
+  const meta = fragment.querySelector('.timeline-map-popup-meta');
+  title.textContent = entry.title;
+  if (entry.text) {
+    text.textContent = entry.text;
+    text.hidden = false;
+  }
+  if (entry.distanceM != null) {
+    meta.textContent = t('timelineDistance', { distance: fmtKm(entry.distanceM / 1000) });
+    meta.hidden = false;
+  }
+  return popup;
+}
+
+/**
+ * Builds map layers for all locatable Komoot timeline entries of a track.
+ * @param {object} track Track containing raw Komoot timeline data.
+ * @returns {L.LayerGroup} Layer group with timeline point and segment markers.
+ */
+function buildTrackTimelineLayer(track) {
+  const layer = L.layerGroup();
+  normalizeTrackTimeline(track).forEach((rawEntry) => {
+    const entry = locateTimelineEntryOnTrack(track, rawEntry);
+    if (entry.segment) {
+      L.polyline(entry.segment.map((location) => [location.lat, location.lng]), { color: '#e6a33e', weight: 7, opacity: 0.78, lineCap: 'round', lineJoin: 'round' }).bindPopup(createTimelineMapPopup(entry)).addTo(layer);
+    }
+    if (!entry.location) return;
+    const marker = L.marker([entry.location.lat, entry.location.lng], {
+      timelineEntryId: entry.id,
+      icon: L.divIcon({ className: 'timeline-map-marker-wrap', html: createTimelineMapMarkerElement(entry), iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -13] })
+    }).bindPopup(createTimelineMapPopup(entry));
+    layer.addLayer(marker);
+  });
+  return layer;
+}
+
+/**
+ * Centers the main map on a timeline entry and opens its marker popup when available.
+ * @param {object} track Track owning the requested timeline entry.
+ * @param {string} entryId Identifier of the normalized timeline entry.
+ * @returns {void} Updates the highlighted map layer and viewport.
+ */
+function focusTimelineEntryOnMap(track, entryId) {
+  setHighlightedTrack(track.id);
+  const entry = normalizeTrackTimeline(track).map((item) => locateTimelineEntryOnTrack(track, item)).find((item) => item.id === entryId);
+  if (!entry?.location) return;
+  state.map.panTo([entry.location.lat, entry.location.lng]);
+  const timelineLayer = state.layers.get(track.id)?.timelineLayer;
+  timelineLayer?.eachLayer((layer) => {
+    if (layer.options?.timelineEntryId === entryId) layer.openPopup();
   });
 }
 function photoDisplayUrl(photo) {
@@ -805,18 +1228,51 @@ function collectGpxPhotos(xml) {
 }
 function haversine(a, b) { const r = 6371; const toRad = (d) => d * Math.PI / 180; const dLat = toRad(b.lat - a.lat); const dLng = toRad(b.lng - a.lng); const q = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2; return 2 * r * Math.atan2(Math.sqrt(q), Math.sqrt(1 - q)); }
 function bearingDegrees(a, b) { return ((Math.atan2(b.lng - a.lng, b.lat - a.lat) * 180 / Math.PI) + 360) % 360; }
+
+/**
+ * Finds the local route heading at a photo location using the nearest track point.
+ * @param {Array<object>} points Ordered geographic track points.
+ * @param {object} location Geographic photo location with latitude and longitude.
+ * @returns {number} Heading in degrees clockwise from north, or zero without a usable segment.
+ */
+function trackHeadingAtLocation(points, location) {
+  if (!Array.isArray(points) || points.length < 2) return 0;
+  const target = { lat: Number(location?.lat), lng: Number(location?.lng) };
+  if (!Number.isFinite(target.lat) || !Number.isFinite(target.lng)) return 0;
+  let closestIndex = -1;
+  let closestDistance = Infinity;
+  for (let index = 0; index < points.length; index += 1) {
+    const point = points[index];
+    if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lng)) continue;
+    const distance = haversine(target, point);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestIndex = index;
+    }
+  }
+  if (closestIndex < 0) return 0;
+  let startIndex = closestIndex - 1;
+  let endIndex = closestIndex + 1;
+  if (startIndex < 0) startIndex = 0;
+  if (endIndex >= points.length) endIndex = points.length - 1;
+  if (startIndex === endIndex) return 0;
+  return bearingDegrees(points[startIndex], points[endIndex]);
+}
 function parsePointTime(value) {
   if (!value) return null;
   const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? timestamp : null;
+  if (Number.isFinite(timestamp)) return timestamp;
+  return null;
 }
 function profileGradeAtPoint(points, index) {
   if (!Array.isArray(points) || index < 0 || index >= points.length) return null;
   const current = points[index];
   const previous = points[Math.max(0, index - 1)];
   const next = points[Math.min(points.length - 1, index + 1)];
-  const left = previous === current ? current : previous;
-  const right = next === current ? current : next;
+  let left = previous;
+  let right = next;
+  if (previous === current) left = current;
+  if (next === current) right = current;
   if (left?.ele == null || right?.ele == null || left.cumulativeKm == null || right.cumulativeKm == null) return null;
   const distanceMeters = Math.abs((right.cumulativeKm - left.cumulativeKm) * 1000);
   if (!distanceMeters) return null;
@@ -849,10 +1305,14 @@ function sampleAlongTrack(points, targetKm) {
   return null;
 }
 function markerIconHtml(label, color, highlighted) {
-  return `<span class="km-marker${highlighted ? ' is-highlighted' : ''}" style="--marker-color:${color}">${label}</span>`;
+  let className = 'km-marker';
+  if (highlighted) className += ' is-highlighted';
+  return `<span class="${className}" style="--marker-color:${color}">${label}</span>`;
 }
 function arrowIconHtml(color, rotation, highlighted) {
-    return `<span class="track-arrow${highlighted ? ' is-highlighted' : ''}" style="--arrow-color:${color}; --arrow-rotation:${(rotation ?? 0) + 90}deg"></span>`;
+    let className = 'track-arrow';
+    if (highlighted) className += ' is-highlighted';
+    return `<span class="${className}" style="--arrow-color:${color}; --arrow-rotation:${(rotation ?? 0) + 90}deg"></span>`;
   }
   function replayMarkerIconHtml(rotation) {
     return `<span class="replay-marker-arrow" style="--replay-arrow-rotation:${(rotation ?? 0) + 90}deg"></span>`;
@@ -875,7 +1335,8 @@ function enrichTrackMetrics(track) {
       };
     } catch {}
   }
-  const points = Array.isArray(track.points) ? track.points.map((point) => ({ ...point })) : [];
+  let points = [];
+  if (Array.isArray(track.points)) points = track.points.map((point) => ({ ...point }));
   let distanceKm = 0;
   let elevationGainM = 0;
   let elevationLossM = 0;
@@ -911,9 +1372,17 @@ function enrichTrackMetrics(track) {
     if (point.ele != null) previousElevation = point.ele;
   });
   const elevationValues = points.map((point) => point.ele).filter((value) => value != null);
-  const derivedDurationHours = firstTime != null && lastTime != null && lastTime > firstTime ? (lastTime - firstTime) / 3600000 : null;
+  let derivedDurationHours = null;
+  if (firstTime != null && lastTime != null && lastTime > firstTime) derivedDurationHours = (lastTime - firstTime) / 3600000;
   const durationHours = track.durationHours ?? derivedDurationHours;
-  const avgSpeedKmh = durationHours && durationHours > 0 ? Number((distanceKm / durationHours).toFixed(1)) : null;
+  let avgSpeedKmh = null;
+  if (durationHours && durationHours > 0) avgSpeedKmh = Number((distanceKm / durationHours).toFixed(1));
+  let elevationMinM = null;
+  let elevationMaxM = null;
+  if (elevationValues.length) {
+    elevationMinM = Math.min(...elevationValues);
+    elevationMaxM = Math.max(...elevationValues);
+  }
   return {
     ...track,
     points,
@@ -922,8 +1391,8 @@ function enrichTrackMetrics(track) {
     hasElevation: elevationValues.length >= 2,
     elevationGainM: track.elevationGainM ?? Math.round(elevationGainM),
     elevationLossM: track.elevationLossM ?? Math.round(elevationLossM),
-    elevationMinM: track.elevationMinM ?? (elevationValues.length ? Math.min(...elevationValues) : null),
-    elevationMaxM: track.elevationMaxM ?? (elevationValues.length ? Math.max(...elevationValues) : null),
+    elevationMinM: track.elevationMinM ?? elevationMinM,
+    elevationMaxM: track.elevationMaxM ?? elevationMaxM,
     durationHours,
     avgSpeedKmh
   };
@@ -939,7 +1408,9 @@ function parseGpx(text) {
   if (!nodes.length) throw new Error('No track points found');
   const points = nodes.map((node) => {
     const elevation = Number(node.querySelector('ele')?.textContent);
-    return { lat: Number(node.getAttribute('lat')), lng: Number(node.getAttribute('lon')), ele: Number.isFinite(elevation) ? elevation : null, time: node.querySelector('time')?.textContent || null, cumulativeKm: 0, cumulativeTimeSec: 0, cumulativeAscentM: 0 };
+    let normalizedElevation = null;
+    if (Number.isFinite(elevation)) normalizedElevation = elevation;
+    return { lat: Number(node.getAttribute('lat')), lng: Number(node.getAttribute('lon')), ele: normalizedElevation, time: node.querySelector('time')?.textContent || null, cumulativeKm: 0, cumulativeTimeSec: 0, cumulativeAscentM: 0 };
   });
   let distanceKm = 0;
   let elevationGainM = 0;
@@ -971,8 +1442,16 @@ function parseGpx(text) {
   }
   const dates = points.map((point) => point.time).filter(Boolean).sort();
   const elevationValues = points.map((point) => point.ele).filter((value) => value != null);
-  const durationHours = firstTime != null && lastTime != null && lastTime > firstTime ? (lastTime - firstTime) / 3600000 : null;
-  const avgSpeedKmh = durationHours && durationHours > 0 ? Number((distanceKm / durationHours).toFixed(1)) : null;
+  let durationHours = null;
+  if (firstTime != null && lastTime != null && lastTime > firstTime) durationHours = (lastTime - firstTime) / 3600000;
+  let avgSpeedKmh = null;
+  if (durationHours && durationHours > 0) avgSpeedKmh = Number((distanceKm / durationHours).toFixed(1));
+  let elevationMinM = null;
+  let elevationMaxM = null;
+  if (elevationValues.length) {
+    elevationMinM = Math.min(...elevationValues);
+    elevationMaxM = Math.max(...elevationValues);
+  }
   return {
     name,
     description,
@@ -984,8 +1463,8 @@ function parseGpx(text) {
     hasElevation: elevationValues.length >= 2,
     elevationGainM: Math.round(elevationGainM),
     elevationLossM: Math.round(elevationLossM),
-    elevationMinM: elevationValues.length ? Math.min(...elevationValues) : null,
-    elevationMaxM: elevationValues.length ? Math.max(...elevationValues) : null,
+    elevationMinM,
+    elevationMaxM,
     durationHours,
     avgSpeedKmh
   };
@@ -996,21 +1475,35 @@ function buildTrackRecord({ gpxText, fileName, source, type, account, descriptio
   const timestamp = isoNow();
   const surfaceSegments = normalizeRangeSegments(meta?.surfaceSegments);
   const wayTypeSegments = normalizeRangeSegments(meta?.wayTypeSegments);
+  let trackPhotos = parsed.photos;
+  if (Array.isArray(photos) && photos.length) trackPhotos = photos;
+  let komootUrl = null;
+  if (source === 'komoot' && account?.sourceTrackId) komootUrl = `https://www.komoot.de/tour/${account.sourceTrackId}`;
+  let dateStart = resolveTrackDate(parsed.dateStart, meta?.dateStart);
+  if (source === 'komoot') dateStart = resolveTrackDate(meta?.dateStart, parsed.dateStart);
+  let avgSpeedKmh = parsed.avgSpeedKmh ?? null;
+  if (meta?.durationHours) avgSpeedKmh = Number((parsed.distanceKm / meta.durationHours).toFixed(1));
+  let surfaces = segmentValues(surfaceSegments);
+  const metaSurfaces = normalizeTagList(meta?.surfaces);
+  if (metaSurfaces.length) surfaces = metaSurfaces;
+  let wayTypes = segmentValues(wayTypeSegments);
+  const metaWayTypes = normalizeTagList(meta?.wayTypes);
+  if (metaWayTypes.length) wayTypes = metaWayTypes;
   const track = {
     id: id('track'),
     name: parsed.name || fileName?.replace(/\.gpx$/i, '') || t('unnamedTrack'),
     description: normalizeTrackDescription(description, parsed.description),
-    photos: normalizePhotos(Array.isArray(photos) && photos.length ? photos : parsed.photos),
+    photos: normalizePhotos(trackPhotos),
     source,
     type: trackType(type),
     accountId: account?.id ?? null,
     accountEmail: account?.email ?? null,
     accountLabel: account?.label ?? null,
     sourceTrackId: account?.sourceTrackId ?? null,
-    komootUrl: source === 'komoot' && account?.sourceTrackId ? `https://www.komoot.de/tour/${account.sourceTrackId}` : null,
+    komootUrl,
     importedAt: timestamp,
     lastChanged: timestamp,
-    dateStart: source === 'komoot' ? resolveTrackDate(meta?.dateStart, parsed.dateStart) : resolveTrackDate(parsed.dateStart, meta?.dateStart),
+    dateStart,
     distanceKm: parsed.distanceKm,
     pointCount: parsed.pointCount,
     hasElevation: parsed.hasElevation,
@@ -1019,10 +1512,10 @@ function buildTrackRecord({ gpxText, fileName, source, type, account, descriptio
     elevationMinM: parsed.elevationMinM,
     elevationMaxM: parsed.elevationMaxM,
     durationHours: meta?.durationHours ?? parsed.durationHours ?? null,
-    avgSpeedKmh: meta?.durationHours ? Number((parsed.distanceKm / meta.durationHours).toFixed(1)) : parsed.avgSpeedKmh ?? null,
+    avgSpeedKmh,
     sport: meta?.sport ?? null,
-    surfaces: normalizeTagList(meta?.surfaces).length ? normalizeTagList(meta?.surfaces) : segmentValues(surfaceSegments),
-    wayTypes: normalizeTagList(meta?.wayTypes).length ? normalizeTagList(meta?.wayTypes) : segmentValues(wayTypeSegments),
+    surfaces,
+    wayTypes,
     surfaceSegments,
     wayTypeSegments,
     directions: normalizeDirections(meta?.directions),
@@ -1037,7 +1530,8 @@ function buildTrackRecord({ gpxText, fileName, source, type, account, descriptio
 }
 
 function normalizedElementLabel(value) {
-  return cleanText(typeof value === 'string' ? value.replace(/^[a-z]+#/, '') : value);
+  if (typeof value === 'string') return cleanText(value.replace(/^[a-z]+#/, ''));
+  return cleanText(value);
 }
 const DETAIL_VALUE_LABELS = {
   asphalt: { de: 'Asphalt', en: 'Asphalt', fr: 'Asphalte' },
@@ -1104,9 +1598,9 @@ const DIRECTION_VALUE_LABELS = {
   roundabout: { de: 'Kreisverkehr', en: 'Roundabout', fr: 'Rond-point' },
   enter_roundabout: { de: 'In den Kreisverkehr', en: 'Enter roundabout', fr: 'Entrer dans le rond-point' },
   exit_roundabout: { de: 'Kreisverkehr verlassen', en: 'Exit roundabout', fr: 'Sortir du rond-point' },
-  merge: { de: 'Einfaedeln', en: 'Merge', fr: 'S inserer' },
+  merge: { de: 'Einfädeln', en: 'Merge', fr: 'S inserer' },
   fork: { de: 'Gabelung', en: 'Fork', fr: 'Bifurcation' },
-  ferry: { de: 'Faehre', en: 'Ferry', fr: 'Ferry' },
+  ferry: { de: 'Fähre', en: 'Ferry', fr: 'Ferry' },
   stairs: { de: 'Treppe', en: 'Stairs', fr: 'Escaliers' },
   tunnel: { de: 'Tunnel', en: 'Tunnel', fr: 'Tunnel' }
 };
@@ -1149,29 +1643,27 @@ function uniqueTextList(values) { return [...new Set((values ?? []).map((value) 
 function normalizeTagList(value) {
   if (Array.isArray(value)) return uniqueTextList(value.map((item) => item?.name || item?.type || item?.label || item?.surface || item?.surface_type || item?.way_type || item?.wayType || item?.value || item?.slug || normalizedElementLabel(item?.element) || item));
   if (value && typeof value === 'object') {
-    const nested = [
-      ...(Array.isArray(value.items) ? value.items : []),
-      ...(Array.isArray(value.values) ? value.values : []),
-      ...(Array.isArray(value.surfaces) ? value.surfaces : []),
-      ...(Array.isArray(value.way_types) ? value.way_types : []),
-      ...(Array.isArray(value.wayTypes) ? value.wayTypes : []),
-    ];
+    const nested = [];
+    if (Array.isArray(value.items)) nested.push(...value.items);
+    if (Array.isArray(value.values)) nested.push(...value.values);
+    if (Array.isArray(value.surfaces)) nested.push(...value.surfaces);
+    if (Array.isArray(value.way_types)) nested.push(...value.way_types);
+    if (Array.isArray(value.wayTypes)) nested.push(...value.wayTypes);
     if (nested.length) return uniqueTextList(nested.map((item) => item?.name || item?.type || item?.label || item?.surface || item?.surface_type || item?.way_type || item?.wayType || item?.value || item?.slug || normalizedElementLabel(item?.element) || item));
   }
   return [];
 }
 function normalizeRangeSegments(value) {
-  const items = Array.isArray(value)
-    ? value
-    : value && typeof value === 'object'
-      ? [
-          ...(Array.isArray(value.items) ? value.items : []),
-          ...(Array.isArray(value.values) ? value.values : []),
-          ...(Array.isArray(value.surfaces) ? value.surfaces : []),
-          ...(Array.isArray(value.way_types) ? value.way_types : []),
-          ...(Array.isArray(value.wayTypes) ? value.wayTypes : []),
-        ]
-      : [];
+  let items = [];
+  if (Array.isArray(value)) {
+    items = value;
+  } else if (value && typeof value === 'object') {
+    if (Array.isArray(value.items)) items.push(...value.items);
+    if (Array.isArray(value.values)) items.push(...value.values);
+    if (Array.isArray(value.surfaces)) items.push(...value.surfaces);
+    if (Array.isArray(value.way_types)) items.push(...value.way_types);
+    if (Array.isArray(value.wayTypes)) items.push(...value.wayTypes);
+  }
   return items.map((item) => {
     if (!item || typeof item !== 'object') return null;
     const from = Number(item.from ?? item.start ?? item.begin ?? item.indexFrom);
@@ -1188,6 +1680,287 @@ function normalizeRangeSegments(value) {
 }
 function segmentValues(segments) {
   return [...new Set(normalizeRangeSegments(segments).map((segment) => segment.value).filter(Boolean))];
+}
+
+/**
+ * Builds evenly spaced reference points so a long track does not create one OSM request per GPX point.
+ * @param {Array<object>} points Track points with latitude and longitude values.
+ * @returns {Array<{pointIndex: number, lat: number, lng: number}>} Bounded set of valid route reference points.
+ */
+function buildOsmAnalysisSamples(points) {
+  if (!Array.isArray(points) || points.length < 2) return [];
+  const validPoints = [];
+  points.forEach((point, pointIndex) => {
+    if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lng)) return;
+    validPoints.push({ pointIndex, lat: point.lat, lng: point.lng });
+  });
+  if (validPoints.length < 2) return [];
+  let totalDistanceM = 0;
+  for (let index = 1; index < validPoints.length; index += 1) {
+    totalDistanceM += haversine(validPoints[index - 1], validPoints[index]) * 1000;
+  }
+  let minimumDistanceM = OSM_ANALYSIS_SAMPLE_DISTANCE_M;
+  if (totalDistanceM / minimumDistanceM > OSM_ANALYSIS_MAX_SAMPLES - 1) {
+    minimumDistanceM = totalDistanceM / (OSM_ANALYSIS_MAX_SAMPLES - 1);
+  }
+  const samples = [validPoints[0]];
+  let distanceSinceSampleM = 0;
+  for (let index = 1; index < validPoints.length - 1; index += 1) {
+    distanceSinceSampleM += haversine(validPoints[index - 1], validPoints[index]) * 1000;
+    if (distanceSinceSampleM < minimumDistanceM) continue;
+    samples.push(validPoints[index]);
+    distanceSinceSampleM = 0;
+  }
+  const lastPoint = validPoints.at(-1);
+  if (samples.at(-1)?.pointIndex !== lastPoint.pointIndex) samples.push(lastPoint);
+  return samples;
+}
+
+/**
+ * Splits reference points into small, sequential Overpass query groups.
+ * @param {Array<object>} samples OSM analysis reference points.
+ * @returns {Array<Array<object>>} Batches safe to send one after another.
+ */
+function splitOsmAnalysisSamples(samples) {
+  const chunks = [];
+  for (let start = 0; start < samples.length; start += OSM_ANALYSIS_QUERY_CHUNK_SIZE) {
+    chunks.push(samples.slice(start, start + OSM_ANALYSIS_QUERY_CHUNK_SIZE));
+  }
+  return chunks;
+}
+
+/**
+ * Creates an Overpass query for highway-tagged ways near one batch of track reference points.
+ * @param {Array<{lat: number, lng: number}>} samples Reference points of one query batch.
+ * @returns {string} Overpass QL query requesting tags and geometry only.
+ */
+function buildOsmWayTypeQuery(samples) {
+  const clauses = samples.map((sample) => `way(around:${OSM_ANALYSIS_MATCH_DISTANCE_M},${sample.lat.toFixed(6)},${sample.lng.toFixed(6)})[highway];`).join('\n');
+  return `[out:json][timeout:25];\n(\n${clauses}\n);\nout tags geom;`;
+}
+
+/**
+ * Converts an Overpass HTTP status into a helpful retry instruction instead of exposing a technical status alone.
+ * @param {number} status HTTP status returned by the OSM service.
+ * @returns {string} Localized explanation with a safe next action.
+ */
+function osmWayTypesRequestError(status) {
+  if (status === 429) return t('osmWayTypesRateLimited');
+  if (status === 406) return t('osmWayTypesRequestRejected');
+  if (status >= 500) return t('osmWayTypesServiceUnavailable');
+  return t('osmWayTypesRequestFailed', { status });
+}
+
+/**
+ * Pauses a retry without blocking the browser event loop.
+ * @param {number} durationMs Time to wait in milliseconds.
+ * @returns {Promise<void>} Resolves after the requested delay.
+ */
+function waitForOsmAnalysisRetry(durationMs) {
+  return new Promise((resolve) => window.setTimeout(resolve, durationMs));
+}
+
+/**
+ * Requests nearby OSM ways for one group of reference points.
+ * @param {Array<{lat: number, lng: number}>} samples Reference points of one query batch.
+ * @returns {Promise<Array<object>>} OSM way elements with tags and geometry.
+ */
+async function fetchOsmWayTypeWays(samples) {
+  const url = `${OSM_OVERPASS_ENDPOINT}?data=${encodeURIComponent(buildOsmWayTypeQuery(samples))}`;
+  let retryAvailable = true;
+  while (true) {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (response.ok) {
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch {
+        throw new Error(t('osmWayTypesInvalidResponse'));
+      }
+      if (!Array.isArray(payload?.elements)) throw new Error(t('osmWayTypesInvalidResponse'));
+      return payload.elements.filter((element) => element?.type === 'way' && element?.tags?.highway && Array.isArray(element?.geometry));
+    }
+    const canRetry = response.status === 429 || response.status === 406;
+    if (!canRetry || !retryAvailable) throw new Error(osmWayTypesRequestError(response.status));
+    retryAvailable = false;
+    setStatus(t('osmWayTypesWaitingToRetry'), false, true);
+    await waitForOsmAnalysisRetry(OSM_ANALYSIS_RETRY_DELAY_MS);
+  }
+}
+
+/**
+ * Calculates the shortest local planar distance from a point to one OSM line segment.
+ * @param {{lat: number, lng: number}} point Track reference point.
+ * @param {{lat: number, lon: number}} start First OSM geometry coordinate.
+ * @param {{lat: number, lon: number}} end Second OSM geometry coordinate.
+ * @returns {number} Distance in meters.
+ */
+function osmPointToSegmentDistanceM(point, start, end) {
+  const metersPerLatitudeDegree = 110540;
+  const metersPerLongitudeDegree = 111320 * Math.cos(point.lat * Math.PI / 180);
+  const endX = (end.lon - start.lon) * metersPerLongitudeDegree;
+  const endY = (end.lat - start.lat) * metersPerLatitudeDegree;
+  const pointX = (point.lng - start.lon) * metersPerLongitudeDegree;
+  const pointY = (point.lat - start.lat) * metersPerLatitudeDegree;
+  const segmentLengthSquared = endX * endX + endY * endY;
+  if (segmentLengthSquared === 0) return Math.hypot(pointX, pointY);
+  let projection = (pointX * endX + pointY * endY) / segmentLengthSquared;
+  if (projection < 0) projection = 0;
+  if (projection > 1) projection = 1;
+  return Math.hypot(pointX - projection * endX, pointY - projection * endY);
+}
+
+/**
+ * Finds the closest highway-tagged OSM way for one sampled track point.
+ * @param {{lat: number, lng: number}} sample Track reference point.
+ * @param {Array<object>} ways OSM ways returned for the sample batch.
+ * @returns {string|null} OSM highway value, or null when no way is close enough.
+ */
+function closestOsmWayType(sample, ways) {
+  let closestValue = null;
+  let closestDistanceM = OSM_ANALYSIS_MATCH_DISTANCE_M;
+  ways.forEach((way) => {
+    const value = cleanText(way?.tags?.highway).toLowerCase();
+    const geometry = way?.geometry;
+    if (!value || !Array.isArray(geometry) || geometry.length < 2) return;
+    for (let index = 1; index < geometry.length; index += 1) {
+      const distanceM = osmPointToSegmentDistanceM(sample, geometry[index - 1], geometry[index]);
+      if (distanceM > closestDistanceM) continue;
+      closestDistanceM = distanceM;
+      closestValue = value;
+    }
+  });
+  return closestValue;
+}
+
+/**
+ * Turns sampled OSM way matches into contiguous point-index ranges understood by Trailthread's segment renderers.
+ * @param {Array<{pointIndex: number, value: string|null}>} matches Ordered sampled OSM way matches.
+ * @param {number} pointCount Number of points in the original track.
+ * @param {boolean} complete Whether every planned OSM query group completed successfully.
+ * @returns {Array<object>} Normalized point-indexed way-type segments.
+ */
+function buildOsmWayTypeSegments(matches, pointCount, complete = true) {
+  const segments = [];
+  let activeSegment = null;
+  matches.forEach((match, index) => {
+    if (!match.value) {
+      activeSegment = null;
+      return;
+    }
+    let from = 0;
+    let to = pointCount - 1;
+    if (index > 0) from = Math.floor((matches[index - 1].pointIndex + match.pointIndex) / 2);
+    if (index < matches.length - 1) to = Math.floor((match.pointIndex + matches[index + 1].pointIndex) / 2);
+    if (!complete && index === matches.length - 1) to = Math.min(pointCount - 1, match.pointIndex + 1);
+    if (to <= from && from < pointCount - 1) to = from + 1;
+    if (to <= from) return;
+    if (activeSegment && activeSegment.value === match.value && activeSegment.to >= from - 1) {
+      activeSegment.to = to;
+      return;
+    }
+    activeSegment = { from, to, value: match.value, raw: match.value };
+    segments.push(activeSegment);
+  });
+  return normalizeRangeSegments(segments);
+}
+
+/**
+ * Persists complete or partial OSM way-type segments and makes the analysed track visible on the map.
+ * @param {object} track Track receiving the derived OSM data.
+ * @param {Array<object>} samples All reference points planned for the analysis.
+ * @param {Array<{pointIndex: number, value: string|null}>} matches Successfully processed OSM matches.
+ * @param {number} totalGroups Number of query groups planned for the analysis.
+ * @param {boolean} complete Whether all query groups completed.
+ * @returns {Promise<{track: object, segments: Array<object>}|null>} Stored result, or null without usable segments.
+ */
+async function persistOsmWayTypeAnalysis(track, samples, matches, totalGroups, complete) {
+  const wayTypeSegments = buildOsmWayTypeSegments(matches, track.points.length, complete);
+  if (!wayTypeSegments.length) return null;
+  const updatedTrack = touchTrack(track, {
+    wayTypes: segmentValues(wayTypeSegments),
+    wayTypeSegments,
+    osmWayTypeAnalysis: {
+      source: 'openstreetmap',
+      analyzedAt: isoNow(),
+      sampledPoints: samples.length,
+      matchedPoints: matches.filter((match) => !!match.value).length,
+      processedGroups: Math.ceil(matches.length / OSM_ANALYSIS_QUERY_CHUNK_SIZE),
+      totalGroups,
+      complete
+    }
+  });
+  await put(STORES.tracks, updatedTrack);
+  state.tracks = state.tracks.map((item) => {
+    if (item.id === updatedTrack.id) return updatedTrack;
+    return item;
+  });
+  state.selectedTrackIds.add(updatedTrack.id);
+  state.highlightedTrackId = updatedTrack.id;
+  if (!state.settings.segmentOverlayMode) {
+    state.settings.segmentOverlayMode = true;
+    await saveSettings();
+  }
+  renderAll();
+  syncMapForSelectionChange();
+  if (state.trackDetailUi.trackId === updatedTrack.id) renderTrackDetailDialog();
+  return { track: updatedTrack, segments: wayTypeSegments };
+}
+
+/**
+ * Loads highway types from OSM for one local track and persists only the derived segment data.
+ * @param {string} trackId Identifier of the track selected in the library.
+ * @returns {Promise<void>} Resolves after the analysis result or error state is rendered.
+ */
+async function analyseTrackWayTypesFromOsm(trackId) {
+  const track = state.tracks.find((item) => item.id === trackId);
+  if (!track) return;
+  const samples = buildOsmAnalysisSamples(track.points);
+  if (samples.length < 2) {
+    setStatus(t('osmWayTypesNeedsTrack'), true);
+    return;
+  }
+  osmAnalysisTrackId = trackId;
+  renderLibrary();
+  const matches = [];
+  const chunks = splitOsmAnalysisSamples(samples);
+  try {
+    for (let index = 0; index < chunks.length; index += 1) {
+      setStatus(t('osmWayTypesProgress', { current: index + 1, total: chunks.length }), false, true);
+      const ways = await fetchOsmWayTypeWays(chunks[index]);
+      chunks[index].forEach((sample) => {
+        matches.push({ pointIndex: sample.pointIndex, value: closestOsmWayType(sample, ways) });
+      });
+    }
+    const result = await persistOsmWayTypeAnalysis(track, samples, matches, chunks.length, true);
+    if (!result) {
+      setStatus(t('osmWayTypesNoMatch'), true);
+      return;
+    }
+    setStatus(t('osmWayTypesDone', {
+      count: result.track.wayTypes.length,
+      segments: result.segments.length,
+      matched: result.track.osmWayTypeAnalysis.matchedPoints,
+      sampled: result.track.osmWayTypeAnalysis.sampledPoints
+    }));
+  } catch (error) {
+    const hasCompleteExistingAnalysis = !!track.osmWayTypeAnalysis && track.osmWayTypeAnalysis.complete !== false;
+    let partialResult = null;
+    if (!hasCompleteExistingAnalysis) partialResult = await persistOsmWayTypeAnalysis(track, samples, matches, chunks.length, false);
+    if (partialResult) {
+      setStatus(t('osmWayTypesPartialSaved', {
+        count: partialResult.track.wayTypes.length,
+        segments: partialResult.segments.length,
+        processed: partialResult.track.osmWayTypeAnalysis.processedGroups,
+        total: partialResult.track.osmWayTypeAnalysis.totalGroups
+      }), true);
+      return;
+    }
+    setStatus(error?.message || t('osmWayTypesFailed'), true);
+  } finally {
+    osmAnalysisTrackId = null;
+    renderLibrary();
+  }
 }
 function segmentPercentages(segments) {
   const normalized = normalizeRangeSegments(segments);
@@ -1206,22 +1979,52 @@ function segmentPercentages(segments) {
     .filter((item) => item.percent > 0)
     .sort((a, b) => b.percent - a.percent || a.value.localeCompare(b.value));
 }
-function profileSegmentBreakdownMarkup(segments, type) {
+/**
+ * Renders surface or way-type percentage chips into a profile breakdown container.
+ * @param {HTMLElement|null} container Target element for the segment chips.
+ * @param {Array<object>} segments Raw track segment ranges.
+ * @param {'surface'|'waytype'} type Segment category that controls the swatch appearance.
+ * @returns {void}
+ */
+function renderProfileSegmentBreakdown(container, segments, type) {
+  if (!container) return;
+  container.replaceChildren();
   const items = segmentPercentages(segments);
-  if (!items.length) return `<span class="map-segment-empty">${t('analysisNone')}</span>`;
-  return items.slice(0, 5).map(({ value, percent }) => {
-    const swatch = type === 'surface'
-      ? `<svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true"><line x1="1" y1="4" x2="31" y2="4" stroke="${surfaceSegmentColor(value)}" stroke-width="4" stroke-linecap="round"></line></svg>`
-      : `<svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true"><line x1="1" y1="4" x2="31" y2="4" stroke="rgba(248, 251, 250, 0.92)" stroke-width="3" stroke-linecap="round" stroke-dasharray="${wayTypeSegmentDash(value)}"></line></svg>`;
-    return `<span class="profile-segment-chip">${swatch}<span>${escapeHtml(displayDetailValue(value))}</span><strong>${percent}%</strong></span>`;
-  }).join('');
+  if (!items.length) {
+    const empty = document.createElement('span');
+    empty.className = 'map-segment-empty';
+    empty.textContent = t('analysisNone');
+    container.append(empty);
+    return;
+  }
+  items.slice(0, 5).forEach(({ value, percent }) => {
+    const fragment = el.profileSegmentChipTemplate.content.cloneNode(true);
+    const swatch = fragment.querySelector('.profile-segment-swatch-line');
+    const label = fragment.querySelector('.profile-segment-chip-label');
+    const percentage = fragment.querySelector('.profile-segment-chip-percent');
+    swatch.setAttribute('stroke', 'rgba(248, 251, 250, 0.92)');
+    swatch.setAttribute('stroke-width', '3');
+    swatch.setAttribute('stroke-linecap', 'round');
+    swatch.setAttribute('stroke-dasharray', wayTypeSegmentDash(value));
+    if (type === 'surface') {
+      swatch.setAttribute('stroke', surfaceSegmentColor(value));
+      swatch.setAttribute('stroke-width', '4');
+      swatch.removeAttribute('stroke-dasharray');
+    }
+    label.textContent = displayDetailValue(value);
+    percentage.textContent = `${percent}%`;
+    container.append(fragment);
+  });
 }
 function normalizeDirections(value) {
   if (!Array.isArray(value)) return [];
   return value.map((item, index) => {
     const rawInstruction = cleanText(item?.instruction || item?.text || item?.name || item?.title || item?.hint);
     const distanceRaw = item?.distanceM ?? item?.distance ?? item?.segment_length ?? item?.length ?? null;
-    const distanceM = Number.isFinite(Number(distanceRaw)) ? Math.round(Number(distanceRaw)) : null;
+    let distanceM = null;
+    if (Number.isFinite(Number(distanceRaw))) distanceM = Math.round(Number(distanceRaw));
+    let prefixDistanceM = 0;
+    if (Number.isFinite(Number(item?.prefixDistanceM))) prefixDistanceM = Math.max(0, Math.round(Number(item.prefixDistanceM)));
     const rawType = cleanText(item?.type || item?._type || item?.icon || item?.direction);
     if (!rawInstruction && !rawType && !Number.isFinite(distanceM)) return null;
     const instruction = translateDirectionText(rawInstruction || rawType);
@@ -1230,7 +2033,7 @@ function normalizeDirections(value) {
       index,
       instruction: instruction || type || `${t('analysisStepFallback')} ${index + 1}`,
       distanceM,
-      prefixDistanceM: Number.isFinite(Number(item?.prefixDistanceM)) ? Math.max(0, Math.round(Number(item.prefixDistanceM))) : 0,
+      prefixDistanceM,
       type: type || null,
       rawInstruction: rawInstruction || null,
       rawType: rawType || null
@@ -1262,10 +2065,11 @@ function iconForSport(value) {
 function metaTags(track) {
   const surfaceTags = segmentValues(track.surfaceSegments);
   const wayTypeTags = segmentValues(track.wayTypeSegments);
-  return [...new Set([
-    ...(surfaceTags.length ? surfaceTags : normalizeTagList(track.surfaces)),
-    ...(wayTypeTags.length ? wayTypeTags : normalizeTagList(track.wayTypes))
-  ].filter(Boolean))];
+  let tags = normalizeTagList(track.surfaces);
+  if (surfaceTags.length) tags = surfaceTags;
+  let wayTypes = normalizeTagList(track.wayTypes);
+  if (wayTypeTags.length) wayTypes = wayTypeTags;
+  return [...new Set([...tags, ...wayTypes].filter(Boolean))];
 }
 function ensureLibraryDerivedCache() {
   const currentLanguage = lang();
@@ -1297,7 +2101,8 @@ function syncSelectOptions(select, items, currentValue, signatureKey) {
     });
     libraryDerivedCache.selectSignatures[signatureKey] = signature;
   }
-  select.value = items.some((item) => item.value === currentValue) ? currentValue : 'all';
+  select.value = 'all';
+  if (items.some((item) => item.value === currentValue)) select.value = currentValue;
 }
 function currentLibraryFilterState() {
   return {
@@ -1316,7 +2121,8 @@ function renderLibraryFilters() {
   const currentSport = el.librarySportFilter.value || 'all';
   const currentTag = el.libraryTagFilter.value || 'all';
   const currentMeta = el.libraryMetaFilter.value || 'all';
-  el.libraryFavoriteFilter.value = ['all', 'favorites', 'non-favorites'].includes(currentFavorite) ? currentFavorite : 'all';
+  el.libraryFavoriteFilter.value = 'all';
+  if (['all', 'favorites', 'non-favorites'].includes(currentFavorite)) el.libraryFavoriteFilter.value = currentFavorite;
   syncSelectOptions(el.librarySportFilter, [{ value: 'all', label: t('filterAllSports') }, ...allSports().map((sport) => ({ value: sport, label: sportLabel(sport) }))], currentSport, 'sport');
   syncSelectOptions(el.libraryTagFilter, [{ value: 'all', label: t('filterAllTags') }, ...allCustomTags().map((tag) => ({ value: tag, label: tag }))], currentTag, 'tag');
   syncSelectOptions(el.libraryMetaFilter, [{ value: 'all', label: t('filterAllDetails') }, ...allMetaTags().map((tag) => ({ value: tag, label: displayDetailValue(tag) }))], currentMeta, 'meta');
@@ -1335,7 +2141,12 @@ function filteredTracks() {
   if (tag !== 'all') tracks = tracks.filter((track) => normalizeTagList(track.tags).includes(tag));
   if (meta !== 'all') tracks = tracks.filter((track) => metaTags(track).includes(meta));
   if (q) tracks = tracks.filter((track) => [track.name, track.description, track.accountLabel, track.accountEmail, track.source, track.dateStart, track.sport, ...metaTags(track), ...normalizeTagList(track.tags)].filter(Boolean).join(' ').toLowerCase().includes(q));
-  tracks.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'distance' ? (b.distanceKm ?? 0) - (a.distanceKm ?? 0) : sort === 'date' ? `${b.dateStart ?? ''}`.localeCompare(`${a.dateStart ?? ''}`) : (b.importedAt ?? '').localeCompare(a.importedAt ?? ''));
+  tracks.sort((a, b) => {
+    if (sort === 'name') return a.name.localeCompare(b.name);
+    if (sort === 'distance') return (b.distanceKm ?? 0) - (a.distanceKm ?? 0);
+    if (sort === 'date') return `${b.dateStart ?? ''}`.localeCompare(`${a.dateStart ?? ''}`);
+    return (b.importedAt ?? '').localeCompare(a.importedAt ?? '');
+  });
   libraryDerivedCache.filteredKey = cacheKey;
   libraryDerivedCache.filteredTracks = tracks;
   libraryDerivedCache.filteredIds = new Set(tracks.map((track) => track.id));
@@ -1358,28 +2169,47 @@ function refreshLibraryFilterView() {
 function recentTracks() { return [...state.tracks].sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? '')).slice(0, 12); }
 function activeAccount() { return state.accounts.find((account) => account.id === state.settings.activeAccountId) ?? null; }
 function photoCountLabel(count) {
-  if (lang() === 'en') return `${count} ${count === 1 ? 'photo' : 'photos'}`;
-  if (lang() === 'fr') return `${count} ${count === 1 ? 'photo' : 'photos'}`;
-  return `${count} ${count === 1 ? 'Foto' : 'Fotos'}`;
+  if (lang() === 'en' || lang() === 'fr') {
+    if (count === 1) return `${count} photo`;
+    return `${count} photos`;
+  }
+  if (count === 1) return `${count} Foto`;
+  return `${count} Fotos`;
 }
 async function toggleTrackFavorite(trackId) {
   const track = state.tracks.find((item) => item.id === trackId);
   if (!track) return;
   const updatedTrack = touchTrack(track, { favorite: !track.favorite });
   await put(STORES.tracks, updatedTrack);
-  state.tracks = state.tracks.map((item) => item.id === updatedTrack.id ? updatedTrack : item);
+  state.tracks = state.tracks.map((item) => {
+    if (item.id === updatedTrack.id) return updatedTrack;
+    return item;
+  });
   renderLibrary();
   renderSelection();
   renderRecent();
   renderProfile();
   syncMap();
 }
-function createFact(icon, label, value) {
-  return `<span class="track-fact"><span class="track-fact-icon">${icon}</span><span>${label}:</span><strong>${value}</strong></span>`;
+/**
+ * Appends one metadata fact by cloning the shared track fact template.
+ * @param {HTMLElement} container Target element for the fact.
+ * @param {string} icon Visual symbol for the fact category.
+ * @param {string} label Localized fact label without punctuation.
+ * @param {string} value Display value for the fact.
+ * @returns {void}
+ */
+function appendTrackFact(container, icon, label, value) {
+  const fragment = el.trackFactTemplate.content.cloneNode(true);
+  fragment.querySelector('.track-fact-icon').textContent = icon;
+  fragment.querySelector('.track-fact-label').textContent = `${label}:`;
+  fragment.querySelector('.track-fact-value').textContent = value;
+  container.append(fragment);
 }
 function photoLatLng(photo) {
   const point = photo?.location || photo?.lineLocation || null;
-  return point && Number.isFinite(point.lat) && Number.isFinite(point.lng) ? [point.lat, point.lng] : null;
+  if (point && Number.isFinite(point.lat) && Number.isFinite(point.lng)) return [point.lat, point.lng];
+  return null;
 }
 function photoNeedsReload(photo) {
   return !!(photo?.loadError && photo?.sourceUrl);
@@ -1395,6 +2225,51 @@ function nearestTrackPoint(track, latLng) {
     return best;
   }, null)?.point ?? null;
 }
+
+/**
+ * Configures a cloned thumbnail image with safe loading behavior and an accessible label.
+ * @param {HTMLImageElement} image Image element from a photo template.
+ * @param {object} photo Photo record with URL and optional title.
+ * @param {object} track Owning track used as the fallback title.
+ * @param {number} index Zero-based position of the photo.
+ * @returns {void}
+ */
+function populatePhotoThumbnailImage(image, photo, track, index) {
+  image.src = photo.url;
+  image.alt = photo.title || `${track.name} ${index + 1}`;
+  image.addEventListener('error', () => image.remove(), { once: true });
+  if (/^https?:\/\//i.test(photo.url)) image.referrerPolicy = 'no-referrer';
+}
+
+/**
+ * Creates a dialog thumbnail from the shared dialog thumbnail template.
+ * @param {object} photo Photo record to render.
+ * @param {object} track Owning track used for accessible fallback text.
+ * @param {number} index Zero-based position of the photo.
+ * @returns {{fragment: DocumentFragment, button: HTMLButtonElement}} Cloned thumbnail and its button.
+ */
+function createPhotoDialogThumbnail(photo, track, index) {
+  const fragment = el.photoDialogThumbTemplate.content.cloneNode(true);
+  const button = fragment.querySelector('.photo-dialog-thumb');
+  const image = fragment.querySelector('img');
+  populatePhotoThumbnailImage(image, photo, track, index);
+  return { fragment, button };
+}
+
+/**
+ * Creates a track photo thumbnail from the shared track thumbnail template.
+ * @param {object} photo Photo record to render.
+ * @param {object} track Owning track used for accessible fallback text.
+ * @param {number} index Zero-based position of the photo.
+ * @returns {{fragment: DocumentFragment, image: HTMLImageElement}} Cloned thumbnail and its image.
+ */
+function createTrackPhotoThumbnail(photo, track, index) {
+  const fragment = el.trackPhotoThumbTemplate.content.cloneNode(true);
+  const image = fragment.querySelector('.track-photo-thumb');
+  populatePhotoThumbnailImage(image, photo, track, index);
+  return { fragment, image };
+}
+
 function renderPhotoDialog() {
   const track = state.tracks.find((item) => item.id === state.photoDialogUi.trackId);
   const photos = state.photoDialogUi.photos;
@@ -1407,30 +2282,120 @@ function renderPhotoDialog() {
   if (/^https?:\/\//i.test(photo.url)) el.photoDialogImage.referrerPolicy = 'no-referrer';
   el.photoDialogCaption.textContent = photo.caption || '';
   el.photoDialogCaption.hidden = !photo.caption;
-  const facts = [];
-  if (photo.createdAt) facts.push(createFact('📅', t('labelDate'), fmtDate(photo.createdAt)));
-  if (photo.attribution) facts.push(createFact('©', t('labelAttribution'), photo.attribution));
-  if (photo.location) facts.push(createFact('📍', 'GPS', `${photo.location.lat.toFixed(5)}, ${photo.location.lng.toFixed(5)}`));
-  el.photoDialogMeta.innerHTML = facts.join('');
+  el.photoDialogMeta.replaceChildren();
+  if (photo.createdAt) appendTrackFact(el.photoDialogMeta, '📅', t('labelDate'), fmtDate(photo.createdAt));
+  if (photo.attribution) appendTrackFact(el.photoDialogMeta, '©', t('labelAttribution'), photo.attribution);
+  if (photo.location) appendTrackFact(el.photoDialogMeta, '📍', 'GPS', `${photo.location.lat.toFixed(5)}, ${photo.location.lng.toFixed(5)}`);
   el.photoDialogThumbs.replaceChildren();
   photos.forEach((item, index) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `photo-dialog-thumb${index === state.photoDialogUi.index ? ' is-active' : ''}`;
-    const image = document.createElement('img');
-    image.src = item.url;
-    image.alt = item.title || `${track.name} ${index + 1}`;
-    button.append(image);
+    const { fragment, button } = createPhotoDialogThumbnail(item, track, index);
+    if (index === state.photoDialogUi.index) button.classList.add('is-active');
     button.addEventListener('click', () => {
       state.photoDialogUi.index = index;
       renderPhotoDialog();
     });
-    el.photoDialogThumbs.append(button);
+    el.photoDialogThumbs.append(fragment);
   });
   el.photoDialogPrev.hidden = photos.length < 2;
   el.photoDialogNext.hidden = photos.length < 2;
   const activeThumb = el.photoDialogThumbs.querySelector('.photo-dialog-thumb.is-active');
   activeThumb?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  renderPhotoDialogFullscreenControl();
+}
+
+/**
+ * Returns whether the photo dialog currently fills the application viewport.
+ * @returns {boolean} True when the photo dialog is in its expanded view.
+ */
+function isPhotoDialogFullscreen() {
+  if (document.fullscreenElement === el.photoDialogSheet) return true;
+  return el.photoDialogSheet?.classList.contains('is-fullscreen') === true;
+}
+
+/**
+ * Updates the label and pressed state of the photo dialog fullscreen control.
+ * @returns {void} The button reflects the current dialog layout.
+ */
+function renderPhotoDialogFullscreenControl() {
+  if (!el.photoDialogFullscreenButton) return;
+  const isFullscreen = isPhotoDialogFullscreen();
+  let label = t('photoFullscreenEnter');
+  if (isFullscreen) label = t('photoFullscreenExit');
+  el.photoDialogFullscreenButton.setAttribute('aria-label', label);
+  el.photoDialogFullscreenButton.setAttribute('title', label);
+  el.photoDialogFullscreenButton.setAttribute('aria-pressed', String(isFullscreen));
+}
+
+/**
+ * Enters native browser fullscreen for the gallery and retains a viewport fallback.
+ * @returns {Promise<void>} Resolves after the fullscreen request has settled.
+ */
+async function enterPhotoDialogFullscreen() {
+  if (!el.photoDialogSheet) return;
+  el.photoDialogSheet.classList.add('is-fullscreen');
+  el.photoDialog.classList.add('is-fullscreen');
+  if (typeof el.photoDialogSheet.requestFullscreen === 'function') {
+    try {
+      await el.photoDialogSheet.requestFullscreen();
+    } catch (error) {
+      // The viewport-filling gallery remains available when native fullscreen is denied.
+    }
+  }
+  renderPhotoDialogFullscreenControl();
+}
+
+/**
+ * Leaves native browser fullscreen and resets the viewport-filling gallery layout.
+ * @returns {Promise<void>} Resolves after native fullscreen has been left when active.
+ */
+async function exitPhotoDialogFullscreen() {
+  if (document.fullscreenElement === el.photoDialogSheet && typeof document.exitFullscreen === 'function') {
+    try {
+      await document.exitFullscreen();
+    } catch (error) {
+      // Removing the local layout state still restores the regular gallery.
+    }
+  }
+  el.photoDialogSheet?.classList.remove('is-fullscreen');
+  el.photoDialog?.classList.remove('is-fullscreen');
+  renderPhotoDialogFullscreenControl();
+}
+
+/**
+ * Toggles the photo dialog between its regular and browser fullscreen layouts.
+ * @returns {Promise<void>} Resolves after the selected layout has been applied.
+ */
+async function togglePhotoDialogFullscreen() {
+  if (isPhotoDialogFullscreen()) {
+    await exitPhotoDialogFullscreen();
+  } else {
+    await enterPhotoDialogFullscreen();
+  }
+}
+
+/**
+ * Closes the photo dialog and resets its fullscreen layout.
+ * @returns {void} The next opened photo starts in the regular dialog layout.
+ */
+function closePhotoDialog() {
+  void exitPhotoDialogFullscreen();
+  el.photoDialog.close();
+}
+
+/**
+ * Switches gallery photos from keyboard input while the photo dialog is open.
+ * @param {KeyboardEvent} event - Key event received by the document.
+ * @returns {void} Moves to the previous or next photo for arrow keys.
+ */
+function handlePhotoDialogKeyboard(event) {
+  if (!el.photoDialog?.open) return;
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    stepPhotoDialog(-1);
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    stepPhotoDialog(1);
+  }
 }
 function stepPhotoDialog(offset) {
   const photos = state.photoDialogUi.photos;
@@ -1439,9 +2404,11 @@ function stepPhotoDialog(offset) {
   renderPhotoDialog();
 }
 function openPhotoDialog(track, photoOrIndex) {
-  const photos = Array.isArray(track?.photos) ? track.photos : [];
+  let photos = [];
+  if (Array.isArray(track?.photos)) photos = track.photos;
   if (!track || !photos.length) return;
-  const index = typeof photoOrIndex === 'number' ? photoOrIndex : Math.max(0, photos.indexOf(photoOrIndex));
+  let index = Math.max(0, photos.indexOf(photoOrIndex));
+  if (typeof photoOrIndex === 'number') index = photoOrIndex;
   state.photoDialogUi.trackId = track.id;
   state.photoDialogUi.photos = photos;
   state.photoDialogUi.index = Math.min(index, photos.length - 1);
@@ -1455,7 +2422,9 @@ function photoPopupMarkup(track, photo) {
 }
 function buildTrackPhotoLayer(track) {
   const layer = L.layerGroup();
-  (Array.isArray(track.photos) ? track.photos : []).forEach((photo, index) => {
+  let photos = [];
+  if (Array.isArray(track.photos)) photos = track.photos;
+  photos.forEach((photo, index) => {
     const latLng = photoLatLng(photo);
     if (!latLng) return;
     const marker = L.marker(latLng, {
@@ -1526,7 +2495,10 @@ async function reloadTrackPhotos(trackId) {
     await put(STORES.tracks, preparedTrack);
     const hydratedTrack = await hydrateTrackPhotos(preparedTrack);
     revokeTrackPhotoUrls(track);
-    state.tracks = state.tracks.map((item) => item.id === hydratedTrack.id ? hydratedTrack : item);
+    state.tracks = state.tracks.map((item) => {
+      if (item.id === hydratedTrack.id) return hydratedTrack;
+      return item;
+    });
     renderAll();
     syncMapForSelectionChange();
     setStatus(t('reloadPhotosDone'));
@@ -1534,89 +2506,241 @@ async function reloadTrackPhotos(trackId) {
     setStatus(error.message || t('reloadPhotosFailed'), true);
   }
 }
-function trackFactsMarkup(track) {
-  const facts = [
-    createFact('📅', t('labelDate'), fmtDate(track.dateStart)),
-    createFact('↔', t('labelDistance'), `${fmtKm(track.distanceKm)} km`)
-  ];
-  if (track.favorite) facts.unshift(`<span class="analysis-pill is-favorite">★ Favorit</span>`);
-  if (track.durationHours != null) facts.push(createFact('⏱', t('labelDuration'), `${track.durationHours.toFixed(1)} h`));
-  if (track.elevationGainM != null) facts.push(createFact('↗', t('labelAscent'), fmtMeters(track.elevationGainM)));
-  if (track.elevationLossM != null) facts.push(createFact('↘', t('labelDescent'), fmtMeters(track.elevationLossM)));
-  if (track.sport) facts.push(createFact(iconForSport(track.sport), t('labelSport'), sportLabel(track.sport)));
-  normalizeTagList(track.tags).slice(0, 3).forEach((item) => facts.push(`<span class="track-tag-chip">#${escapeHtml(item)}</span>`));
-  return facts.join('');
+/**
+ * Renders all metadata facts, badges and tags for a track into one container.
+ * @param {HTMLElement} container Target element for the facts.
+ * @param {object} track Track record whose metadata is displayed.
+ * @returns {void}
+ */
+function renderTrackFacts(container, track) {
+  container.replaceChildren();
+  if (track.favorite) {
+    const favorite = document.createElement('span');
+    favorite.className = 'analysis-pill is-favorite';
+    favorite.textContent = '★ Favorit';
+    container.append(favorite);
+  }
+  appendTrackFact(container, '📅', t('labelDate'), fmtDate(track.dateStart));
+  appendTrackFact(container, '↔', t('labelDistance'), `${fmtKm(track.distanceKm)} km`);
+  if (track.durationHours != null) appendTrackFact(container, '⏱', t('labelDuration'), `${track.durationHours.toFixed(1)} h`);
+  if (track.elevationGainM != null) appendTrackFact(container, '↗', t('labelAscent'), fmtMeters(track.elevationGainM));
+  if (track.elevationLossM != null) appendTrackFact(container, '↘', t('labelDescent'), fmtMeters(track.elevationLossM));
+  if (track.sport) appendTrackFact(container, iconForSport(track.sport), t('labelSport'), sportLabel(track.sport));
+  normalizeTagList(track.tags).slice(0, 3).forEach((item) => {
+    const tag = document.createElement('span');
+    tag.className = 'track-tag-chip';
+    tag.textContent = `#${item}`;
+    container.append(tag);
+  });
 }
-function analysisPills(items) {
+/**
+ * Builds one analysis pill from the shared template.
+ * @param {string} value Label text shown inside the pill.
+ * @returns {HTMLElement} Cloned pill element with its text set.
+ */
+function createAnalysisPill(value) {
+  const fragment = el.analysisPillTemplate.content.cloneNode(true);
+  const pill = fragment.querySelector('.analysis-pill');
+  pill.textContent = value;
+  return pill;
+}
+/**
+ * Builds one navigation pill from a direction entry.
+ * @param {object} direction Normalized navigation step with instruction and optional distance.
+ * @returns {HTMLElement} Cloned pill element with formatted direction text.
+ */
+function createDirectionAnalysisPill(direction) {
+  let label = direction.instruction;
+  if (Number.isFinite(direction.distanceM)) {
+    label = `${label} · ${fmtNum(direction.distanceM)} m`;
+  }
+  return createAnalysisPill(label);
+}
+/**
+ * Converts raw detail values into ready-to-append analysis pills.
+ * @param {Array<string>} items Source values that should be converted.
+ * @returns {Array<HTMLElement>} Pill elements for the provided values or one empty-state pill.
+ */
+function analysisPillElements(items) {
   const values = normalizeTagList(items);
-  if (!values.length) return `<span class="analysis-pill">${t('analysisNone')}</span>`;
-  return values.slice(0, 8).map((item) => `<span class="analysis-pill">${escapeHtml(displayDetailValue(item))}</span>`).join('');
+  if (!values.length) {
+    return [createAnalysisPill(t('analysisNone'))];
+  }
+  return values.slice(0, 8).map((item) => createAnalysisPill(displayDetailValue(item)));
 }
+/**
+ * Returns the localized yes/no label for analysis summary rows.
+ * @param {boolean} value Whether the summarized property is available.
+ * @returns {string} Localized affirmative or negative label.
+ */
 function booleanLabel(value) {
-  return value ? t('analysisYes') : t('analysisNo');
+  if (value) return t('analysisYes');
+  return t('analysisNo');
 }
+/**
+ * Creates one analysis card from the shared card template.
+ * @param {string} title Localized card heading.
+ * @param {string} copy Plain-text summary copy for the card.
+ * @returns {HTMLElement} Card element with copy text rendered.
+ */
+function createTrackAnalysisCopyCard(title, copy) {
+  const fragment = el.trackAnalysisCardTemplate.content.cloneNode(true);
+  const card = fragment.querySelector('.track-analysis-card');
+  const cardTitle = fragment.querySelector('.track-analysis-card-title');
+  const cardCopy = fragment.querySelector('.track-analysis-card-copy');
+  const cardList = fragment.querySelector('.analysis-list');
+  cardTitle.textContent = title;
+  cardCopy.textContent = copy;
+  cardCopy.hidden = false;
+  cardList.remove();
+  return card;
+}
+/**
+ * Creates one analysis card from the shared card template and fills its pill list.
+ * @param {string} title Localized card heading.
+ * @param {Array<HTMLElement>} items Pill elements that should be appended to the list.
+ * @param {string} copy Optional plain-text summary copy shown above the list.
+ * @returns {HTMLElement} Card element with a rendered list.
+ */
+function createTrackAnalysisListCard(title, items, copy = '') {
+  const fragment = el.trackAnalysisCardTemplate.content.cloneNode(true);
+  const card = fragment.querySelector('.track-analysis-card');
+  const cardTitle = fragment.querySelector('.track-analysis-card-title');
+  const cardCopy = fragment.querySelector('.track-analysis-card-copy');
+  const cardList = fragment.querySelector('.analysis-list');
+  cardTitle.textContent = title;
+  if (copy) {
+    cardCopy.textContent = copy;
+    cardCopy.hidden = false;
+  } else {
+    cardCopy.remove();
+  }
+  cardList.hidden = false;
+  cardList.replaceChildren(...items);
+  return card;
+}
+/**
+ * Builds the complete track analysis fragment for the detail dialog via shared templates.
+ * @param {object} track Track whose analysis cards should be rendered.
+ * @returns {DocumentFragment} Fragment containing all analysis cards.
+ */
 function trackAnalysisMarkup(track) {
   const hasPhotos = Array.isArray(track.photos) && track.photos.length > 0;
   const hasElevation = Number.isFinite(track.elevationGainM) || Number.isFinite(track.elevationLossM) || Number.isFinite(track.elevationMinM) || Number.isFinite(track.elevationMaxM);
   const hasTiming = Array.isArray(track.points) && track.points.some((point) => !!point.time);
   const directions = normalizeDirections(track.directions);
+  let photoCount = '0';
+  if (hasPhotos) photoCount = fmtNum(track.photos.length);
+  let directionCount = '0';
+  if (directions.length) directionCount = fmtNum(directions.length);
   const routeText = [
-    `${t('labelSport')}: ${escapeHtml(sportLabel(track.sport))}`,
+    `${t('labelSport')}: ${sportLabel(track.sport)}`,
     `${t('labelDistance')}: ${fmtKm(track.distanceKm)} km`,
     `${t('pointsTitle')}: ${fmtNum(track.pointCount)}`,
     `${t('profileAltitudeRange')}: ${fmtMeters((track.elevationMaxM ?? 0) - (track.elevationMinM ?? 0))}`
   ].join(' · ');
   const dataText = [
-    `${t('analysisPhotosLabel')}: ${hasPhotos ? fmtNum(track.photos.length) : '0'}`,
+    `${t('analysisPhotosLabel')}: ${photoCount}`,
     `${t('analysisElevationLabel')}: ${booleanLabel(hasElevation)}`,
     `${t('analysisTimingLabel')}: ${booleanLabel(hasTiming)}`,
     `${t('analysisReplayLabel')}: ${booleanLabel(track.pointCount > 1)}`,
-    `${t('analysisDirectionsLabel')}: ${directions.length ? fmtNum(directions.length) : '0'}`
+    `${t('analysisDirectionsLabel')}: ${directionCount}`
   ].join(' · ');
   const customTags = normalizeTagList(track.tags);
-  const directionPreview = directions.length
-    ? directions.slice(0, 4).map((item) => {
-        const suffix = Number.isFinite(item.distanceM) ? ` · ${fmtNum(item.distanceM)} m` : '';
-        return `<span class="analysis-pill">${escapeHtml(item.instruction)}${suffix}</span>`;
-      }).join('')
-    : t('analysisNone');
-  return `
-    <div class="track-analysis-grid">
-      <article class="track-analysis-card">
-        <h3>${t('analysisRouteTitle')}</h3>
-        <p>${routeText}</p>
-      </article>
-      <article class="track-analysis-card">
-        <h3>${t('analysisDataTitle')}</h3>
-        <p>${dataText}</p>
-      </article>
-      <article class="track-analysis-card">
-        <h3>${t('analysisSurfaceTitle')}</h3>
-        <div class="analysis-list">${analysisPills(track.surfaces)}</div>
-      </article>
-      <article class="track-analysis-card">
-        <h3>${t('analysisWayTypeTitle')}</h3>
-        <div class="analysis-list">${analysisPills(track.wayTypes)}</div>
-      </article>
-      <article class="track-analysis-card">
-        <h3>${t('analysisNavigationTitle')}</h3>
-        <div class="analysis-list">${directionPreview}</div>
-      </article>
-      <article class="track-analysis-card">
-        <h3>${t('analysisOrganizationTitle')}</h3>
-        <p>${track.favorite ? t('analysisFavoriteLabel') : t('analysisStandardLabel')} · ${t('analysisTagsLabel')}: ${customTags.length ? customTags.length : 0}</p>
-        <div class="analysis-list">${analysisPills(customTags)}</div>
-      </article>
-    </div>
-  `;
+  const directionItems = [];
+  if (!directions.length) {
+    directionItems.push(createAnalysisPill(t('analysisNone')));
+  } else {
+    directions.slice(0, 4).forEach((item) => {
+      directionItems.push(createDirectionAnalysisPill(item));
+    });
+  }
+  let favoriteLabel = t('analysisStandardLabel');
+  if (track.favorite) favoriteLabel = t('analysisFavoriteLabel');
+  let customTagCount = 0;
+  if (customTags.length) customTagCount = customTags.length;
+  let wayTypeCopy = '';
+  if (track.osmWayTypeAnalysis) {
+    if (track.osmWayTypeAnalysis.complete === false) {
+      wayTypeCopy = t('analysisOsmWayTypesPartialInfo', {
+        processed: fmtNum(track.osmWayTypeAnalysis.processedGroups || 0),
+        total: fmtNum(track.osmWayTypeAnalysis.totalGroups || 0)
+      });
+    } else {
+      wayTypeCopy = t('analysisOsmWayTypesInfo', {
+        date: fmtDate(track.osmWayTypeAnalysis.analyzedAt),
+        matched: fmtNum(track.osmWayTypeAnalysis.matchedPoints || 0),
+        sampled: fmtNum(track.osmWayTypeAnalysis.sampledPoints || 0)
+      });
+    }
+  }
+  const fragment = el.trackAnalysisGridTemplate.content.cloneNode(true);
+  const grid = fragment.querySelector('.track-analysis-grid');
+  const organizationItems = analysisPillElements(customTags);
+  grid.append(
+    createTrackAnalysisCopyCard(t('analysisRouteTitle'), routeText),
+    createTrackAnalysisCopyCard(t('analysisDataTitle'), dataText),
+    createTrackAnalysisListCard(t('analysisSurfaceTitle'), analysisPillElements(track.surfaces)),
+    createTrackAnalysisListCard(t('analysisWayTypeTitle'), analysisPillElements(track.wayTypes), wayTypeCopy),
+    createTrackAnalysisListCard(t('analysisNavigationTitle'), directionItems),
+    createTrackAnalysisListCard(
+      t('analysisOrganizationTitle'),
+      organizationItems,
+      `${favoriteLabel} · ${t('analysisTagsLabel')}: ${customTagCount}`
+    )
+  );
+  return fragment;
 }
+
+/**
+ * Builds the Komoot timeline section for the track detail dialog.
+ * @param {object} track Track whose stored timeline should be displayed.
+ * @returns {DocumentFragment} Timeline section fragment, or an empty fragment without timeline data.
+ */
+function trackTimelineMarkup(track) {
+  const entries = normalizeTrackTimeline(track);
+  const fragment = document.createDocumentFragment();
+  if (!entries.length) return fragment;
+  const sectionFragment = el.trackTimelineTemplate.content.cloneNode(true);
+  const title = sectionFragment.querySelector('.track-timeline-title');
+  const description = sectionFragment.querySelector('.track-timeline-description');
+  const list = sectionFragment.querySelector('.track-timeline-list');
+  title.textContent = t('timelineTitle');
+  description.textContent = t('timelineDescription');
+  entries.forEach((rawEntry) => {
+    const entry = locateTimelineEntryOnTrack(track, rawEntry);
+    const itemFragment = el.trackTimelineItemTemplate.content.cloneNode(true);
+    const itemTitle = itemFragment.querySelector('.track-timeline-item-title');
+    const itemText = itemFragment.querySelector('.track-timeline-item-text');
+    const itemMeta = itemFragment.querySelector('.track-timeline-item-meta');
+    const mapButton = itemFragment.querySelector('.track-timeline-map-button');
+    itemTitle.textContent = entry.title;
+    if (entry.text) {
+      itemText.textContent = entry.text;
+      itemText.hidden = false;
+    }
+    if (entry.distanceM != null) {
+      itemMeta.textContent = t('timelineDistance', { distance: fmtKm(entry.distanceM / 1000) });
+      itemMeta.hidden = false;
+    }
+    if (entry.location) {
+      mapButton.textContent = t('timelineShowOnMap');
+      mapButton.hidden = false;
+      mapButton.addEventListener('click', () => focusTimelineEntryOnMap(track, entry.id));
+    }
+    list.append(itemFragment);
+  });
+  fragment.append(sectionFragment);
+  return fragment;
+}
+
 function renderTrackDetailDialog() {
   const track = state.tracks.find((item) => item.id === state.trackDetailUi.trackId);
   if (!track) return;
   const editing = !!state.trackDetailUi.editing;
   el.trackDetailTitle.textContent = track.name;
   el.trackDetailSubtitle.textContent = t('detailDialogSubtitle', { source: track.accountLabel || trackSourceLabel(track.source), date: fmtDate(track.dateStart) });
-  el.trackDetailFacts.innerHTML = trackFactsMarkup(track);
+  renderTrackFacts(el.trackDetailFacts, track);
   el.trackDetailDescription.textContent = track.description || '';
   el.trackDetailDescription.hidden = editing || !track.description;
   el.trackDetailEditBlock.hidden = !editing;
@@ -1624,28 +2748,25 @@ function renderTrackDetailDialog() {
   el.trackDetailFavoriteInput.checked = !!track.favorite;
   el.trackDetailTagsInput.value = normalizeTagList(track.tags).join(', ');
   el.trackDetailDescriptionInput.value = track.description || '';
-  el.trackDetailAnalysis.innerHTML = trackAnalysisMarkup(track);
+  el.trackDetailAnalysis.replaceChildren(trackAnalysisMarkup(track), trackTimelineMarkup(track));
   el.trackDetailEditButton.hidden = editing;
   el.trackDetailSaveButton.hidden = !editing;
   el.trackDetailCancelButton.hidden = !editing;
   el.trackDetailPhotos.replaceChildren();
-  (Array.isArray(track.photos) ? track.photos : []).forEach((photo, index) => {
-    const image = document.createElement('img');
-    image.src = photo.url;
-    image.alt = photo.title || `${track.name} ${index + 1}`;
-    image.loading = 'lazy';
-    image.decoding = 'async';
-    image.addEventListener('error', () => image.remove(), { once: true });
-    if (/^https?:\/\//i.test(photo.url)) image.referrerPolicy = 'no-referrer';
+  let trackPhotos = [];
+  if (Array.isArray(track.photos)) trackPhotos = track.photos;
+  trackPhotos.forEach((photo, index) => {
+    const { fragment, image } = createTrackPhotoThumbnail(photo, track, index);
     image.addEventListener('click', () => openPhotoDialog(track, index));
-    el.trackDetailPhotos.append(image);
+    el.trackDetailPhotos.append(fragment);
   });
   el.trackDetailPhotos.hidden = !(Array.isArray(track.photos) && track.photos.length);
 }
 function renderPhotoGrid(container, track, limit = 4) {
   if (!container) return;
   container.replaceChildren();
-  const allPhotos = Array.isArray(track.photos) ? track.photos : [];
+  let allPhotos = [];
+  if (Array.isArray(track.photos)) allPhotos = track.photos;
   const photos = allPhotos.slice(0, limit);
   if (trackHasReloadablePhotos(track)) {
     const button = document.createElement('button');
@@ -1659,16 +2780,9 @@ function renderPhotoGrid(container, track, limit = 4) {
     container.append(button);
   }
   photos.forEach((photo, index) => {
-    const image = document.createElement('img');
-    image.className = 'track-photo-thumb';
-    image.loading = 'lazy';
-    image.decoding = 'async';
-    image.src = photo.url;
-    image.alt = photo.title || `${track.name} ${index + 1}`;
-    image.addEventListener('error', () => image.remove(), { once: true });
-    if (/^https?:\/\//i.test(photo.url)) image.referrerPolicy = 'no-referrer';
+    const { fragment, image } = createTrackPhotoThumbnail(photo, track, index);
     image.addEventListener('click', (event) => { event.stopPropagation(); openPhotoDialog(track, index); });
-    container.append(image);
+    container.append(fragment);
   });
   if (allPhotos.length > photos.length) {
     const count = document.createElement('span');
@@ -1678,50 +2792,102 @@ function renderPhotoGrid(container, track, limit = 4) {
   }
   container.hidden = photos.length === 0;
 }
+/**
+ * Creates a compact, non-interactive badge from the shared track badge template.
+ * @param {string} text Visible badge text.
+ * @param {string} label Accessible title describing the badge.
+ * @returns {HTMLElement} Ready-to-append badge element.
+ */
+function createTrackQuickBadge(text, label) {
+  const fragment = el.trackQuickBadgeTemplate.content.cloneNode(true);
+  const badge = fragment.querySelector('.track-quick-badge');
+  badge.textContent = text;
+  badge.title = label;
+  return badge;
+}
+
+/**
+ * Renders a bounded description preview and its optional expand control in a library card.
+ * @param {HTMLElement} container Description wrapper that is hidden without text.
+ * @param {HTMLElement} textNode Text node inside the wrapper.
+ * @param {HTMLButtonElement} toggleButton Button that expands or collapses the description.
+ * @param {string|null|undefined} value Full track description.
+ * @param {boolean} expanded Whether the card currently shows its extended preview.
+ * @returns {void} Updates the description area in place.
+ */
+function renderLibraryDescription(container, textNode, toggleButton, value, expanded) {
+  const description = cleanText(value);
+  container.hidden = !description;
+  if (!description) return;
+  const boundedDescription = description.slice(0, LIBRARY_DESCRIPTION_MAX_LENGTH);
+  let displayText = boundedDescription;
+  let hasMoreText = description.length > LIBRARY_DESCRIPTION_PREVIEW_LENGTH;
+  if (!expanded) displayText = description.slice(0, LIBRARY_DESCRIPTION_PREVIEW_LENGTH);
+  if (!expanded && hasMoreText) displayText += '...';
+  if (expanded && description.length > LIBRARY_DESCRIPTION_MAX_LENGTH) displayText += '...';
+  textNode.textContent = displayText;
+  toggleButton.hidden = !hasMoreText;
+  if (hasMoreText) {
+    toggleButton.textContent = t('libraryDescriptionMore');
+    if (expanded) toggleButton.textContent = t('libraryDescriptionLess');
+  }
+}
+
+/**
+ * Renders the compact metadata, bounded description, badges and photos of one library track card.
+ * @param {HTMLElement} copyNode Cloned track card content node.
+ * @param {object} track Track supplying the visible metadata.
+ * @returns {void} Populates the supplied card node and connects its local description toggle.
+ */
 function renderTrackExtras(copyNode, track) {
   const titleBadges = copyNode.querySelector('.track-quick-badges');
   const submeta = copyNode.querySelector('.track-submeta');
   const description = copyNode.querySelector('.track-description');
+  const descriptionText = copyNode.querySelector('.track-description-text');
+  const descriptionToggle = copyNode.querySelector('.track-description-toggle');
   const facts = copyNode.querySelector('.track-facts');
   const photoStrip = copyNode.querySelector('.track-photo-strip');
   if (titleBadges) {
     titleBadges.replaceChildren();
     const favoriteButton = document.createElement('button');
     favoriteButton.type = 'button';
-    favoriteButton.className = `track-quick-badge track-favorite-toggle${track.favorite ? ' is-favorite' : ''}`;
+    favoriteButton.className = 'track-quick-badge track-favorite-toggle';
+    if (track.favorite) favoriteButton.classList.add('is-favorite');
     favoriteButton.textContent = '★';
-    favoriteButton.title = track.favorite ? t('favoriteRemove') : t('favoriteAdd');
+    favoriteButton.title = t('favoriteAdd');
+    if (track.favorite) favoriteButton.title = t('favoriteRemove');
     favoriteButton.setAttribute('aria-label', favoriteButton.title);
-    favoriteButton.setAttribute('aria-pressed', track.favorite ? 'true' : 'false');
+    favoriteButton.setAttribute('aria-pressed', String(!!track.favorite));
     favoriteButton.addEventListener('click', async (event) => {
       event.stopPropagation();
       await toggleTrackFavorite(track.id);
     });
     titleBadges.append(favoriteButton);
     if (Array.isArray(track.photos) && track.photos.length) {
-      const photoBadge = document.createElement('span');
-      photoBadge.className = 'track-quick-badge';
-      photoBadge.title = photoCountLabel(track.photos.length);
-      photoBadge.textContent = `📷 ${fmtNum(track.photos.length)}`;
-      titleBadges.append(photoBadge);
+      titleBadges.append(createTrackQuickBadge(`📷 ${fmtNum(track.photos.length)}`, photoCountLabel(track.photos.length)));
     }
     if (normalizeTagList(track.tags).length) {
-      const tagBadge = document.createElement('span');
-      tagBadge.className = 'track-quick-badge';
-      tagBadge.title = 'Tags';
-      tagBadge.textContent = `# ${fmtNum(normalizeTagList(track.tags).length)}`;
-      titleBadges.append(tagBadge);
+      titleBadges.append(createTrackQuickBadge(`# ${fmtNum(normalizeTagList(track.tags).length)}`, 'Tags'));
+    }
+    const timelineCount = normalizeTrackTimeline(track).length;
+    if (timelineCount) {
+      titleBadges.append(createTrackQuickBadge(`✦ ${fmtNum(timelineCount)}`, t('timelineBadge', { count: timelineCount })));
     }
     titleBadges.hidden = false;
   }
   if (submeta) {
     submeta.textContent = t('trackSubmeta', { date: fmtDate(track.dateStart), source: track.accountLabel || trackSourceLabel(track.source) });
   }
-  if (description) {
-    description.textContent = track.description || '';
-    description.hidden = !track.description;
+  if (description && descriptionText && descriptionToggle) {
+    let expanded = false;
+    renderLibraryDescription(description, descriptionText, descriptionToggle, track.description, expanded);
+    descriptionToggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      expanded = !expanded;
+      renderLibraryDescription(description, descriptionText, descriptionToggle, track.description, expanded);
+    });
   }
-  if (facts) facts.innerHTML = trackFactsMarkup(track);
+  if (facts) renderTrackFacts(facts, track);
   renderPhotoGrid(photoStrip, track, 6);
 }
 function openTrackDetail(trackId, startEditing = false) {
@@ -1739,13 +2905,21 @@ function openTrackDetail(trackId, startEditing = false) {
   }
 }
 function allFilteredSelected() { const tracks = filteredTracks(); return tracks.length > 0 && tracks.every((track) => state.selectedTrackIds.has(track.id)); }
-function renderToggleSelectionButton() { if (el.libraryToggleSelectionButton) el.libraryToggleSelectionButton.textContent = allFilteredSelected() ? t('clearSelection') : t('selectAll'); }
+function renderToggleSelectionButton() {
+  if (!el.libraryToggleSelectionButton) return;
+  el.libraryToggleSelectionButton.textContent = t('selectAll');
+  if (allFilteredSelected()) el.libraryToggleSelectionButton.textContent = t('clearSelection');
+}
 function selectedTracksForMerge() {
   const preferredOrder = filteredTracks().filter((track) => state.selectedTrackIds.has(track.id) && track.points?.length);
   const fallback = state.tracks.filter((track) => state.selectedTrackIds.has(track.id) && track.points?.length && !preferredOrder.some((item) => item.id === track.id));
   const ordered = preferredOrder.concat(fallback);
   if (state.highlightedTrackId && ordered.some((track) => track.id === state.highlightedTrackId)) {
-    ordered.sort((a, b) => (a.id === state.highlightedTrackId ? -1 : b.id === state.highlightedTrackId ? 1 : 0));
+    ordered.sort((a, b) => {
+      if (a.id === state.highlightedTrackId) return -1;
+      if (b.id === state.highlightedTrackId) return 1;
+      return 0;
+    });
   }
   return ordered;
 }
@@ -1754,7 +2928,9 @@ function renderMergeSelectedTracksButton() {
   const tracks = selectedTracksForMerge();
   const enabled = tracks.length === 2;
   el.mergeSelectedTracksButton.disabled = !enabled;
-  el.mergeSelectedTracksButton.setAttribute('title', enabled ? t('mergeSelectedTracks') : t('mergeSelectedTracksNeedTwo'));
+  let title = t('mergeSelectedTracksNeedTwo');
+  if (enabled) title = t('mergeSelectedTracks');
+  el.mergeSelectedTracksButton.setAttribute('title', title);
 }
 function mergeDialogTracks() {
   return state.mergeUi.orderedTrackIds.map((trackId) => state.tracks.find((track) => track.id === trackId)).filter(Boolean);
@@ -1765,14 +2941,12 @@ function renderMergeDialog() {
   if (el.mergeDialogFirstName) el.mergeDialogFirstName.textContent = firstTrack?.name || t('unnamedTrack');
   if (el.mergeDialogSecondName) el.mergeDialogSecondName.textContent = secondTrack?.name || t('unnamedTrack');
   if (el.mergeDialogFirstMeta) {
-    el.mergeDialogFirstMeta.textContent = firstTrack
-      ? t('trackMeta', { distance: fmtKm(firstTrack.distanceKm), points: fmtNum(firstTrack.pointCount), type: trackTypeLabel(firstTrack.type) })
-      : '-';
+    el.mergeDialogFirstMeta.textContent = '-';
+    if (firstTrack) el.mergeDialogFirstMeta.textContent = t('trackMeta', { distance: fmtKm(firstTrack.distanceKm), points: fmtNum(firstTrack.pointCount), type: trackTypeLabel(firstTrack.type) });
   }
   if (el.mergeDialogSecondMeta) {
-    el.mergeDialogSecondMeta.textContent = secondTrack
-      ? t('trackMeta', { distance: fmtKm(secondTrack.distanceKm), points: fmtNum(secondTrack.pointCount), type: trackTypeLabel(secondTrack.type) })
-      : '-';
+    el.mergeDialogSecondMeta.textContent = '-';
+    if (secondTrack) el.mergeDialogSecondMeta.textContent = t('trackMeta', { distance: fmtKm(secondTrack.distanceKm), points: fmtNum(secondTrack.pointCount), type: trackTypeLabel(secondTrack.type) });
   }
   if (el.mergeDialogConfirm) el.mergeDialogConfirm.disabled = !(firstTrack && secondTrack);
 }
@@ -1814,7 +2988,8 @@ function renderTrackWidthControl() {
 function renderMapPhotoModeButton() {
   if (!el.mapPhotoModeButton) return;
   const active = !!state.settings.photoOverlayOnly;
-  el.mapPhotoModeButton.textContent = active ? t('showTracksAgain') : t('showAllTrackPhotos');
+  el.mapPhotoModeButton.textContent = t('showAllTrackPhotos');
+  if (active) el.mapPhotoModeButton.textContent = t('showTracksAgain');
   el.mapPhotoModeButton.classList.toggle('is-active', active);
   el.mapPhotoModeButton.disabled = !!state.settings.heatmapMode;
 }
@@ -1823,90 +2998,173 @@ function renderMapHeatmapButton() {
   const active = !!state.settings.heatmapMode;
   const available = canRenderHeatmap();
   el.mapHeatmapButton.classList.toggle('is-active', active);
-  el.mapHeatmapButton.setAttribute('aria-pressed', active ? 'true' : 'false');
-  el.mapHeatmapButton.setAttribute('aria-disabled', (!active && !available) ? 'true' : 'false');
-  el.mapHeatmapButton.setAttribute('title', !active && !available ? t('heatmapNeedsMultipleTracks') : t('mapHeatmap'));
+  el.mapHeatmapButton.setAttribute('aria-pressed', String(active));
+  const disabled = !active && !available;
+  el.mapHeatmapButton.setAttribute('aria-disabled', String(disabled));
+  el.mapHeatmapButton.setAttribute('title', t('mapHeatmap'));
+  if (disabled) el.mapHeatmapButton.setAttribute('title', t('heatmapNeedsMultipleTracks'));
 }
 function highlightedTrackWithSegments() {
   const track = state.tracks.find((item) => item.id === state.highlightedTrackId);
   if (!track || !state.selectedTrackIds.has(track.id) || !filteredTrackIdSet().has(track.id)) return null;
   const hasSurfaceSegments = normalizeRangeSegments(track.surfaceSegments).length > 0;
   const hasWayTypeSegments = normalizeRangeSegments(track.wayTypeSegments).length > 0;
-  return hasSurfaceSegments || hasWayTypeSegments ? track : null;
+  if (hasSurfaceSegments || hasWayTypeSegments) return track;
+  return null;
 }
 function renderMapSegmentButton() {
   if (!el.mapSegmentButton) return;
   const active = !!state.settings.segmentOverlayMode;
   const availableTrack = highlightedTrackWithSegments();
   el.mapSegmentButton.classList.toggle('is-active', active);
-  el.mapSegmentButton.setAttribute('aria-pressed', active ? 'true' : 'false');
-  el.mapSegmentButton.setAttribute('aria-disabled', (!active && !availableTrack) ? 'true' : 'false');
-  el.mapSegmentButton.setAttribute('title', !active && !availableTrack ? t('segmentOverlayNeedsTrack') : t('mapSegments'));
+  el.mapSegmentButton.setAttribute('aria-pressed', String(active));
+  const disabled = !active && !availableTrack;
+  el.mapSegmentButton.setAttribute('aria-disabled', String(disabled));
+  el.mapSegmentButton.setAttribute('title', t('mapSegments'));
+  if (disabled) el.mapSegmentButton.setAttribute('title', t('segmentOverlayNeedsTrack'));
 }
 function renderPaneCompactButtons() {
   const sidebarCompact = !!state.settings.sidebarCompact;
   const libraryCompact = !!state.settings.libraryCompact;
   if (el.toggleSidebarCompactButton) {
-    const label = lang() === 'fr'
-      ? (sidebarCompact ? 'Elargir la colonne gauche' : 'Rendre la colonne gauche plus etroite')
-      : lang() === 'en'
-        ? (sidebarCompact ? 'Expand left column' : 'Make left column narrower')
-        : (sidebarCompact ? 'Linke Spalte verbreitern' : 'Linke Spalte schmal schalten');
-    el.toggleSidebarCompactButton.textContent = sidebarCompact ? '⟫' : '⟪';
+    let label = 'Linke Spalte schmal schalten';
+    if (sidebarCompact) label = 'Linke Spalte verbreitern';
+    if (lang() === 'en') {
+      label = 'Make left column narrower';
+      if (sidebarCompact) label = 'Expand left column';
+    }
+    if (lang() === 'fr') {
+      label = 'Rendre la colonne gauche plus etroite';
+      if (sidebarCompact) label = 'Elargir la colonne gauche';
+    }
+    el.toggleSidebarCompactButton.textContent = '⟪';
+    if (sidebarCompact) el.toggleSidebarCompactButton.textContent = '⟫';
     el.toggleSidebarCompactButton.setAttribute('title', label);
     el.toggleSidebarCompactButton.setAttribute('aria-label', label);
   }
   if (el.toggleLibraryCompactButton) {
-    const label = lang() === 'fr'
-      ? (libraryCompact ? 'Elargir la bibliotheque' : 'Rendre la bibliotheque plus etroite')
-      : lang() === 'en'
-        ? (libraryCompact ? 'Expand library column' : 'Make library column narrower')
-        : (libraryCompact ? 'Bibliothek verbreitern' : 'Bibliothek schmal schalten');
-    el.toggleLibraryCompactButton.textContent = libraryCompact ? '⟫' : '⟪';
+    let label = 'Bibliothek schmal schalten';
+    if (libraryCompact) label = 'Bibliothek verbreitern';
+    if (lang() === 'en') {
+      label = 'Make library column narrower';
+      if (libraryCompact) label = 'Expand library column';
+    }
+    if (lang() === 'fr') {
+      label = 'Rendre la bibliotheque plus etroite';
+      if (libraryCompact) label = 'Elargir la bibliotheque';
+    }
+    el.toggleLibraryCompactButton.textContent = '⟪';
+    if (libraryCompact) el.toggleLibraryCompactButton.textContent = '⟫';
     el.toggleLibraryCompactButton.setAttribute('title', label);
     el.toggleLibraryCompactButton.setAttribute('aria-label', label);
   }
 }
 
+/**
+ * Resolves the configured browser-extension download address against the current app URL.
+ * @returns {string|null} Absolute package URL, or null when the configuration is invalid.
+ */
+function komootExtensionDownloadUrl() {
+  const configuredUrl = TRAILTHREAD_CONFIG.komootExtensionDownloadUrl;
+  if (typeof configuredUrl !== 'string' || !configuredUrl.trim()) return null;
+  try {
+    return new URL(configuredUrl, window.location.href).href;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Applies the configurable extension package URL to the Komoot installation link.
+ * @returns {void} Hides the download action when no valid URL is configured.
+ */
+function applyKomootExtensionConfiguration() {
+  const downloadLink = document.querySelector('#komoot-extension-download-link');
+  if (!downloadLink) return;
+  const downloadUrl = komootExtensionDownloadUrl();
+  if (!downloadUrl) {
+    downloadLink.hidden = true;
+    return;
+  }
+  downloadLink.href = downloadUrl;
+  downloadLink.hidden = false;
+}
+
+/**
+ * Returns the localized accessible label for a previous or next track button.
+ * @param {'previous'|'next'} direction Direction represented by the control.
+ * @returns {string} Localized control label.
+ */
+function trackNavigationLabel(direction) {
+  let label = 'Nächster Track';
+  if (direction === 'previous') label = 'Vorheriger Track';
+  if (lang() === 'en') {
+    label = 'Next track';
+    if (direction === 'previous') label = 'Previous track';
+  }
+  if (lang() === 'fr') {
+    label = 'Trace suivante';
+    if (direction === 'previous') label = 'Trace precedente';
+  }
+  return label;
+}
+
+/**
+ * Applies translated texts and accessible labels to the persistent application controls.
+ * @returns {void}
+ */
 function renderI18n() {
-  document.documentElement.lang = lang(); document.title = 'Trailthread'; document.querySelectorAll('[data-i18n]').forEach((node) => { node.textContent = t(node.dataset.i18n); }); el.librarySearchInput.placeholder = t('searchPlaceholder'); el.librarySearchInput.setAttribute('aria-label', t('searchPlaceholder')); el.prevTrackButton?.setAttribute('aria-label', lang() === 'fr' ? 'Trace precedente' : lang() === 'en' ? 'Previous track' : 'Vorheriger Track'); el.prevTrackButton?.setAttribute('title', lang() === 'fr' ? 'Trace precedente' : lang() === 'en' ? 'Previous track' : 'Vorheriger Track'); el.nextTrackButton?.setAttribute('aria-label', lang() === 'fr' ? 'Trace suivante' : lang() === 'en' ? 'Next track' : 'Naechster Track'); el.nextTrackButton?.setAttribute('title', lang() === 'fr' ? 'Trace suivante' : lang() === 'en' ? 'Next track' : 'Naechster Track'); el.photoDialogClose?.setAttribute('aria-label', t('closeButton')); el.photoDialogClose?.setAttribute('title', t('closeButton')); [['replayRestartButton', 'replayRestart'], ['replayBackButton', 'replayBack'], ['replayPlayButton', 'replayPlay'], ['replayPauseButton', 'replayStop'], ['replayForwardButton', 'replayForward']].forEach(([ref, key]) => { el[ref]?.setAttribute('aria-label', t(key)); el[ref]?.setAttribute('title', t(key)); }); el.languageSelect.value = state.settings.language ?? 'auto'; renderTrackWidthControl(); renderMapPhotoModeButton(); renderMapHeatmapButton(); renderMapSegmentButton(); renderPaneCompactButtons(); renderReplayControls(); renderVersionLabel();
+  document.documentElement.lang = lang();
+  document.title = 'Trailthread';
+  document.querySelectorAll('[data-i18n]').forEach((node) => { node.textContent = t(node.dataset.i18n); });
+  el.librarySearchInput.placeholder = t('searchPlaceholder');
+  el.librarySearchInput.setAttribute('aria-label', t('searchPlaceholder'));
+  const previousLabel = trackNavigationLabel('previous');
+  const nextLabel = trackNavigationLabel('next');
+  el.prevTrackButton?.setAttribute('aria-label', previousLabel);
+  el.prevTrackButton?.setAttribute('title', previousLabel);
+  el.nextTrackButton?.setAttribute('aria-label', nextLabel);
+  el.nextTrackButton?.setAttribute('title', nextLabel);
+  el.photoDialogClose?.setAttribute('aria-label', t('closeButton'));
+  el.photoDialogClose?.setAttribute('title', t('closeButton'));
+  [['replayRestartButton', 'replayRestart'], ['replayBackButton', 'replayBack'], ['replayPlayButton', 'replayPlay'], ['replayPauseButton', 'replayStop'], ['replayForwardButton', 'replayForward']].forEach(([ref, key]) => {
+    el[ref]?.setAttribute('aria-label', t(key));
+    el[ref]?.setAttribute('title', t(key));
+  });
+  el.languageSelect.value = state.settings.language ?? 'auto';
+  renderTrackWidthControl();
+  renderMapPhotoModeButton();
+  renderMapHeatmapButton();
+  renderMapSegmentButton();
+  renderPaneCompactButtons();
+  renderReplayControls();
+  renderVersionLabel();
+  renderPhotoDialogFullscreenControl();
 }
-function renderOnboardingPanel() {
-  if (!el.onboardingPanel) return;
-  const hasTracks = state.tracks.length > 0;
-  const hasAccounts = state.accounts.length > 0;
-  const hasReplayTrack = !!replayCandidateTrack();
-  el.onboardingPanel.hidden = hasTracks && hasAccounts;
-  if (el.onboardingSteps) {
-    const steps = [
-      { done: hasTracks, label: t('onboardingImport') },
-      { done: hasAccounts, label: t('onboardingKomoot') },
-      { done: hasReplayTrack, label: t('onboardingReplay') }
-    ];
-    el.onboardingSteps.innerHTML = steps.map((step, index) => `
-      <div class="onboarding-step${step.done ? ' is-done' : ''}">
-        <span class="onboarding-step-badge">${step.done ? '✓' : index + 1}</span>
-        <span>${escapeHtml(step.label)}</span>
-      </div>
-    `).join('');
-  }
-  if (el.onboardingHint) {
-    const contextual = !hasTracks
-      ? `${t('onboardingHint')} ${t('onboardingImport')}.`
-      : !hasAccounts
-        ? `${t('onboardingHint')} ${t('onboardingKomoot')}.`
-        : `${t('onboardingHint')} ${t('onboardingReplay')}.`;
-    el.onboardingHint.textContent = contextual;
-  }
-  if (el.onboardingReplayButton) el.onboardingReplayButton.disabled = !hasTracks;
+/**
+ * Shows the selected main workspace and redirects retired workspace states to the library.
+ * @returns {void} Updates workspace visibility and refreshes the map layout.
+ */
+function renderWorkspace() {
+  let workspace = state.settings.activeWorkspace;
+  if (!['library', 'replay'].includes(workspace)) workspace = 'library';
+  state.settings.activeWorkspace = workspace;
+  el.libraryWorkspace.hidden = workspace !== 'library';
+  el.komootWorkspace.hidden = true;
+  el.replayWorkspace.hidden = workspace !== 'replay';
+  el.workspaceButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.workspace === workspace));
+  if (workspace === 'replay') ensureReplayMaps();
+  scheduleMapLayoutRefresh();
 }
-function renderWorkspace() { const w = ['library', 'komoot', 'replay'].includes(state.settings.activeWorkspace) ? state.settings.activeWorkspace : 'library'; state.settings.activeWorkspace = w; el.libraryWorkspace.hidden = w !== 'library'; el.komootWorkspace.hidden = w !== 'komoot'; el.replayWorkspace.hidden = w !== 'replay'; el.workspaceButtons.forEach((button) => button.classList.toggle('is-active', button.dataset.workspace === w)); if (w === 'replay') ensureReplayMaps(); scheduleMapLayoutRefresh(); }
 function renderAccounts() {
   el.accountsList.replaceChildren(); el.komootAccountSelect.replaceChildren();
   const first = document.createElement('option'); first.value = ''; first.textContent = t('accountSelectPlaceholder'); el.komootAccountSelect.append(first);
   state.accounts.forEach((account) => {
     const frag = el.accountItemTemplate.content.cloneNode(true); const card = frag.querySelector('.account-card'); const name = frag.querySelector('.account-name'); const meta = frag.querySelector('.account-meta'); const useButton = frag.querySelector('.account-use-button'); const deleteButton = frag.querySelector('.account-delete-button'); const active = account.id === state.settings.activeAccountId;
-    card.classList.toggle('is-active', active); name.textContent = account.label || account.email; meta.textContent = t('accountMeta', { email: account.email, label: active ? t('accountActive') : t('accountInactive') });
+    card.classList.toggle('is-active', active); name.textContent = account.label || account.email;
+    let accountStateLabel = t('accountInactive');
+    if (active) accountStateLabel = t('accountActive');
+    meta.textContent = t('accountMeta', { email: account.email, label: accountStateLabel });
     useButton.title = 'Use'; deleteButton.title = t('deleteTrack');
     useButton.addEventListener('click', async () => { state.settings.activeAccountId = account.id; await saveSettings(); renderAccounts(); });
     deleteButton.addEventListener('click', async () => { if (!await confirmAction(t('confirmDeleteAccount'))) return; await del(STORES.accounts, account.id); state.accounts = state.accounts.filter((item) => item.id !== account.id); if (state.settings.activeAccountId === account.id) { state.settings.activeAccountId = state.accounts[0]?.id ?? null; await saveSettings(); } renderAll(); setStatus(t('accountRemoved')); });
@@ -1917,7 +3175,8 @@ function renderAccounts() {
 }
 function renderLibrary() {
   renderLibraryFilters();
-  const tracks = filteredTracks(); el.trackList.replaceChildren(); el.librarySummary.textContent = tracks.length ? t('librarySummary', { count: tracks.length }) : t('libraryEmpty');
+  const tracks = filteredTracks(); el.trackList.replaceChildren(); el.librarySummary.textContent = t('libraryEmpty');
+  if (tracks.length) el.librarySummary.textContent = t('librarySummary', { count: tracks.length });
   tracks.forEach((track) => {
     const frag = el.trackItemTemplate.content.cloneNode(true);
     const item = frag.querySelector('.track-item');
@@ -1931,6 +3190,7 @@ function renderLibrary() {
     const replayButton = frag.querySelector('.replay-button');
     const editButton = frag.querySelector('.edit-button');
     const exportButton = frag.querySelector('.export-button');
+    const osmWaytypeButton = frag.querySelector('.track-osm-waytype-button');
     const expandButton = frag.querySelector('.expand-button');
     const deleteButton = frag.querySelector('.delete-button');
     item.classList.toggle('is-selected', state.selectedTrackIds.has(track.id));
@@ -1951,7 +3211,8 @@ function renderLibrary() {
         return;
       }
       preserveLibraryListState(track.id);
-      checkbox.checked ? state.selectedTrackIds.delete(track.id) : state.selectedTrackIds.add(track.id);
+      if (checkbox.checked) state.selectedTrackIds.delete(track.id);
+      else state.selectedTrackIds.add(track.id);
       renderLibrary();
       renderSelection();
       syncMapForSelectionChange();
@@ -1965,7 +3226,8 @@ function renderLibrary() {
         return;
       }
       preserveLibraryListState(track.id);
-      checkbox.checked ? state.selectedTrackIds.delete(track.id) : state.selectedTrackIds.add(track.id);
+      if (checkbox.checked) state.selectedTrackIds.delete(track.id);
+      else state.selectedTrackIds.add(track.id);
       renderLibrary();
       renderSelection();
       syncMapForSelectionChange();
@@ -1974,7 +3236,10 @@ function renderLibrary() {
       event.stopPropagation();
       const updatedTrack = touchTrack(track, { color: colorInput.value });
       await put(STORES.tracks, updatedTrack);
-      state.tracks = state.tracks.map((item) => item.id === updatedTrack.id ? updatedTrack : item);
+      state.tracks = state.tracks.map((item) => {
+        if (item.id === updatedTrack.id) return updatedTrack;
+        return item;
+      });
       swatch.style.background = updatedTrack.color;
       updateTrackLayerStyle(updatedTrack.id);
     });
@@ -1991,6 +3256,15 @@ function renderLibrary() {
     exportButton.title = t('exportTrackGpx');
     exportButton.setAttribute('aria-label', t('exportTrackGpx'));
     exportButton.addEventListener('click', (event) => { event.stopPropagation(); exportTrackGpx(track.id); });
+    const canAnalyseOsmWayTypes = Array.isArray(track.points) && track.points.length > 1;
+    osmWaytypeButton.hidden = !canAnalyseOsmWayTypes;
+    let osmWaytypeButtonLabel = t('osmWayTypesButton');
+    if (track.osmWayTypeAnalysis) osmWaytypeButtonLabel = t('osmWayTypesButtonAgain');
+    osmWaytypeButton.textContent = osmWaytypeButtonLabel;
+    osmWaytypeButton.title = t('osmWayTypesButtonTitle');
+    osmWaytypeButton.disabled = osmAnalysisTrackId === track.id;
+    if (osmWaytypeButton.disabled) osmWaytypeButton.textContent = t('osmWayTypesLoading');
+    osmWaytypeButton.addEventListener('click', (event) => { event.stopPropagation(); analyseTrackWayTypesFromOsm(track.id); });
     focusButton.textContent = '≣';
     focusButton.title = t('focusTrack');
     focusButton.setAttribute('aria-label', t('focusTrack'));
@@ -2023,11 +3297,13 @@ function renderSelection() {
 }
 function renderRecent() {
   if (!el.recentList || !el.recentSummary) return;
-  const tracks = recentTracks(); el.recentList.replaceChildren(); el.recentSummary.textContent = tracks.length ? t('recentSummary', { count: tracks.length }) : t('inboxEmpty');
+  const tracks = recentTracks(); el.recentList.replaceChildren(); el.recentSummary.textContent = t('inboxEmpty');
+  if (tracks.length) el.recentSummary.textContent = t('recentSummary', { count: tracks.length });
   tracks.forEach((track) => { const frag = el.stagingItemTemplate.content.cloneNode(true); frag.querySelector('.track-name').textContent = track.name; frag.querySelector('.track-meta').textContent = t('trackMeta', { distance: fmtKm(track.distanceKm), points: fmtNum(track.pointCount), type: trackTypeLabel(track.type) }); frag.querySelector('.track-submeta').textContent = t('trackSubmeta', { date: fmtDate(track.importedAt), source: track.accountLabel || trackSourceLabel(track.source) }); el.recentList.append(frag); });
 }
 function preserveKomootListState(listName) {
-  const container = listName === 'recorded' ? el.recordedList : el.plannedList;
+  let container = el.plannedList;
+  if (listName === 'recorded') container = el.recordedList;
   if (!container) return;
   state.komootUi.scrollTopByList[listName] = container.scrollTop;
 }
@@ -2047,7 +3323,8 @@ function restoreLibraryListState() {
 }
 function restoreKomootListState() {
   ['recorded', 'planned'].forEach((listName) => {
-    const container = listName === 'recorded' ? el.recordedList : el.plannedList;
+    let container = el.plannedList;
+    if (listName === 'recorded') container = el.recordedList;
     if (!container) return;
     container.scrollTop = state.komootUi.scrollTopByList[listName] ?? 0;
   });
@@ -2055,13 +3332,17 @@ function restoreKomootListState() {
 function renderKomootSelectionUi() {
   const recorded = state.komootTours.filter((tour) => tour.type === 'recorded');
   const planned = state.komootTours.filter((tour) => tour.type === 'planned');
-  el.recordedSelectAllButton.textContent = recorded.length && recorded.every((tour) => state.selectedKomootTourIds.has(tour.id)) ? t('clearSelection') : t('selectAll');
-  el.plannedSelectAllButton.textContent = planned.length && planned.every((tour) => state.selectedKomootTourIds.has(tour.id)) ? t('clearSelection') : t('selectAll');
+  el.recordedSelectAllButton.textContent = t('selectAll');
+  if (recorded.length && recorded.every((tour) => state.selectedKomootTourIds.has(tour.id))) el.recordedSelectAllButton.textContent = t('clearSelection');
+  el.plannedSelectAllButton.textContent = t('selectAll');
+  if (planned.length && planned.every((tour) => state.selectedKomootTourIds.has(tour.id))) el.plannedSelectAllButton.textContent = t('clearSelection');
 }
 function renderKomoot() {
   const toggleTourSelection = (tour, listName, checked) => {
-    checked ? state.selectedKomootTourIds.add(tour.id) : state.selectedKomootTourIds.delete(tour.id);
-    const container = listName === 'recorded' ? el.recordedList : el.plannedList;
+    if (checked) state.selectedKomootTourIds.add(tour.id);
+    else state.selectedKomootTourIds.delete(tour.id);
+    let container = el.plannedList;
+    if (listName === 'recorded') container = el.recordedList;
     const item = container?.querySelector(`.tour-item[data-tour-id="${tour.id}"]`);
     const checkbox = container?.querySelector(`.tour-checkbox[data-tour-id="${tour.id}"]`);
     if (checkbox) checkbox.checked = checked;
@@ -2077,7 +3358,9 @@ function renderKomoot() {
       const checkbox = frag.querySelector('.tour-checkbox');
       const importedTrack = state.tracks.find((track) => track.source === 'komoot' && track.accountEmail === tour.accountEmail && `${track.sourceTrackId ?? ''}` === `${tour.id}`) ?? null;
       const hasImportedNavigation = !!(importedTrack && ((importedTrack.directions?.length ?? 0) > 0 || (importedTrack.wayTypes?.length ?? 0) > 0 || (importedTrack.surfaces?.length ?? 0) > 0));
-      const navHint = importedTrack ? (hasImportedNavigation ? t('komootNavLikely') : t('komootNavMissing')) : (tour.type === 'planned' ? t('komootNavLikely') : t('komootNavMissing'));
+      let navHint = t('komootNavMissing');
+      if (tour.type === 'planned') navHint = t('komootNavLikely');
+      if (importedTrack && hasImportedNavigation) navHint = t('komootNavLikely');
       frag.querySelector('.track-name').textContent = tour.name;
       frag.querySelector('.track-meta').textContent = `${fmtKm(tour.distanceKm)} km · ${sportLabel(tour.sport)} · ${trackTypeLabel(tour.type)}`;
       frag.querySelector('.track-submeta').textContent = `${fmtDate(tour.date)} · ${tour.accountLabel} · ${navHint} · ${tour.id}`;
@@ -2104,16 +3387,23 @@ function renderKomoot() {
     });
   };
   const byNewest = (left, right) => `${right.date ?? ''}`.localeCompare(`${left.date ?? ''}`);
-  const recorded = state.komootTours.filter((tour) => tour.type === 'recorded').sort(byNewest); const planned = state.komootTours.filter((tour) => tour.type === 'planned').sort(byNewest); renderList(el.recordedList, recorded, 'recorded'); renderList(el.plannedList, planned, 'planned'); restoreKomootListState(); el.recordedSummary.textContent = recorded.length ? t('komootLoadedSummary', { count: recorded.length }) : t('recordedEmpty'); el.plannedSummary.textContent = planned.length ? t('komootLoadedSummary', { count: planned.length }) : t('plannedEmpty'); renderKomootSelectionUi(); if (komootRestoreRaf) window.cancelAnimationFrame(komootRestoreRaf); komootRestoreRaf = window.requestAnimationFrame(() => { restoreKomootListState(); komootRestoreRaf = 0; });
+  const recorded = state.komootTours.filter((tour) => tour.type === 'recorded').sort(byNewest); const planned = state.komootTours.filter((tour) => tour.type === 'planned').sort(byNewest); renderList(el.recordedList, recorded, 'recorded'); renderList(el.plannedList, planned, 'planned'); restoreKomootListState(); el.recordedSummary.textContent = t('recordedEmpty'); el.plannedSummary.textContent = t('plannedEmpty'); if (recorded.length) el.recordedSummary.textContent = t('komootLoadedSummary', { count: recorded.length }); if (planned.length) el.plannedSummary.textContent = t('komootLoadedSummary', { count: planned.length }); renderKomootSelectionUi(); if (komootRestoreRaf) window.cancelAnimationFrame(komootRestoreRaf); komootRestoreRaf = window.requestAnimationFrame(() => { restoreKomootListState(); komootRestoreRaf = 0; });
   renderKomootLoadButton();
 }
 function renderProxy() {
-  el.diagProxy.textContent = state.proxy.online ? t('proxyOnline') : state.proxy.lastCheckAt ? t('proxyOffline') : t('proxyUnknown');
-  el.diagMode.textContent = state.proxy.mode ? t(state.proxy.mode === 'stub' ? 'proxyModeStub' : 'proxyModeReal') : t('proxyModeUnknown');
-  el.diagChecked.textContent = state.proxy.lastCheckAt ? new Date(state.proxy.lastCheckAt).toLocaleString(lang()) : t('lastCheckNever');
+  el.diagProxy.textContent = t('proxyUnknown');
+  if (state.proxy.lastCheckAt) el.diagProxy.textContent = t('proxyOffline');
+  if (state.proxy.online) el.diagProxy.textContent = t('proxyOnline');
+  el.diagMode.textContent = t('proxyModeUnknown');
+  if (state.proxy.mode) {
+    el.diagMode.textContent = t('proxyModeReal');
+    if (state.proxy.mode === 'stub') el.diagMode.textContent = t('proxyModeStub');
+  }
+  el.diagChecked.textContent = t('lastCheckNever');
+  if (state.proxy.lastCheckAt) el.diagChecked.textContent = new Date(state.proxy.lastCheckAt).toLocaleString(lang());
   el.diagError.textContent = state.proxy.lastError || t('noError');
 }
-function renderKomootProgress() { const progress = state.komootUi.progress; el.komootProgress.hidden = !progress.active; el.komootProgressLabel.textContent = progress.label || ''; el.komootProgressValue.textContent = progress.indeterminate ? '...' : `${Math.round(progress.value)}%`; if (progress.indeterminate) { el.komootProgressBar.removeAttribute('value'); } else { el.komootProgressBar.value = progress.value; } }
+function renderKomootProgress() { const progress = state.komootUi.progress; el.komootProgress.hidden = !progress.active; el.komootProgressLabel.textContent = progress.label || ''; el.komootProgressValue.textContent = `${Math.round(progress.value)}%`; if (progress.indeterminate) { el.komootProgressValue.textContent = '...'; el.komootProgressBar.removeAttribute('value'); } else { el.komootProgressBar.value = progress.value; } }
 function setKomootProgress(label, value = 0, indeterminate = false) { state.komootUi.progress = { active: true, label, value, indeterminate }; renderKomootProgress(); }
 function clearKomootProgress() { state.komootUi.progress = { active: false, label: '', value: 0, indeterminate: false }; renderKomootProgress(); }
 function ensureProfileHoverMarker() {
@@ -2126,7 +3416,7 @@ function clearProfileHover() {
   state.profileUi.hoverMarker = null;
   if (!el.profileChart) return;
   const hover = el.profileChart.querySelector('.profile-hover');
-  if (hover) hover.innerHTML = '';
+  if (hover) hover.replaceChildren();
   if (el.profileCursorInfo) {
     el.profileCursorInfo.hidden = true;
     el.profileCursorInfo.classList.remove('is-right');
@@ -2137,8 +3427,40 @@ function profileSampleFromEvent(event) {
   const rect = el.profileChart.getBoundingClientRect();
   const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
   const targetKm = (state.profileUi.samples.at(-1)?.cumulativeKm ?? 0) * ratio;
-  return state.profileUi.samples.reduce((best, current) => Math.abs(current.cumulativeKm - targetKm) < Math.abs(best.cumulativeKm - targetKm) ? current : best, state.profileUi.samples[0]);
+  return state.profileUi.samples.reduce((best, current) => {
+    if (Math.abs(current.cumulativeKm - targetKm) < Math.abs(best.cumulativeKm - targetKm)) return current;
+    return best;
+  }, state.profileUi.samples[0]);
 }
+
+/**
+ * Creates an SVG element in the SVG namespace and applies its attributes.
+ * @param {string} name SVG element name.
+ * @param {Record<string, string|number>} attributes Attributes for the SVG element.
+ * @returns {SVGElement} Configured SVG element.
+ */
+function createProfileSvgElement(name, attributes) {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', name);
+  Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, `${value}`));
+  return element;
+}
+
+/**
+ * Draws the dynamic crosshair and point for the hovered elevation sample.
+ * @param {SVGGElement} container SVG group reserved for hover graphics.
+ * @param {number} x Horizontal chart coordinate.
+ * @param {number} y Vertical chart coordinate.
+ * @returns {void}
+ */
+function renderProfileHoverGraphics(container, x, y) {
+  container.replaceChildren();
+  container.append(
+    createProfileSvgElement('line', { class: 'profile-hover-line', x1: x, y1: 22, x2: x, y2: 214 }),
+    createProfileSvgElement('line', { class: 'profile-hover-line', x1: 46, y1: y, x2: 954, y2: y }),
+    createProfileSvgElement('circle', { class: 'profile-hover-dot', cx: x, cy: y, r: 6 })
+  );
+}
+
 function updateProfileHover(sample) {
   const marker = ensureProfileHoverMarker();
   marker.setLatLng([sample.lat, sample.lng]);
@@ -2146,11 +3468,14 @@ function updateProfileHover(sample) {
   if (!hover || !state.profileUi.plot) return;
   const x = state.profileUi.plot.x(sample.cumulativeKm);
   const y = state.profileUi.plot.y(sample.ele);
-  hover.innerHTML = `<line class="profile-hover-line" x1="${x}" y1="22" x2="${x}" y2="214"></line><line class="profile-hover-line" x1="46" y1="${y}" x2="954" y2="${y}"></line><circle class="profile-hover-dot" cx="${x}" cy="${y}" r="6"></circle>`;
+  renderProfileHoverGraphics(hover, x, y);
   if (!el.profileCursorInfo) return;
-  const ascent = Number.isFinite(sample.cumulativeAscentM) ? Math.round(sample.cumulativeAscentM) : 0;
+  let ascent = 0;
+  if (Number.isFinite(sample.cumulativeAscentM)) ascent = Math.round(sample.cumulativeAscentM);
   const grade = profileGradeAtPoint(state.profileUi.samples, state.profileUi.samples.indexOf(sample));
-  el.profileCursorAfter.textContent = `${fmtKm(sample.cumulativeKm)} km (${fmtElapsedShort(sample.cumulativeTimeSec)}, ${gradeArrow(ascent > 0 ? 1 : 0)} ${fmtNum(ascent)} m)`;
+  let ascentDirection = 0;
+  if (ascent > 0) ascentDirection = 1;
+  el.profileCursorAfter.textContent = `${fmtKm(sample.cumulativeKm)} km (${fmtElapsedShort(sample.cumulativeTimeSec)}, ${gradeArrow(ascentDirection)} ${fmtNum(ascent)} m)`;
   el.profileCursorAltitude.textContent = fmtMeters(sample.ele);
   el.profileCursorGrade.textContent = fmtGrade(grade);
   el.profileCursorInfo.classList.toggle('is-right', x < 280);
@@ -2163,27 +3488,26 @@ function focusProfileSample(sample) {
 }
 function renderProfile() {
   const visibleIds = filteredTrackIdSet();
-  const track = state.selectedTrackIds.has(state.highlightedTrackId) && visibleIds.has(state.highlightedTrackId)
-    ? (state.tracks.find((item) => item.id === state.highlightedTrackId) ?? null)
-    : null;
+  let track = null;
+  if (state.selectedTrackIds.has(state.highlightedTrackId) && visibleIds.has(state.highlightedTrackId)) track = state.tracks.find((item) => item.id === state.highlightedTrackId) ?? null;
   el.profileTrackName.textContent = track?.name || '-';
-  el.profileDistance.textContent = track ? `${fmtKm(track.distanceKm)} km` : '-';
-  el.profileElevationRange.textContent = track?.hasElevation ? `${fmtMeters(track.elevationMinM)} - ${fmtMeters(track.elevationMaxM)}` : '-';
-  el.profileAscent.textContent = track?.hasElevation ? fmtMeters(track.elevationGainM) : '-';
-  el.profileDescent.textContent = track?.hasElevation ? fmtMeters(track.elevationLossM) : '-';
-  el.profileAvgSpeed.textContent = track?.avgSpeedKmh != null ? fmtHours(track.avgSpeedKmh) : '-';
+  el.profileDistance.textContent = '-'; if (track) el.profileDistance.textContent = `${fmtKm(track.distanceKm)} km`;
+  el.profileElevationRange.textContent = '-'; if (track?.hasElevation) el.profileElevationRange.textContent = `${fmtMeters(track.elevationMinM)} - ${fmtMeters(track.elevationMaxM)}`;
+  el.profileAscent.textContent = '-'; if (track?.hasElevation) el.profileAscent.textContent = fmtMeters(track.elevationGainM);
+  el.profileDescent.textContent = '-'; if (track?.hasElevation) el.profileDescent.textContent = fmtMeters(track.elevationLossM);
+  el.profileAvgSpeed.textContent = '-'; if (track?.avgSpeedKmh != null) el.profileAvgSpeed.textContent = fmtHours(track.avgSpeedKmh);
   state.profileUi.trackId = track?.id ?? null;
   state.profileUi.samples = [];
   state.profileUi.plot = null;
   clearProfileHover();
   if (el.profileSegmentSummary) el.profileSegmentSummary.hidden = true;
-  if (el.profileSurfaceBreakdown) el.profileSurfaceBreakdown.innerHTML = '';
-  if (el.profileWaytypeBreakdown) el.profileWaytypeBreakdown.innerHTML = '';
+  el.profileSurfaceBreakdown?.replaceChildren();
+  el.profileWaytypeBreakdown?.replaceChildren();
   if (!track) {
     el.profileEmpty.hidden = false;
     el.profileEmpty.textContent = t('profileHintNoTrack');
     el.profileChartShell.hidden = true;
-    el.profileChart.innerHTML = '';
+    el.profileChart.replaceChildren();
     return;
   }
   const samples = track.points.filter((point) => point.ele != null);
@@ -2191,15 +3515,13 @@ function renderProfile() {
     el.profileEmpty.hidden = false;
     el.profileEmpty.textContent = t('profileHintNoElevation');
     el.profileChartShell.hidden = true;
-    el.profileChart.innerHTML = '';
+    el.profileChart.replaceChildren();
     return;
   }
-  const surfaceBreakdown = profileSegmentBreakdownMarkup(track.surfaceSegments, 'surface');
-  const wayTypeBreakdown = profileSegmentBreakdownMarkup(track.wayTypeSegments, 'waytype');
   const hasSegmentSummary = state.settings.segmentOverlayMode && (normalizeRangeSegments(track.surfaceSegments).length || normalizeRangeSegments(track.wayTypeSegments).length);
   if (el.profileSegmentSummary) el.profileSegmentSummary.hidden = !hasSegmentSummary;
-  if (el.profileSurfaceBreakdown) el.profileSurfaceBreakdown.innerHTML = surfaceBreakdown;
-  if (el.profileWaytypeBreakdown) el.profileWaytypeBreakdown.innerHTML = wayTypeBreakdown;
+  renderProfileSegmentBreakdown(el.profileSurfaceBreakdown, track.surfaceSegments, 'surface');
+  renderProfileSegmentBreakdown(el.profileWaytypeBreakdown, track.wayTypeSegments, 'waytype');
   const minEle = Math.min(...samples.map((point) => point.ele));
   const maxEle = Math.max(...samples.map((point) => point.ele));
   const maxDist = Math.max(track.distanceKm || samples.at(-1)?.cumulativeKm || 0, 0.1);
@@ -2212,23 +3534,45 @@ function renderProfile() {
   const elevSpan = Math.max(maxEle - minEle, 10);
   const x = (distance) => padX + (distance / maxDist) * plotWidth;
   const y = (elevation) => padY + ((maxEle - elevation) / elevSpan) * plotHeight;
-  const linePath = samples.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(point.cumulativeKm).toFixed(2)} ${y(point.ele).toFixed(2)}`).join(' ');
+  const linePath = samples.map((point, index) => {
+    let command = 'L';
+    if (index === 0) command = 'M';
+    return `${command} ${x(point.cumulativeKm).toFixed(2)} ${y(point.ele).toFixed(2)}`;
+  }).join(' ');
   const areaPath = `${linePath} L ${x(samples.at(-1).cumulativeKm).toFixed(2)} ${(padY + plotHeight).toFixed(2)} L ${x(samples[0].cumulativeKm).toFixed(2)} ${(padY + plotHeight).toFixed(2)} Z`;
-  const photoMarkers = (Array.isArray(track.photos) ? track.photos : []).map((photo, index) => {
-    const latLng = photoLatLng(photo);
-    const point = nearestTrackPoint(track, latLng);
-    if (!point || point.cumulativeKm == null) return '';
-    const photoX = x(point.cumulativeKm).toFixed(2);
-    return `<g class="profile-photo-marker" data-photo-index="${index}" tabindex="0" role="button" aria-label="${escapeHtml(photo.title || `${track.name} ${index + 1}`)}"><line class="profile-photo-line" x1="${photoX}" y1="22" x2="${photoX}" y2="36"></line><circle class="profile-photo-dot" cx="${photoX}" cy="18" r="7"></circle><text class="profile-photo-icon" x="${photoX}" y="22" text-anchor="middle">📷</text></g>`;
-  }).join('');
-  const grid = [0, 0.5, 1].map((ratio) => {
+  el.profileChart.replaceChildren();
+  [0, 0.5, 1].forEach((ratio) => {
     const elevation = maxEle - elevSpan * ratio;
     const lineY = y(elevation);
-    return `<line class="profile-grid-line" x1="${padX}" y1="${lineY.toFixed(2)}" x2="${width - padX}" y2="${lineY.toFixed(2)}"></line><text class="profile-axis-text" x="8" y="${(lineY + 6).toFixed(2)}">${Math.round(elevation)} m</text>`;
-  }).join('');
-  const xTicks = [0, maxDist / 2, maxDist].map((distance, index) => `<text class="profile-axis-text" x="${x(distance).toFixed(2)}" y="${height - 8}" text-anchor="${index === 0 ? 'start' : index === 2 ? 'end' : 'middle'}">${fmtKm(distance)} km</text>`).join('');
-  el.profileChart.innerHTML = `${grid}<path class="profile-area" d="${areaPath}" fill="${track.color}"></path><path class="profile-line" d="${linePath}" stroke="${track.color}"></path><g class="profile-photos">${photoMarkers}</g><g class="profile-hover"></g>`;
-  el.profileChart.insertAdjacentHTML('beforeend', xTicks);
+    const gridLine = createProfileSvgElement('line', { class: 'profile-grid-line', x1: padX, y1: lineY, x2: width - padX, y2: lineY });
+    const gridLabel = createProfileSvgElement('text', { class: 'profile-axis-text', x: 8, y: lineY + 6 });
+    gridLabel.textContent = `${Math.round(elevation)} m`;
+    el.profileChart.append(gridLine, gridLabel);
+  });
+  el.profileChart.append(createProfileSvgElement('path', { class: 'profile-area', d: areaPath, fill: track.color }));
+  el.profileChart.append(createProfileSvgElement('path', { class: 'profile-line', d: linePath, stroke: track.color }));
+  const photoGroup = createProfileSvgElement('g', { class: 'profile-photos' });
+  let profilePhotos = [];
+  if (Array.isArray(track.photos)) profilePhotos = track.photos;
+  profilePhotos.forEach((photo, index) => {
+    const point = nearestTrackPoint(track, photoLatLng(photo));
+    if (!point || point.cumulativeKm == null) return;
+    const photoX = x(point.cumulativeKm);
+    const marker = createProfileSvgElement('g', { class: 'profile-photo-marker', 'data-photo-index': index, tabindex: 0, role: 'button', 'aria-label': photo.title || `${track.name} ${index + 1}` });
+    const icon = createProfileSvgElement('text', { class: 'profile-photo-icon', x: photoX, y: 22, 'text-anchor': 'middle' });
+    icon.textContent = '📷';
+    marker.append(createProfileSvgElement('line', { class: 'profile-photo-line', x1: photoX, y1: 22, x2: photoX, y2: 36 }), createProfileSvgElement('circle', { class: 'profile-photo-dot', cx: photoX, cy: 18, r: 7 }), icon);
+    photoGroup.append(marker);
+  });
+  el.profileChart.append(photoGroup, createProfileSvgElement('g', { class: 'profile-hover' }));
+  [0, maxDist / 2, maxDist].forEach((distance, index) => {
+    let anchor = 'middle';
+    if (index === 0) anchor = 'start';
+    else if (index === 2) anchor = 'end';
+    const tick = createProfileSvgElement('text', { class: 'profile-axis-text', x: x(distance), y: height - 8, 'text-anchor': anchor });
+    tick.textContent = `${fmtKm(distance)} km`;
+    el.profileChart.append(tick);
+  });
   el.profileEmpty.hidden = true;
   el.profileChartShell.hidden = false;
   state.profileUi.samples = samples;
@@ -2242,16 +3586,22 @@ function buildReplayTrack(track) {
   const samples = track.points.map((point, index, points) => {
     const previous = points[Math.max(0, index - 1)];
     const next = points[Math.min(points.length - 1, index + 1)];
-    const timeMs = point.time ? parsePointTime(point.time) : null;
+    let timeMs = null;
+    if (point.time) timeMs = parsePointTime(point.time);
+    let cumulativeKm = point.cumulativeKm;
+    if (cumulativeKm == null) {
+      cumulativeKm = 0;
+      if (index) cumulativeKm = previous.cumulativeKm + haversine(previous, point);
+    }
     return {
       index,
       lat: point.lat,
       lng: point.lng,
       ele: point.ele ?? null,
-      cumulativeKm: point.cumulativeKm ?? (index ? previous.cumulativeKm + haversine(previous, point) : 0),
+      cumulativeKm,
       timeMs,
       elapsedSec: null,
-      bearing: bearingDegrees(previous === point ? point : previous, next === point ? point : next),
+      bearing: bearingDegrees(previous, next),
       gradePercent: profileGradeAtPoint(points, index),
       pointIndex: index
     };
@@ -2259,8 +3609,10 @@ function buildReplayTrack(track) {
   const firstTime = samples.find((sample) => sample.timeMs != null)?.timeMs ?? null;
   const rawHasTime = firstTime != null && samples.some((sample) => sample.timeMs != null && sample.timeMs !== firstTime);
   const totalDistanceKm = samples.at(-1)?.cumulativeKm ?? 0;
-  const rawDurationSec = rawHasTime ? (Math.max(0, ((samples.at(-1)?.timeMs ?? firstTime) - firstTime) / 1000)) : null;
-  const fallbackDurationSec = Number.isFinite(track?.durationHours) && track.durationHours > 0 ? track.durationHours * 3600 : null;
+  let rawDurationSec = null;
+  if (rawHasTime) rawDurationSec = Math.max(0, ((samples.at(-1)?.timeMs ?? firstTime) - firstTime) / 1000);
+  let fallbackDurationSec = null;
+  if (Number.isFinite(track?.durationHours) && track.durationHours > 0) fallbackDurationSec = track.durationHours * 3600;
   const shouldUseFallbackDuration = Number.isFinite(fallbackDurationSec) && fallbackDurationSec > 0 && (
     !rawHasTime ||
     !Number.isFinite(rawDurationSec) ||
@@ -2279,7 +3631,8 @@ function buildReplayTrack(track) {
       .filter(({ sample }) => sample.timeMs != null)
       .map(({ index }) => index);
     samples.forEach((sample) => {
-      sample.elapsedSec = sample.timeMs != null ? Math.max(0, (sample.timeMs - firstTime) / 1000) : null;
+      sample.elapsedSec = null;
+      if (sample.timeMs != null) sample.elapsedSec = Math.max(0, (sample.timeMs - firstTime) / 1000);
     });
     for (let anchorIndex = 0; anchorIndex < knownTimedIndexes.length - 1; anchorIndex += 1) {
       const startIndex = knownTimedIndexes[anchorIndex];
@@ -2337,7 +3690,10 @@ function buildReplayTrack(track) {
     } else if (totalDistanceKm) {
       cumulativeDirectionKm = ((directionIndex + 1) / Math.max(1, normalizedDirections.length + 1)) * totalDistanceKm;
     }
-    const sampleIndex = samples.reduce((best, sample, index) => Math.abs((sample.cumulativeKm ?? 0) - distanceKm) < Math.abs((samples[best]?.cumulativeKm ?? 0) - distanceKm) ? index : best, 0);
+    const sampleIndex = samples.reduce((best, sample, index) => {
+      if (Math.abs((sample.cumulativeKm ?? 0) - distanceKm) < Math.abs((samples[best]?.cumulativeKm ?? 0) - distanceKm)) return index;
+      return best;
+    }, 0);
     return {
       directionIndex,
       sampleIndex,
@@ -2346,18 +3702,20 @@ function buildReplayTrack(track) {
       type: direction.type || null
     };
   }).filter(Boolean);
-  return {
+  const replayTrack = {
     trackId: track.id,
     track,
     samples,
     totalDistanceKm,
-    totalDurationSec: hasTime ? (samples.at(-1)?.elapsedSec ?? 0) : totalDistanceKm,
+    totalDurationSec: totalDistanceKm,
     totalAscentM: track.elevationGainM ?? 0,
     totalDescentM: track.elevationLossM ?? 0,
     modeAvailable: { time: hasTime, distance: true },
     photoMarkers,
     directionMarkers
   };
+  if (hasTime) replayTrack.totalDurationSec = samples.at(-1)?.elapsedSec ?? 0;
+  return replayTrack;
 }
 function nextReplayDirection(replayTrack, frame) {
   if (!replayTrack?.directionMarkers?.length || !frame) return null;
@@ -2368,15 +3726,18 @@ function replayDirectionText(replayTrack, frame) {
   if (!nextDirection?.instruction) return '-';
   const remainingKm = Math.max(0, (nextDirection.distanceKm ?? 0) - (frame?.cumulativeKm ?? 0));
   const remainingMeters = Math.round(remainingKm * 1000);
-  return remainingMeters > 30 ? `${nextDirection.instruction} · ${t('replayDirectionIn', { distance: `${fmtNum(remainingMeters)} m` })}` : nextDirection.instruction;
+  if (remainingMeters > 30) return `${nextDirection.instruction} · ${t('replayDirectionIn', { distance: `${fmtNum(remainingMeters)} m` })}`;
+  return nextDirection.instruction;
 }
 function interpolateReplaySample(left, right, ratio) {
   const safeRatio = clamp(ratio, 0, 1);
   const lerp = (a, b) => a + (b - a) * safeRatio;
+  let elevation = left.ele ?? right.ele ?? null;
+  if (left.ele != null && right.ele != null) elevation = lerp(left.ele, right.ele);
   return {
     lat: lerp(left.lat, right.lat),
     lng: lerp(left.lng, right.lng),
-    ele: left.ele != null && right.ele != null ? lerp(left.ele, right.ele) : (left.ele ?? right.ele ?? null),
+    ele: elevation,
     cumulativeKm: lerp(left.cumulativeKm, right.cumulativeKm),
     elapsedSec: lerp(left.elapsedSec ?? 0, right.elapsedSec ?? 0),
     bearing: lerp(left.bearing ?? 0, right.bearing ?? 0),
@@ -2387,7 +3748,8 @@ function interpolateReplaySample(left, right, ratio) {
 }
 function replayFrameAtCursor(replayTrack, mode, cursor) {
   if (!replayTrack?.samples?.length) return null;
-  const metric = mode === 'time' && replayTrack.modeAvailable.time ? 'elapsedSec' : 'cumulativeKm';
+  let metric = 'cumulativeKm';
+  if (mode === 'time' && replayTrack.modeAvailable.time) metric = 'elapsedSec';
   const samples = replayTrack.samples;
   const clampedCursor = clamp(cursor, 0, replayMetricMax(replayTrack, mode));
   for (let index = 1; index < samples.length; index += 1) {
@@ -2404,7 +3766,8 @@ function replayFrameAtCursor(replayTrack, mode, cursor) {
 }
 function replayMetricMax(replayTrack, mode = state.replay.mode) {
   if (!replayTrack) return 0;
-  return mode === 'time' && replayTrack.modeAvailable.time ? replayTrack.totalDurationSec : replayTrack.totalDistanceKm;
+  if (mode === 'time' && replayTrack.modeAvailable.time) return replayTrack.totalDurationSec;
+  return replayTrack.totalDistanceKm;
 }
 function replayMetricLabel(replayTrack, cursor, mode = state.replay.mode) {
   if (mode === 'time' && replayTrack?.modeAvailable.time) return fmtElapsedShort(cursor);
@@ -2412,9 +3775,8 @@ function replayMetricLabel(replayTrack, cursor, mode = state.replay.mode) {
 }
 function replayCursorForMode(replayTrack, targetMode, referenceFrame) {
   if (!replayTrack || !referenceFrame) return 0;
-  return targetMode === 'time' && replayTrack.modeAvailable.time
-    ? clamp(referenceFrame.elapsedSec ?? 0, 0, replayTrack.totalDurationSec)
-    : clamp(referenceFrame.cumulativeKm ?? 0, 0, replayTrack.totalDistanceKm);
+  if (targetMode === 'time' && replayTrack.modeAvailable.time) return clamp(referenceFrame.elapsedSec ?? 0, 0, replayTrack.totalDurationSec);
+  return clamp(referenceFrame.cumulativeKm ?? 0, 0, replayTrack.totalDistanceKm);
 }
 function replayCandidateTrack() {
   const highlighted = state.tracks.find((track) => track.id === state.highlightedTrackId) ?? null;
@@ -2429,7 +3791,12 @@ function replayCandidateTrack() {
 function replaySeekValueFromDistance(distanceKm) {
   if (!state.replay.replayTrack) return 0;
   if (state.replay.mode !== 'time' || !state.replay.replayTrack.modeAvailable.time) return distanceKm;
-  const sample = state.replay.replayTrack.samples.reduce((best, current) => Math.abs(current.cumulativeKm - distanceKm) < Math.abs(best.cumulativeKm - distanceKm) ? current : best, state.replay.replayTrack.samples[0]);
+  const sample = state.replay.replayTrack.samples.reduce((best, current) => {
+    const currentDistance = Math.abs(current.cumulativeKm - distanceKm);
+    const bestDistance = Math.abs(best.cumulativeKm - distanceKm);
+    if (currentDistance < bestDistance) return current;
+    return best;
+  }, state.replay.replayTrack.samples[0]);
   return sample?.elapsedSec ?? 0;
 }
 function replayDistanceFromProfileEvent(event) {
@@ -2479,8 +3846,8 @@ function ensureReplayMaps() {
         version: 8,
         sources: {
           osm: { type: 'raster', tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '&copy; OpenStreetMap Contributors', maxzoom: 19 },
-          terrainSource: { type: 'raster-dem', url: 'https://tiles.mapterhorn.com/tilejson.json' },
-          hillshadeSource: { type: 'raster-dem', url: 'https://tiles.mapterhorn.com/tilejson.json' }
+          terrainSource: { type: 'raster-dem', url: 'https://tiles.mapterhorn.com/tilejson.json', attribution: '<a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener noreferrer">&copy; Mapterhorn</a>' },
+          hillshadeSource: { type: 'raster-dem', url: 'https://tiles.mapterhorn.com/tilejson.json', attribution: '<a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener noreferrer">&copy; Mapterhorn</a>' }
         },
         layers: [
           { id: 'osm', type: 'raster', source: 'osm' },
@@ -2497,7 +3864,10 @@ function ensureReplayMaps() {
       updateReplayScene();
     });
   } else if (!window.maplibregl && el.replayMap3d && !el.replayMap3d.textContent.trim()) {
-    el.replayMap3d.innerHTML = `<div class="replay-placeholder-note">${t('replayUnavailable3d')}</div>`;
+    const template = document.querySelector('#replay-3d-placeholder-template');
+    const fragment = template.content.cloneNode(true);
+    fragment.querySelector('.replay-placeholder-note').textContent = t('replayUnavailable3d');
+    el.replayMap3d.append(fragment);
   }
 }
 function ensureReplay3DSources() {
@@ -2543,7 +3913,9 @@ function replay2DTarget(replayTrack, frame) {
   if (!replayTrack || !frame) return null;
   if (state.replay.cameraMode2d === 'overview') {
     const bounds = trackBounds(replayTrack.track);
-    return { center: bounds ? bounds.getCenter() : L.latLng(frame.lat, frame.lng), zoom: null, bounds };
+    let center = L.latLng(frame.lat, frame.lng);
+    if (bounds) center = bounds.getCenter();
+    return { center, zoom: null, bounds };
   }
   if (state.replay.cameraMode2d === 'ahead') {
     const frameIndex = Math.max(0, Math.round(frame.sampleIndex ?? frame.pointIndex ?? 0));
@@ -2570,7 +3942,9 @@ function applyReplay2DCamera(replayTrack = state.replay.replayTrack, frame = rep
   if (!target) return;
   if (target.bounds) {
     if (!force && state.replay.lastApplied2DMode === 'overview') return;
-    state.replayMap2d.fitBounds(target.bounds.pad(0.22), { animate, duration: animate ? 0.45 : 0 });
+    let duration = 0;
+    if (animate) duration = 0.45;
+    state.replayMap2d.fitBounds(target.bounds.pad(0.22), { animate, duration });
     state.replay.lastApplied2DMode = 'overview';
     return;
   }
@@ -2579,16 +3953,20 @@ function applyReplay2DCamera(replayTrack = state.replay.replayTrack, frame = rep
   const currentZoom = map.getZoom();
   state.replay.lastApplied2DMode = state.replay.cameraMode2d;
   if (force || Math.abs(currentZoom - zoomTarget) > 0.12) {
-    map.setView(target.center, zoomTarget, { animate, duration: animate ? 0.45 : 0 });
+    let duration = 0;
+    if (animate) duration = 0.45;
+    map.setView(target.center, zoomTarget, { animate, duration });
     return;
   }
   const size = map.getSize();
   const markerPoint = map.latLngToContainerPoint([frame.lat, frame.lng]);
-  const desiredX = size.x * (state.replay.cameraMode2d === 'ahead' ? 0.34 : 0.5);
+  let desiredX = size.x * 0.5;
+  if (state.replay.cameraMode2d === 'ahead') desiredX = size.x * 0.34;
   const desiredY = size.y * 0.56;
   const deltaX = markerPoint.x - desiredX;
   const deltaY = markerPoint.y - desiredY;
-  const deadZoneX = state.replay.cameraMode2d === 'ahead' ? Math.max(56, size.x * 0.09) : Math.max(40, size.x * 0.06);
+  let deadZoneX = Math.max(40, size.x * 0.06);
+  if (state.replay.cameraMode2d === 'ahead') deadZoneX = Math.max(56, size.x * 0.09);
   const deadZoneY = Math.max(28, size.y * 0.08);
   if (!force && Math.abs(deltaX) <= deadZoneX && Math.abs(deltaY) <= deadZoneY) return;
   map.panBy([deltaX, deltaY], { animate: false, duration: 0 });
@@ -2646,7 +4024,8 @@ function replay3DCamera(frame) {
   if (!frame) return { pitch: 70, zoom: 13.8, bearing: 0 };
   if (state.replay.cameraMode3d === 'top') return { pitch: 32, zoom: 13.45, bearing: 0 };
   if (state.replay.cameraMode3d === 'orbit') {
-    const stableBearing = Number.isFinite(state.replay.replayTrack?.orbitBearing) ? state.replay.replayTrack.orbitBearing : ((frame.bearing ?? 0) + 32) % 360;
+    let stableBearing = ((frame.bearing ?? 0) + 32) % 360;
+    if (Number.isFinite(state.replay.replayTrack?.orbitBearing)) stableBearing = state.replay.replayTrack.orbitBearing;
     return { pitch: 72, zoom: 14.05, bearing: stableBearing };
   }
   return { pitch: 79, zoom: 14.85, bearing: frame.bearing ?? 0 };
@@ -2657,7 +4036,15 @@ function syncReplay3DScene(replayTrack, frame) {
   const map = state.replayMap3d;
   map.getSource('replay-route')?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: replayRouteCoordinates(replayTrack) } });
   map.getSource('replay-played')?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: replayPlayedLatLngs(replayTrack, frame).map(([lat, lng]) => [lng, lat]) } });
-  map.getSource('replay-photos')?.setData({ type: 'FeatureCollection', features: state.replay.showPhotos ? (replayTrack.track.photos ?? []).map((photo) => { const latLng = photoLatLng(photo); return latLng ? { type: 'Feature', geometry: { type: 'Point', coordinates: [latLng[1], latLng[0]] }, properties: {} } : null; }).filter(Boolean) : [] });
+  let photoFeatures = [];
+  if (state.replay.showPhotos) {
+    photoFeatures = (replayTrack.track.photos ?? []).map((photo) => {
+      const latLng = photoLatLng(photo);
+      if (!latLng) return null;
+      return { type: 'Feature', geometry: { type: 'Point', coordinates: [latLng[1], latLng[0]] }, properties: {} };
+    }).filter(Boolean);
+  }
+  map.getSource('replay-photos')?.setData({ type: 'FeatureCollection', features: photoFeatures });
   state.replay.marker3d?.setLngLat([frame.lng, frame.lat]);
   if (state.settings.activeWorkspace === 'replay' && state.replay.view === '3d' && state.replay.followCamera) {
     const camera = replay3DCamera(frame);
@@ -2674,14 +4061,14 @@ function renderReplayControls() {
   el.replayViewButtons?.forEach((button) => {
     const active = button.dataset.replayView === state.replay.view;
     button.classList.toggle('is-active', active);
-    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.setAttribute('aria-pressed', String(active));
   });
   if (el.replaySpeedSelect) el.replaySpeedSelect.value = String(state.replay.speed);
   el.replayModeButtons?.forEach((button) => {
     const isTime = button.dataset.replayMode === 'time';
     const active = button.dataset.replayMode === state.replay.mode;
     button.classList.toggle('is-active', active);
-    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.setAttribute('aria-pressed', String(active));
     button.disabled = !hasTrack || (isTime && !canUseTime);
   });
   if (el.replayCamera2dRow) el.replayCamera2dRow.hidden = !is2d;
@@ -2690,17 +4077,23 @@ function renderReplayControls() {
     const mode = button.getAttribute('data-replay-camera-2d') || 'center';
     const active = mode === state.replay.cameraMode2d;
     button.classList.toggle('is-active', active);
-    button.dataset.active = active ? 'true' : 'false';
-    button.setAttribute('aria-pressed', active ? 'true' : 'false');
-    button.style.background = active ? 'linear-gradient(135deg, rgba(185, 224, 196, 0.98), rgba(142, 198, 160, 0.82))' : '';
-    button.style.borderColor = active ? 'rgba(185, 224, 196, 0.9)' : '';
-    button.style.color = active ? '#18302a' : '';
-    button.style.boxShadow = active ? 'inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 10px 20px rgba(8, 16, 14, 0.22)' : '';
+    button.dataset.active = String(active);
+    button.setAttribute('aria-pressed', String(active));
+    button.style.background = '';
+    button.style.borderColor = '';
+    button.style.color = '';
+    button.style.boxShadow = '';
+    if (active) {
+      button.style.background = 'linear-gradient(135deg, rgba(185, 224, 196, 0.98), rgba(142, 198, 160, 0.82))';
+      button.style.borderColor = 'rgba(185, 224, 196, 0.9)';
+      button.style.color = '#18302a';
+      button.style.boxShadow = 'inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 10px 20px rgba(8, 16, 14, 0.22)';
+    }
   });
   el.replayCameraButtons?.forEach((button) => {
     const active = button.dataset.replayCamera === state.replay.cameraMode3d;
     button.classList.toggle('is-active', active);
-    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.setAttribute('aria-pressed', String(active));
   });
   [el.replayRestartButton, el.replayPlayButton, el.replayPauseButton, el.replayBackButton, el.replayForwardButton, ...el.replayViewButtons, ...el.replayCamera2dButtons, ...el.replayCameraButtons].forEach((button) => {
     if (!button) return;
@@ -2729,7 +4122,10 @@ function buildReplayProfileGeometry(replayTrack) {
   const min = Math.min(...elevations);
   const max = Math.max(...elevations);
   const span = Math.max(1, max - min);
-  const exaggeration = span < 35 ? 1.85 : span < 80 ? 1.55 : span < 180 ? 1.3 : 1.12;
+  let exaggeration = 1.12;
+  if (span < 180) exaggeration = 1.3;
+  if (span < 80) exaggeration = 1.55;
+  if (span < 35) exaggeration = 1.85;
   const mid = (min + max) / 2;
   const midY = padding.top + ((height - padding.top - padding.bottom) / 2);
   const halfPlotHeight = (height - padding.top - padding.bottom) / 2;
@@ -2759,20 +4155,47 @@ function ensureReplayProfileGeometry(replayTrack) {
   state.replay.profileRender = { key: geometry.key, geometry };
   return geometry;
 }
+/**
+ * Renders the static elevation-profile SVG elements from the replay chart template.
+ * @param {object} replayTrack Replay data containing the track color.
+ * @param {object} geometry Precalculated dimensions and profile coordinates.
+ * @returns {void}
+ */
 function renderReplayProfileStaticChart(replayTrack, geometry) {
   const startX = geometry.padding.left;
   const startY = geometry.yFor(geometry.min);
-  el.replayProfileChart.innerHTML = `
-    <line class="profile-grid-line" x1="${geometry.padding.left}" y1="${geometry.height - geometry.padding.bottom}" x2="${geometry.width - geometry.padding.right}" y2="${geometry.height - geometry.padding.bottom}"></line>
-    <polyline class="profile-line" points="${geometry.polyline}" stroke="${replayTrack.track.color || '#9ed5b0'}"></polyline>
-    <line class="profile-hover-line" x1="${startX}" y1="${geometry.padding.top}" x2="${startX}" y2="${geometry.height - geometry.padding.bottom}"></line>
-    <circle class="profile-hover-dot" cx="${startX}" cy="${startY}" r="7"></circle>
-  `;
+  const fragment = el.replayProfileChartTemplate.content.cloneNode(true);
+  const chartTemplate = fragment.querySelector('svg');
+  const gridLine = chartTemplate.querySelector('.profile-grid-line');
+  const profileLine = chartTemplate.querySelector('.profile-line');
+  const hoverLine = chartTemplate.querySelector('.profile-hover-line');
+  const hoverDot = chartTemplate.querySelector('.profile-hover-dot');
+  const chartBottom = geometry.height - geometry.padding.bottom;
+  const chartRight = geometry.width - geometry.padding.right;
+  let trackColor = '#9ed5b0';
+  if (replayTrack.track.color) trackColor = replayTrack.track.color;
+  gridLine.setAttribute('x1', `${geometry.padding.left}`);
+  gridLine.setAttribute('y1', `${chartBottom}`);
+  gridLine.setAttribute('x2', `${chartRight}`);
+  gridLine.setAttribute('y2', `${chartBottom}`);
+  profileLine.setAttribute('points', geometry.polyline);
+  profileLine.setAttribute('stroke', trackColor);
+  hoverLine.setAttribute('x1', `${startX}`);
+  hoverLine.setAttribute('y1', `${geometry.padding.top}`);
+  hoverLine.setAttribute('x2', `${startX}`);
+  hoverLine.setAttribute('y2', `${chartBottom}`);
+  hoverDot.setAttribute('cx', `${startX}`);
+  hoverDot.setAttribute('cy', `${startY}`);
+  el.replayProfileChart.replaceChildren(...chartTemplate.children);
   el.replayProfileChart.dataset.geometryKey = geometry.key;
 }
 function updateReplayProfileCursor(geometry, frame) {
-  const cursorX = frame ? geometry.xFor(frame.cumulativeKm) : geometry.padding.left;
-  const cursorY = frame ? geometry.yFor(frame.ele ?? geometry.min) : geometry.yFor(geometry.min);
+  let cursorX = geometry.padding.left;
+  let cursorY = geometry.yFor(geometry.min);
+  if (frame) {
+    cursorX = geometry.xFor(frame.cumulativeKm);
+    cursorY = geometry.yFor(frame.ele ?? geometry.min);
+  }
   const cursorLine = el.replayProfileChart.querySelector('.profile-hover-line');
   const cursorDot = el.replayProfileChart.querySelector('.profile-hover-dot');
   if (cursorLine) {
@@ -2791,15 +4214,22 @@ function renderReplayProfile() {
   el.replayProfilePanel.hidden = !state.replay.showProfile;
   el.replayWorkspace?.classList.toggle('is-profile-collapsed', !state.replay.showProfile);
   if (el.replayProfileTrackName) el.replayProfileTrackName.textContent = replayTrack?.track?.name || '-';
-  el.replayAscentValue.textContent = replayTrack?.track?.hasElevation ? fmtMeters(replayTrack.track.elevationGainM) : '-';
-  el.replayDescentValue.textContent = replayTrack?.track?.hasElevation ? fmtMeters(replayTrack.track.elevationLossM) : '-';
-  el.replaySpeedValue.textContent = frame?.elapsedSec > 0 && frame?.cumulativeKm > 0 ? fmtHours((frame.cumulativeKm / frame.elapsedSec) * 3600) : '-';
-  el.replayPointValue.textContent = replayTrack && frame ? `${fmtNum(Math.min(replayTrack.samples.length, Math.round(frame.pointIndex ?? 0) + 1))} / ${fmtNum(replayTrack.samples.length)}` : '-';
+  el.replayAscentValue.textContent = '-';
+  el.replayDescentValue.textContent = '-';
+  if (replayTrack?.track?.hasElevation) {
+    el.replayAscentValue.textContent = fmtMeters(replayTrack.track.elevationGainM);
+    el.replayDescentValue.textContent = fmtMeters(replayTrack.track.elevationLossM);
+  }
+  el.replaySpeedValue.textContent = '-';
+  if (frame?.elapsedSec > 0 && frame?.cumulativeKm > 0) el.replaySpeedValue.textContent = fmtHours((frame.cumulativeKm / frame.elapsedSec) * 3600);
+  el.replayPointValue.textContent = '-';
+  if (replayTrack && frame) el.replayPointValue.textContent = `${fmtNum(Math.min(replayTrack.samples.length, Math.round(frame.pointIndex ?? 0) + 1))} / ${fmtNum(replayTrack.samples.length)}`;
   el.replayProfileEmpty.hidden = visible;
   el.replayProfileChartShell.hidden = !visible;
   if (!visible) {
-    el.replayProfileEmpty.textContent = replayTrack && !replayTrack.track.hasElevation ? t('profileHintNoElevation') : t('replayProfileHint');
-    el.replayProfileChart.innerHTML = '';
+    el.replayProfileEmpty.textContent = t('replayProfileHint');
+    if (replayTrack && !replayTrack.track.hasElevation) el.replayProfileEmpty.textContent = t('profileHintNoElevation');
+    el.replayProfileChart.replaceChildren();
     state.replay.profileRender = { key: null, geometry: null };
     return;
   }
@@ -2810,10 +4240,16 @@ function renderReplayProfile() {
 }
 function renderReplayTimeline() {}
 function updateReplayReadouts(replayTrack, frame) {
-  el.replayDistanceValue.textContent = frame ? `${fmtKm(frame.cumulativeKm)} km` : '0.0 km';
-  el.replayAltitudeValue.textContent = frame?.ele != null ? fmtMeters(frame.ele) : '-';
-  el.replayGradeValue.textContent = frame ? fmtGrade(frame.gradePercent) : '-';
-  el.replayTimeValue.textContent = frame ? fmtElapsedShort(frame.elapsedSec) : '--:--:--';
+  el.replayDistanceValue.textContent = '0.0 km';
+  el.replayAltitudeValue.textContent = '-';
+  el.replayGradeValue.textContent = '-';
+  el.replayTimeValue.textContent = '--:--:--';
+  if (frame) {
+    el.replayDistanceValue.textContent = `${fmtKm(frame.cumulativeKm)} km`;
+    el.replayGradeValue.textContent = fmtGrade(frame.gradePercent);
+    el.replayTimeValue.textContent = fmtElapsedShort(frame.elapsedSec);
+    if (frame.ele != null) el.replayAltitudeValue.textContent = fmtMeters(frame.ele);
+  }
   if (el.replayDirectionValue) el.replayDirectionValue.textContent = replayDirectionText(replayTrack, frame);
 }
 function renderReplayDirectionOverlay(replayTrack, frame) {
@@ -2821,9 +4257,14 @@ function renderReplayDirectionOverlay(replayTrack, frame) {
   const collapsed = !!state.settings.replayDirectionOverlayCollapsed;
   el.replayDirectionOverlay.hidden = collapsed;
   el.replayDirectionOverlayIcon.hidden = !collapsed;
-  el.replayDirectionOverlayToggle.textContent = collapsed ? '+' : '–';
-  el.replayDirectionOverlayToggle.setAttribute('aria-label', collapsed ? t('replayDirectionShow') : t('replayDirectionHide'));
-  el.replayDirectionOverlayToggle.setAttribute('title', collapsed ? t('replayDirectionShow') : t('replayDirectionHide'));
+  let directionToggleLabel = t('replayDirectionHide');
+  el.replayDirectionOverlayToggle.textContent = '–';
+  if (collapsed) {
+    el.replayDirectionOverlayToggle.textContent = '+';
+    directionToggleLabel = t('replayDirectionShow');
+  }
+  el.replayDirectionOverlayToggle.setAttribute('aria-label', directionToggleLabel);
+  el.replayDirectionOverlayToggle.setAttribute('title', directionToggleLabel);
   el.replayDirectionOverlayIcon.setAttribute('aria-label', t('replayDirectionShow'));
   el.replayDirectionOverlayIcon.setAttribute('title', t('replayDirectionShow'));
 }
@@ -2883,9 +4324,8 @@ function replayTick(timestamp) {
   state.replay.lastFrameAt = timestamp;
   const metricMax = replayMetricMax(state.replay.replayTrack, state.replay.mode);
   const distanceScale = Math.max(0.05, (state.replay.replayTrack.totalDistanceKm || 1) / REPLAY_DISTANCE_SECONDS);
-  const increment = state.replay.mode === 'time'
-    ? deltaSec * state.replay.speed * REPLAY_TIME_SCALE
-    : deltaSec * state.replay.speed * distanceScale;
+  let increment = deltaSec * state.replay.speed * distanceScale;
+  if (state.replay.mode === 'time') increment = deltaSec * state.replay.speed * REPLAY_TIME_SCALE;
   state.replay.cursor = clamp(state.replay.cursor + increment, 0, metricMax);
   if (state.replay.cursor >= metricMax) {
     state.replay.playing = false;
@@ -2922,7 +4362,12 @@ function jumpReplayTo(kind) {
   if (kind === 'end') {
     targetFrame = replayTrack.samples.at(-1);
   } else if (kind === 'highest') {
-    targetFrame = replayTrack.samples.reduce((best, sample) => ((sample.ele ?? Number.NEGATIVE_INFINITY) > (best.ele ?? Number.NEGATIVE_INFINITY) ? sample : best), replayTrack.samples[0]);
+    targetFrame = replayTrack.samples.reduce((best, sample) => {
+      const bestElevation = best.ele ?? Number.NEGATIVE_INFINITY;
+      const sampleElevation = sample.ele ?? Number.NEGATIVE_INFINITY;
+      if (sampleElevation > bestElevation) return sample;
+      return best;
+    }, replayTrack.samples[0]);
   } else if (kind === 'photo') {
     const currentFrame = replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor);
     const currentDistance = currentFrame?.cumulativeKm ?? 0;
@@ -2939,13 +4384,15 @@ function resetReplayToStart() {
 function setReplayMode(mode) {
   const replayTrack = state.replay.replayTrack;
   const referenceFrame = replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor);
-  state.replay.mode = mode === 'time' && replayTrack?.modeAvailable.time ? 'time' : 'distance';
+  state.replay.mode = 'distance';
+  if (mode === 'time' && replayTrack?.modeAvailable.time) state.replay.mode = 'time';
   applyReplayModeDefaults(state.replay.mode, state.replay.view);
   state.replay.cursor = replayCursorForMode(replayTrack, state.replay.mode, referenceFrame);
   renderReplayWorkspace();
 }
 function setReplayView(view) {
-  state.replay.view = view === '3d' ? '3d' : '2d';
+  state.replay.view = '2d';
+  if (view === '3d') state.replay.view = '3d';
   state.replay.mode = 'distance';
   applyReplayModeDefaults(state.replay.mode, state.replay.view);
   if (state.replay.view === '3d') {
@@ -2979,13 +4426,30 @@ async function openReplayTrack(trackId) {
   fitReplayMaps(state.replay.replayTrack);
   renderReplayWorkspace();
 }
-function renderAll() { renderI18n(); renderWorkspace(); renderAccounts(); renderLibrary(); renderOnboardingPanel(); renderSelection(); renderRecent(); renderKomoot(); renderProxy(); renderKomootProgress(); renderProfile(); renderReplayWorkspace(); }
+function renderAll() { renderI18n(); renderWorkspace(); renderAccounts(); renderLibrary(); renderSelection(); renderRecent(); renderKomoot(); renderProxy(); renderKomootProgress(); renderProfile(); renderReplayWorkspace(); }
 function layerStyleForTrack(track, casing = false) {
   const highlighted = state.highlightedTrackId === track.id;
   const baseWeight = Math.max(4, Number(state.settings.trackLineWeight) || 6);
-  return casing
-    ? { color: highlighted ? TRACK_HIGHLIGHT_CASING : TRACK_CASING_COLOR, weight: highlighted ? baseWeight + 6 : baseWeight + 4, opacity: 0.98, dashArray: null, lineCap: 'round', lineJoin: 'round' }
-    : { color: highlighted ? HIGHLIGHT_COLOR : track.color, weight: highlighted ? baseWeight + 2 : baseWeight, opacity: 1, dashArray: track.type === 'planned' ? '10 8' : null, lineCap: 'round', lineJoin: 'round' };
+  let color = track.color;
+  let weight = baseWeight;
+  let opacity = 1;
+  let dashArray = null;
+  if (highlighted) {
+    color = HIGHLIGHT_COLOR;
+    weight = baseWeight + 2;
+  }
+  if (track.type === 'planned') dashArray = '10 8';
+  if (casing) {
+    color = TRACK_CASING_COLOR;
+    weight = baseWeight + 4;
+    opacity = 0.98;
+    dashArray = null;
+    if (highlighted) {
+      color = TRACK_HIGHLIGHT_CASING;
+      weight = baseWeight + 6;
+    }
+  }
+  return { color, weight, opacity, dashArray, lineCap: 'round', lineJoin: 'round' };
 }
 function surfaceSegmentColor(value) {
   const key = `${value ?? ''}`.toLowerCase();
@@ -3061,27 +4525,58 @@ function buildTrackSegmentLayers(track) {
   }
   return L.layerGroup(layers);
 }
-function legendItemsMarkup(values, type) {
-  return values.map((value) => {
-    const label = escapeHtml(displayDetailValue(value));
-    const svg = type === 'surface'
-      ? `<svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true"><line x1="1" y1="4" x2="31" y2="4" stroke="${surfaceSegmentColor(value)}" stroke-width="4" stroke-linecap="round"></line></svg>`
-      : `<svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true"><line x1="1" y1="4" x2="31" y2="4" stroke="rgba(248, 251, 250, 0.92)" stroke-width="3" stroke-linecap="round" stroke-dasharray="${wayTypeSegmentDash(value)}"></line></svg>`;
-    return `<div class="map-segment-legend-item">${svg}<span>${label}</span></div>`;
-  }).join('');
+/**
+ * Renders surface or way-type legend items using the shared legend item template.
+ * @param {HTMLElement|null} container Target element for legend items.
+ * @param {Array<string>} values Segment values to display.
+ * @param {'surface'|'waytype'} type Segment category that controls the line style.
+ * @returns {void}
+ */
+function renderMapSegmentLegendItems(container, values, type) {
+  if (!container) return;
+  container.replaceChildren();
+  if (!values.length) {
+    const empty = document.createElement('span');
+    empty.className = 'map-segment-empty';
+    empty.textContent = t('analysisNone');
+    container.append(empty);
+    return;
+  }
+  const template = document.querySelector('#map-segment-legend-item-template');
+  values.forEach((value) => {
+    const fragment = template.content.cloneNode(true);
+    const line = fragment.querySelector('.map-segment-legend-line');
+    const label = fragment.querySelector('.map-segment-legend-label');
+    line.setAttribute('stroke', 'rgba(248, 251, 250, 0.92)');
+    line.setAttribute('stroke-width', '3');
+    line.setAttribute('stroke-linecap', 'round');
+    line.setAttribute('stroke-dasharray', wayTypeSegmentDash(value));
+    if (type === 'surface') {
+      line.setAttribute('stroke', surfaceSegmentColor(value));
+      line.setAttribute('stroke-width', '4');
+      line.removeAttribute('stroke-dasharray');
+    }
+    label.textContent = displayDetailValue(value);
+    container.append(fragment);
+  });
 }
 function renderMapSegmentLegend() {
   const track = state.tracks.find((item) => item.id === state.highlightedTrackId);
-  const surfaceValues = track ? segmentValues(track.surfaceSegments) : [];
-  const wayTypeValues = track ? segmentValues(track.wayTypeSegments) : [];
-  if (el.segmentHelpSurfaceItems) el.segmentHelpSurfaceItems.innerHTML = surfaceValues.length ? legendItemsMarkup(surfaceValues, 'surface') : `<span class="map-segment-empty">${t('analysisNone')}</span>`;
-  if (el.segmentHelpWaytypeItems) el.segmentHelpWaytypeItems.innerHTML = wayTypeValues.length ? legendItemsMarkup(wayTypeValues, 'waytype') : `<span class="map-segment-empty">${t('analysisNone')}</span>`;
+  let surfaceValues = [];
+  let wayTypeValues = [];
+  if (track) {
+    surfaceValues = segmentValues(track.surfaceSegments);
+    wayTypeValues = segmentValues(track.wayTypeSegments);
+  }
+  renderMapSegmentLegendItems(el.segmentHelpSurfaceItems, surfaceValues, 'surface');
+  renderMapSegmentLegendItems(el.segmentHelpWaytypeItems, wayTypeValues, 'waytype');
 }
 function buildTrackDecorations(track) {
   const zoom = state.map?.getZoom?.() ?? 0;
   const { kmStep, arrowStep } = decorationStepsForZoom(zoom);
   const highlighted = state.highlightedTrackId === track.id;
-  const color = highlighted ? HIGHLIGHT_COLOR : track.color;
+  let color = track.color;
+  if (highlighted) color = HIGHLIGHT_COLOR;
   const kmLayer = L.layerGroup();
   const arrowLayer = L.layerGroup();
   if (kmStep && highlighted) {
@@ -3095,7 +4590,8 @@ function buildTrackDecorations(track) {
     }
   }
   if (arrowStep) {
-    const offset = kmStep ? 0.5 : Math.max(0.5, arrowStep / 2);
+    let offset = Math.max(0.5, arrowStep / 2);
+    if (kmStep) offset = 0.5;
     for (let arrowKm = offset; arrowKm < (track.distanceKm ?? 0); arrowKm += arrowStep) {
       const sample = sampleAlongTrack(track.points, arrowKm);
       if (!sample) continue;
@@ -3171,9 +4667,14 @@ function heatmapColor(ratio) {
         if (previous && previous.key !== snapped.key) {
           const forward = `${previous.key}->${snapped.key}`;
           const reverse = `${snapped.key}->${previous.key}`;
-          const key = forward < reverse ? forward : reverse;
-          const start = forward < reverse ? previous : snapped;
-          const end = forward < reverse ? snapped : previous;
+          let key = reverse;
+          let start = snapped;
+          let end = previous;
+          if (forward < reverse) {
+            key = forward;
+            start = previous;
+            end = snapped;
+          }
           if (!trackSegments.has(key)) {
             trackSegments.set(key, { start, end });
           }
@@ -3270,7 +4771,10 @@ const CRC32_TABLE = (() => {
   const table = new Uint32Array(256);
   for (let i = 0; i < 256; i += 1) {
     let c = i;
-    for (let j = 0; j < 8; j += 1) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    for (let j = 0; j < 8; j += 1) {
+      if (c & 1) c = 0xEDB88320 ^ (c >>> 1);
+      else c >>>= 1;
+    }
     table[i] = c >>> 0;
   }
   return table;
@@ -3281,8 +4785,10 @@ function crc32(bytes) {
   return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 function dosDateTimeParts(value) {
-  const date = value ? new Date(value) : new Date();
-  const safe = Number.isNaN(date.getTime()) ? new Date() : date;
+  let date = new Date();
+  if (value) date = new Date(value);
+  let safe = date;
+  if (Number.isNaN(date.getTime())) safe = new Date();
   const year = Math.max(1980, safe.getFullYear());
   const dosTime = ((safe.getHours() & 0x1F) << 11) | ((safe.getMinutes() & 0x3F) << 5) | Math.floor(safe.getSeconds() / 2);
   const dosDate = (((year - 1980) & 0x7F) << 9) | (((safe.getMonth() + 1) & 0x0F) << 5) | (safe.getDate() & 0x1F);
@@ -3296,7 +4802,8 @@ async function createZipBlob(files) {
   let offset = 0;
   for (const file of files) {
     const nameBytes = encoder.encode(file.name);
-    const dataBytes = file.bytes instanceof Uint8Array ? file.bytes : new Uint8Array(file.bytes);
+    let dataBytes = new Uint8Array(file.bytes);
+    if (file.bytes instanceof Uint8Array) dataBytes = file.bytes;
     const { dosTime, dosDate } = dosDateTimeParts(file.modifiedAt);
     const checksum = crc32(dataBytes);
     const localHeader = new Uint8Array(30 + nameBytes.length);
@@ -3359,6 +4866,231 @@ async function createZipBlob(files) {
   parts.push(...centralParts, end);
   return new Blob(parts, { type: 'application/zip' });
 }
+
+/**
+ * Turns a value into text that is safe inside a KML CDATA section.
+ * @param {unknown} value Text content to protect.
+ * @returns {string} CDATA-safe text.
+ */
+function cdataText(value) {
+  return `${value ?? ''}`.replaceAll(']]>', ']]]]><![CDATA[>');
+}
+
+/**
+ * Creates a KML coordinate tuple from a Trailthread point.
+ * @param {object} point Track or photo location.
+ * @returns {string|null} KML longitude, latitude and optional altitude tuple.
+ */
+function kmlCoordinates(point) {
+  const lat = Number(point?.lat);
+  const lng = Number(point?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const altitude = Number(point?.alt ?? point?.ele);
+  if (Number.isFinite(altitude)) return `${lng.toFixed(6)},${lat.toFixed(6)},${altitude.toFixed(1)}`;
+  return `${lng.toFixed(6)},${lat.toFixed(6)}`;
+}
+
+/**
+ * Converts a CSS hexadecimal color into KML's alpha-blue-green-red color order.
+ * @param {string} color CSS color in #RRGGBB format.
+ * @returns {string} Fully opaque KML color in aabbggrr format.
+ */
+function kmlLineColor(color) {
+  let hex = cleanText(color).replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(hex)) hex = '0050ff';
+  const red = hex.slice(0, 2);
+  const green = hex.slice(2, 4);
+  const blue = hex.slice(4, 6);
+  return `ff${blue}${green}${red}`;
+}
+
+/**
+ * Converts a data URL into its bytes and media type.
+ * @param {string} dataUrl Image data URL.
+ * @returns {Promise<{bytes: Uint8Array, type: string}>} Image file contents and media type.
+ */
+async function dataUrlToBytes(dataUrl) {
+  const response = await fetch(dataUrl);
+  return { bytes: new Uint8Array(await response.arrayBuffer()), type: response.headers.get('content-type') || 'application/octet-stream' };
+}
+
+/**
+ * Returns a suitable filename extension for a packaged photo.
+ * @param {string} type Image media type.
+ * @returns {string} Filename extension without a dot.
+ */
+function imageExtensionForType(type) {
+  const normalized = cleanText(type).toLocaleLowerCase();
+  if (normalized === 'image/jpeg') return 'jpg';
+  if (normalized === 'image/png') return 'png';
+  if (normalized === 'image/webp') return 'webp';
+  if (normalized === 'image/gif') return 'gif';
+  return 'bin';
+}
+
+/**
+ * Builds a portable KML description for one photo.
+ * @param {object} photo Serialized photo metadata.
+ * @param {string|null} imageUrl External image URL, if available.
+ * @returns {string} HTML used as KML feature description.
+ */
+function buildKmlPhotoDescription(photo, imageUrl) {
+  const parts = [];
+  const caption = cleanText(photo.caption || photo.title);
+  if (caption) parts.push(`<p>${escapeXml(caption)}</p>`);
+  if (imageUrl) parts.push(`<p><img src="${escapeXml(imageUrl)}" alt="${escapeXml(photo.title || caption || 'Foto')}"></p>`);
+  return parts.join('');
+}
+
+/**
+ * Creates an inline KML style that keeps Trailthread metadata out of the feature balloon.
+ * @param {string|null} imagePath Local image path used as a compatibility-mode point icon.
+ * @returns {string} KML style markup for one photo feature.
+ */
+function buildKmlPhotoStyle(imagePath = null) {
+  const lines = ['        <Style>'];
+  if (imagePath) {
+    lines.push('          <IconStyle><scale>0.45</scale><Icon>');
+    lines.push(`            <href>${escapeXml(imagePath)}</href>`);
+    lines.push('          </Icon></IconStyle>');
+  }
+  lines.push('          <BalloonStyle><text><![CDATA[<b>$[name]</b><br/>$[description]]]></text></BalloonStyle>');
+  lines.push('        </Style>');
+  return lines.join('\n');
+}
+
+/**
+ * Builds the KML and packaged image files for selected Trailthread tracks.
+ * @param {Array<object>} tracks Tracks to export.
+ * @param {'compatibility'|'photo-overlay'} photoExportMode Target viewer compatibility mode for photos.
+ * @returns {Promise<Array<{name: string, bytes: Uint8Array, modifiedAt?: string}>>} KMZ file entries.
+ */
+async function buildKmzFiles(tracks, photoExportMode = 'compatibility') {
+  const encoder = new TextEncoder();
+  const files = [];
+  const folders = [];
+  for (let trackIndex = 0; trackIndex < tracks.length; trackIndex += 1) {
+    const serializedTrack = await serializeTrackForBackup(tracks[trackIndex]);
+    const photos = normalizePhotos(serializedTrack.photos).map((photo) => ({ ...photo }));
+    const photoFeatures = [];
+    for (let photoIndex = 0; photoIndex < photos.length; photoIndex += 1) {
+      const photo = photos[photoIndex];
+      let imagePath = null;
+      let descriptionImageUrl = null;
+      const externalImageUrl = photo.externalUrl || photo.url;
+      if (isRenderablePhotoUrl(externalImageUrl) && !isDataImageUrl(externalImageUrl)) descriptionImageUrl = externalImageUrl;
+      if (isDataImageUrl(photo.url)) {
+        const image = await dataUrlToBytes(photo.url);
+        imagePath = `photos/tour-${trackIndex + 1}/photo-${photoIndex + 1}.${imageExtensionForType(image.type)}`;
+        files.push({ name: imagePath, bytes: image.bytes, modifiedAt: serializedTrack.lastChanged });
+        photo.url = imagePath;
+      }
+      const point = photo.location || photo.lineLocation;
+      const coordinate = kmlCoordinates(point);
+      if (!coordinate) continue;
+      const photoHeading = trackHeadingAtLocation(serializedTrack.points, point);
+      let photoFeature = [];
+      if (imagePath && photoExportMode === 'photo-overlay') {
+        const photoDescriptionUrl = imagePath;
+        const photoStyle = buildKmlPhotoStyle();
+        photoFeature = [
+          '      <PhotoOverlay>',
+          `        <name>${escapeXml(photo.title || `Foto ${photoIndex + 1}`)}</name>`,
+          `        <description><![CDATA[${cdataText(buildKmlPhotoDescription(photo, photoDescriptionUrl))}]]></description>`,
+          photoStyle,
+          `        <ExtendedData><Data name="trailthread:photo-json"><value><![CDATA[${cdataText(JSON.stringify(photo))}]]></value></Data></ExtendedData>`,
+          '        <Camera>',
+          `          <longitude>${Number(point.lng).toFixed(6)}</longitude>`,
+          `          <latitude>${Number(point.lat).toFixed(6)}</latitude>`,
+          '          <altitude>12</altitude>',
+          `          <heading>${photoHeading.toFixed(1)}</heading>`,
+          '          <tilt>90</tilt>',
+          '          <altitudeMode>relativeToGround</altitudeMode>',
+          '        </Camera>',
+          `        <Icon><href>${escapeXml(imagePath)}</href></Icon>`,
+          '        <ViewVolume><leftFov>-35</leftFov><rightFov>35</rightFov><bottomFov>-25</bottomFov><topFov>25</topFov><near>12</near></ViewVolume>',
+          `        <Point><coordinates>${coordinate}</coordinates></Point>`,
+          '        <shape>rectangle</shape>',
+          '      </PhotoOverlay>'
+        ];
+      } else {
+        const photoStyle = buildKmlPhotoStyle(imagePath);
+        photoFeature = [
+          '      <Placemark>',
+          `        <name>${escapeXml(photo.title || `Foto ${photoIndex + 1}`)}</name>`,
+          `        <description><![CDATA[${cdataText(buildKmlPhotoDescription(photo, descriptionImageUrl))}]]></description>`,
+          photoStyle,
+          `        <ExtendedData><Data name="trailthread:photo-json"><value><![CDATA[${cdataText(JSON.stringify(photo))}]]></value></Data></ExtendedData>`,
+          `        <Point><coordinates>${coordinate}</coordinates></Point>`,
+          '      </Placemark>'
+        ];
+      }
+      photoFeatures.push(photoFeature.join('\n'));
+    }
+    const coordinates = serializedTrack.points.map(kmlCoordinates).filter(Boolean).join(' ');
+    const trackJson = JSON.stringify({ ...serializedTrack, photos });
+    const trackColor = serializedTrack.color || defaultTrackColor(serializedTrack);
+    const trackLineColor = kmlLineColor(trackColor);
+    const photoFolder = [];
+    if (photoFeatures.length) {
+      photoFolder.push('    <Folder><name>Fotos</name>');
+      photoFolder.push(...photoFeatures);
+      photoFolder.push('    </Folder>');
+    }
+    folders.push([
+      '  <Folder>',
+      `    <name>${escapeXml(serializedTrack.name || t('unnamedTrack'))}</name>`,
+      '    <Placemark>',
+      `      <name>${escapeXml(serializedTrack.name || t('unnamedTrack'))}</name>`,
+      `      <description><![CDATA[${cdataText(serializedTrack.description || '')}]]></description>`,
+      '      <Style>',
+      `        <LineStyle><color>${trackLineColor}</color><width>4</width></LineStyle>`,
+      '      </Style>',
+      `      <ExtendedData><Data name="trailthread:track-json"><value><![CDATA[${cdataText(trackJson)}]]></value></Data></ExtendedData>`,
+      '      <LineString><tessellate>1</tessellate><coordinates>',
+      `        ${coordinates}`,
+      '      </coordinates></LineString>',
+      '    </Placemark>',
+      ...photoFolder,
+      '  </Folder>'
+    ].filter(Boolean).join('\n'));
+  }
+  const kml = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<kml xmlns="http://www.opengis.net/kml/2.2">',
+    '  <Document>',
+    '    <name>Trailthread-Export</name>',
+    '    <ExtendedData><Data name="trailthread:format"><value>trailthread-kmz-v1</value></Data></ExtendedData>',
+    ...folders,
+    '  </Document>',
+    '</kml>'
+  ].join('\n');
+  files.unshift({ name: 'doc.kml', bytes: encoder.encode(kml), modifiedAt: isoNow() });
+  return files;
+}
+
+/**
+ * Exports selected tracks in one KMZ document for the requested photo viewer mode.
+ * @param {'compatibility'|'photo-overlay'} photoExportMode Target viewer compatibility mode for photos.
+ * @returns {Promise<void>} Resolves after the browser download has started.
+ */
+async function exportSelectedTracksKmz(photoExportMode = 'compatibility') {
+  const tracks = state.tracks.filter((track) => state.selectedTrackIds.has(track.id) && track.points?.length);
+  if (!tracks.length) {
+    setStatus(t('exportSelectedKmzUnavailable'), true);
+    return;
+  }
+  let fileNameKey = 'exportSelectedKmzFileName';
+  let doneKey = 'exportSelectedKmzDone';
+  if (photoExportMode === 'photo-overlay') {
+    fileNameKey = 'exportSelectedKmzProFileName';
+    doneKey = 'exportSelectedKmzProDone';
+  }
+  const blob = await createZipBlob(await buildKmzFiles(tracks, photoExportMode));
+  downloadBlob(t(fileNameKey), blob);
+  el.exportSelectedGpxMenu?.removeAttribute('open');
+  setStatus(t(doneKey, { count: tracks.length }));
+}
 function buildSelectedTracksMultiGpxXml(tracks) {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -3412,7 +5144,8 @@ function shiftedPointCopy(point, timeOffsetMs = 0) {
   const copy = { ...point };
   if (timeOffsetMs && point?.time) {
     const parsed = parsePointTime(point.time);
-    copy.time = Number.isFinite(parsed) ? new Date(parsed + timeOffsetMs).toISOString() : point.time;
+    if (Number.isFinite(parsed)) copy.time = new Date(parsed + timeOffsetMs).toISOString();
+    else copy.time = point.time;
   }
   return copy;
 }
@@ -3445,7 +5178,8 @@ async function mergeSelectedTracks(orderedTracks = selectedTracksForMerge()) {
   }
   for (const track of tracks) {
     const pointOffset = combinedPoints.length;
-    const timeOffsetMs = track.id === secondTrack.id ? secondTimeOffsetMs : 0;
+    let timeOffsetMs = 0;
+    if (track.id === secondTrack.id) timeOffsetMs = secondTimeOffsetMs;
     track.points.forEach((point) => combinedPoints.push(shiftedPointCopy(point, timeOffsetMs)));
     mergedSurfaceSegments.push(...shiftRangeSegments(track.surfaceSegments, pointOffset));
     mergedWayTypeSegments.push(...shiftRangeSegments(track.wayTypeSegments, pointOffset));
@@ -3458,17 +5192,20 @@ async function mergeSelectedTracks(orderedTracks = selectedTracksForMerge()) {
   const mergedPhotos = normalizePhotos((await Promise.all(tracks.map(cloneTrackPhotosForMerge))).flat());
   const mergedTags = [...new Set(tracks.flatMap((track) => normalizeTagList(track.tags)))];
   const descriptions = [...new Set(tracks.map((track) => cleanText(track.description)).filter(Boolean))];
+  const sport = firstTrack.sport || secondTrack.sport || null;
+  let mergedType = 'unknown';
+  if (trackType(firstTrack.type) === trackType(secondTrack.type)) mergedType = trackType(firstTrack.type);
   const mergedTrackDraft = {
     name: `${firstTrack.name || t('unnamedTrack')} + ${secondTrack.name || t('unnamedTrack')}`,
     description: descriptions.join('\n\n'),
-    sport: firstTrack.sport && secondTrack.sport && firstTrack.sport === secondTrack.sport ? firstTrack.sport : firstTrack.sport || secondTrack.sport || null,
+    sport,
     points: combinedPoints
   };
   const mergedTrack = buildTrackRecord({
     gpxText: buildSingleTrackGpxXml(mergedTrackDraft),
     fileName: sanitizeFileName(mergedTrackDraft.name) || 'merged-track',
     source: 'local',
-    type: firstTrack.type === secondTrack.type ? firstTrack.type : 'unknown',
+    type: mergedType,
     account: null,
     description: mergedTrackDraft.description || null,
     photos: mergedPhotos,
@@ -3581,7 +5318,8 @@ function initMap() {
 }
 function trackBounds(track) {
   const latLngs = track?.points?.map((point) => [point.lat, point.lng]).filter((point) => point.every(Number.isFinite));
-  return latLngs?.length ? L.latLngBounds(latLngs) : null;
+  if (latLngs?.length) return L.latLngBounds(latLngs);
+  return null;
 }
 function syncMap() {
   for (const entry of state.layers.values()) {
@@ -3608,7 +5346,7 @@ function syncMap() {
             lineJoin: 'round'
           });
           const group = L.layerGroup([baseLine]).addTo(state.map);
-          state.layers.set(track.id, { track, group, casing: null, line: baseLine, kmLayer: null, arrowLayer: null, photoLayer: null, segmentLayer: null });
+          state.layers.set(track.id, { track, group, casing: null, line: baseLine, kmLayer: null, arrowLayer: null, photoLayer: null, segmentLayer: null, timelineLayer: null });
         });
         state.heatmapLayer = buildHeatmapLayer(tracks).addTo(state.map);
         state.heatmapStats = state.heatmapLayer.__heatmapStats ?? null;
@@ -3629,19 +5367,21 @@ function syncMap() {
     kmLayer = decorationLayers.kmLayer;
     arrowLayer = decorationLayers.arrowLayer;
     const photoLayer = buildTrackPhotoLayer(track);
-    const segmentLayer = state.settings.segmentOverlayMode && state.highlightedTrackId === track.id ? buildTrackSegmentLayers(track) : L.layerGroup();
+    const timelineLayer = buildTrackTimelineLayer(track);
+    let segmentLayer = L.layerGroup();
+    if (state.settings.segmentOverlayMode && state.highlightedTrackId === track.id) segmentLayer = buildTrackSegmentLayers(track);
     if (!photoOnlyMode) {
       casing = L.polyline(latLngs, layerStyleForTrack(track, true));
       line = L.polyline(latLngs, layerStyleForTrack(track, false)).bindPopup(`<strong>${track.name}</strong><br>${fmtKm(track.distanceKm)} km`);
       line.on('click', (event) => { L.DomEvent.stopPropagation(event); setHighlightedTrack(track.id); });
       casing.on('click', (event) => { L.DomEvent.stopPropagation(event); setHighlightedTrack(track.id); });
       layers.push(casing, line, segmentLayer, kmLayer, arrowLayer);
-      if (state.highlightedTrackId === track.id) layers.push(photoLayer);
+      if (state.highlightedTrackId === track.id) layers.push(photoLayer, timelineLayer);
     } else if (photoLayer.getLayers().length) {
       layers.push(photoLayer);
     }
     const group = L.layerGroup(layers).addTo(state.map);
-    state.layers.set(track.id, { group, casing, line, kmLayer, arrowLayer, photoLayer, segmentLayer });
+    state.layers.set(track.id, { group, casing, line, kmLayer, arrowLayer, photoLayer, segmentLayer, timelineLayer });
   });
   renderMapSegmentLegend();
   renderMapSegmentButton();
@@ -3649,7 +5389,10 @@ function syncMap() {
 function fitSelection() {
   const bounds = visibleSelectedTracks().map(trackBounds).filter(Boolean);
   if (!bounds.length) return;
-  const merged = bounds.reduce((acc, current) => acc ? acc.extend(current) : current, null);
+  const merged = bounds.reduce((acc, current) => {
+    if (acc) return acc.extend(current);
+    return current;
+  }, null);
   if (merged) state.map.fitBounds(merged.pad(0.08));
 }
 function activeTrackNavigationOrder() {
@@ -3659,7 +5402,11 @@ function stepTrackSelection(offset) {
   const tracks = activeTrackNavigationOrder();
   if (!tracks.length) return;
   const currentIndex = Math.max(0, tracks.findIndex((track) => track.id === state.highlightedTrackId));
-  const fallbackIndex = state.highlightedTrackId ? currentIndex : (offset > 0 ? -1 : 0);
+  let fallbackIndex = currentIndex;
+  if (!state.highlightedTrackId) {
+    fallbackIndex = 0;
+    if (offset > 0) fallbackIndex = -1;
+  }
   const nextIndex = (fallbackIndex + offset + tracks.length) % tracks.length;
   focusTrack(tracks[nextIndex].id);
 }
@@ -3696,7 +5443,9 @@ async function deleteTracks(trackIds) { for (const trackId of trackIds) { const 
 async function importTrackRecords(records, replaceExisting = false) {
   const existing = new Map(state.tracks.map((track) => [track.signature, track])); const existingRemote = new Map(state.tracks.map((track) => [remoteTrackKey(track), track]).filter(([key]) => !!key)); const incoming = []; let duplicates = 0;
   records.forEach((record) => {
-    const remoteExisting = remoteTrackKey(record) ? existingRemote.get(remoteTrackKey(record)) : null;
+    const remoteKey = remoteTrackKey(record);
+    let remoteExisting = null;
+    if (remoteKey) remoteExisting = existingRemote.get(remoteKey);
     const dupe = remoteExisting ?? existing.get(record.signature);
     if (dupe && !replaceExisting) { duplicates += 1; return; }
     if (dupe && replaceExisting) {
@@ -3722,12 +5471,26 @@ async function importTrackRecords(records, replaceExisting = false) {
   state.tracks = state.tracks.filter((track) => !map.has(track.id)).concat(hydrated).sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? ''));
   hydrated.forEach((track) => state.selectedTrackIds.add(track.id));
   hydrated.forEach((track) => { const entry = state.layers.get(track.id); if (!entry) return; entry.group.remove(); state.layers.delete(track.id); });
-  if (state.replay.activeTrackId) { const updatedReplayTrack = state.tracks.find((track) => track.id === state.replay.activeTrackId) || hydrated.find((track) => track.id === state.replay.activeTrackId) || null; state.replay.replayTrack = updatedReplayTrack ? buildReplayTrack(updatedReplayTrack) : null; }
-  renderAll(); syncMap(); fitSelection(); setStatus(duplicates ? `${t('statusImported')} · ${t('duplicateTracksSkipped', { count: duplicates })}` : t('statusImported')); return { imported: hydrated.length, duplicates };
+  if (state.replay.activeTrackId) {
+    const updatedReplayTrack = state.tracks.find((track) => track.id === state.replay.activeTrackId) || hydrated.find((track) => track.id === state.replay.activeTrackId) || null;
+    state.replay.replayTrack = null;
+    if (updatedReplayTrack) state.replay.replayTrack = buildReplayTrack(updatedReplayTrack);
+  }
+  renderAll();
+  syncMap();
+  fitSelection();
+  let importStatus = t('statusImported');
+  if (duplicates) importStatus = `${t('statusImported')} · ${t('duplicateTracksSkipped', { count: duplicates })}`;
+  setStatus(importStatus);
+  return { imported: hydrated.length, duplicates };
 }
 function normalizeBackupTrack(track) {
   const surfaceSegments = normalizeRangeSegments(track.surfaceSegments);
   const wayTypeSegments = normalizeRangeSegments(track.wayTypeSegments);
+  let surfaces = normalizeTagList(track.surfaces);
+  let wayTypes = normalizeTagList(track.wayTypes);
+  if (!surfaces.length) surfaces = segmentValues(surfaceSegments);
+  if (!wayTypes.length) wayTypes = segmentValues(wayTypeSegments);
   const normalized = {
     ...track,
     id: track.id || id('track'),
@@ -3735,10 +5498,11 @@ function normalizeBackupTrack(track) {
     lastChanged: trackLastChanged(track) || track.importedAt || isoNow(),
     signature: track.signature || signature(track),
     komootUrl: track.komootUrl || komootTrackUrl(track),
+    type: trackType(track.type),
     description: normalizeTrackDescription(track.description),
     dateStart: normalizeTrackDate(track.dateStart),
-    surfaces: normalizeTagList(track.surfaces).length ? normalizeTagList(track.surfaces) : segmentValues(surfaceSegments),
-    wayTypes: normalizeTagList(track.wayTypes).length ? normalizeTagList(track.wayTypes) : segmentValues(wayTypeSegments),
+    surfaces,
+    wayTypes,
     surfaceSegments,
     wayTypeSegments,
     favorite: !!track.favorite,
@@ -3761,7 +5525,8 @@ async function importTourBackupRecords(records) {
     if (existingSameId) {
       const incomingStamp = Date.parse(trackLastChanged(track) || '') || 0;
       const existingStamp = Date.parse(trackLastChanged(existingSameId) || '') || 0;
-      const key = incomingStamp > existingStamp ? 'confirmBackupOverwriteNewer' : 'confirmBackupOverwriteOlder';
+      let key = 'confirmBackupOverwriteOlder';
+      if (incomingStamp > existingStamp) key = 'confirmBackupOverwriteNewer';
       const shouldOverwrite = await confirmAction(t(key, { name: track.name || existingSameId.name || t('unnamedTrack') }));
       if (!shouldOverwrite) {
         skippedConflicts += 1;
@@ -3780,7 +5545,7 @@ async function importTourBackupRecords(records) {
   if (!incoming.length && (duplicates || skippedConflicts)) {
     const pieces = [];
     if (duplicates) pieces.push(t('duplicateTracksSkipped', { count: duplicates }));
-    if (skippedConflicts) pieces.push(`${skippedConflicts} Konflikte uebersprungen`);
+    if (skippedConflicts) pieces.push(`${skippedConflicts} Konflikte übersprungen`);
     setStatus(pieces.join(' · '));
     return { imported: 0, duplicates, skippedConflicts };
   }
@@ -3803,28 +5568,332 @@ async function importTourBackupRecords(records) {
   });
   if (state.replay.activeTrackId) {
     const updatedReplayTrack = state.tracks.find((track) => track.id === state.replay.activeTrackId) || null;
-    state.replay.replayTrack = updatedReplayTrack ? buildReplayTrack(updatedReplayTrack) : null;
+    state.replay.replayTrack = null;
+    if (updatedReplayTrack) state.replay.replayTrack = buildReplayTrack(updatedReplayTrack);
   }
   renderAll();
   syncMap();
   fitSelection();
   const pieces = [t('tourBackupImported')];
   if (duplicates) pieces.push(t('duplicateTracksSkipped', { count: duplicates }));
-  if (skippedConflicts) pieces.push(`${skippedConflicts} Konflikte uebersprungen`);
+  if (skippedConflicts) pieces.push(`${skippedConflicts} Konflikte übersprungen`);
   setStatus(pieces.join(' · '));
   return { imported: hydrated.length, duplicates, skippedConflicts };
 }
-async function importLocalFiles(files) { const records = []; for (const file of files) records.push(buildTrackRecord({ gpxText: await file.text(), fileName: file.name, source: 'local', type: 'unknown', account: null })); await importTrackRecords(records); }
+/**
+ * Checks whether a JSON value is a manifest created by the Trailthread Komoot companion extension.
+ * @param {unknown} payload Parsed JSON value from a local file.
+ * @returns {boolean} True when the value has the supported companion manifest shape.
+ */
+function isKomootCompanionManifest(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  if (payload.kind !== 'trailthread-komoot-companion') return false;
+  if (payload.version !== 1) return false;
+  return Array.isArray(payload.tours);
+}
+
+/**
+ * Checks whether a JSON payload is a complete Trailthread tour backup.
+ * @param {unknown} payload Parsed JSON value from a local file.
+ * @returns {boolean} True when the payload contains Trailthread track records.
+ */
+function isTrailthreadTourBackup(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  if (payload.kind !== 'gpx-bibliothek-touren') return false;
+  return Array.isArray(payload.tracks);
+}
+
+/**
+ * Normalizes a local file name for matching a GPX download to its extension manifest entry.
+ * @param {string} value File name or route title.
+ * @returns {string} Lowercase comparison key without a file extension.
+ */
+function localImportMatchKey(value) {
+  return cleanText(value)
+    .replace(/\.[a-z0-9]{1,8}$/i, '')
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9\u00c0-\u024f]+/gi, ' ')
+    .trim();
+}
+
+/**
+ * Finds a companion manifest entry for one GPX file.
+ * @param {File} file GPX file selected by the user.
+ * @param {Array<object>} tours Tour entries supplied by the companion extension.
+ * @returns {object|null} Matching tour metadata or null when no safe match exists.
+ */
+function companionTourForFile(file, tours) {
+  const fileKey = localImportMatchKey(file.name);
+  const directMatch = tours.find((tour) => localImportMatchKey(tour.gpxFileName || '') === fileKey);
+  if (directMatch) return directMatch;
+  const titleMatch = tours.find((tour) => localImportMatchKey(tour.name || '') === fileKey);
+  if (titleMatch) return titleMatch;
+  return null;
+}
+
+/**
+ * Reads all files from a ZIP or KMZ archive, including deflate-compressed entries.
+ * @param {File} file Archive selected by the user.
+ * @returns {Promise<Map<string, Uint8Array>>} Archive entries indexed by their paths.
+ */
+async function readZipEntries(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let endOffset = -1;
+  for (let offset = Math.max(0, bytes.length - 65557); offset <= bytes.length - 22; offset += 1) {
+    if (view.getUint32(offset, true) === 0x06054b50) endOffset = offset;
+  }
+  if (endOffset < 0) throw new Error(t('kmzInvalidArchiveDirectory'));
+  const entryCount = view.getUint16(endOffset + 10, true);
+  let offset = view.getUint32(endOffset + 16, true);
+  const decoder = new TextDecoder();
+  const entries = new Map();
+  for (let index = 0; index < entryCount; index += 1) {
+    if (view.getUint32(offset, true) !== 0x02014b50) throw new Error(t('kmzInvalidZipEntry'));
+    const method = view.getUint16(offset + 10, true);
+    const compressedSize = view.getUint32(offset + 20, true);
+    const uncompressedSize = view.getUint32(offset + 24, true);
+    const nameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const localOffset = view.getUint32(offset + 42, true);
+    const name = decoder.decode(bytes.slice(offset + 46, offset + 46 + nameLength));
+    if (view.getUint32(localOffset, true) !== 0x04034b50) throw new Error(t('kmzInvalidZipContent'));
+    const localNameLength = view.getUint16(localOffset + 26, true);
+    const localExtraLength = view.getUint16(localOffset + 28, true);
+    const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
+    const compressed = bytes.slice(dataOffset, dataOffset + compressedSize);
+    let content = compressed;
+    if (method === 8) {
+      if (typeof DecompressionStream === 'undefined') throw new Error(t('kmzDecompressionUnavailable'));
+      content = new Uint8Array(await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+    } else if (method !== 0) {
+      throw new Error(t('kmzUnsupportedCompression', { method }));
+    }
+    if (content.length !== uncompressedSize) throw new Error(t('kmzCorruptZipEntry', { name }));
+    entries.set(name, content);
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
+/**
+ * Converts KML coordinate text into Trailthread points.
+ * @param {string} value Whitespace-separated KML coordinate tuples.
+ * @returns {Array<object>} Parsed geographic points.
+ */
+function parseKmlCoordinates(value) {
+  return `${value || ''}`.trim().split(/\s+/).map((tuple) => {
+    const parts = tuple.split(',').map(Number);
+    const lng = parts[0];
+    const lat = parts[1];
+    const ele = parts[2];
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    let elevation = null;
+    if (Number.isFinite(ele)) elevation = ele;
+    return { lat, lng, ele: elevation, time: null };
+  }).filter(Boolean);
+}
+
+/**
+ * Builds GPX XML for a route read from a standard KML Placemark.
+ * @param {object} track Parsed KML track fields.
+ * @returns {string} GPX document for the normal Trailthread import path.
+ */
+function buildGpxFromKmlTrack(track) {
+  const points = track.points.map((point) => {
+    const attributes = `lat="${point.lat.toFixed(6)}" lon="${point.lng.toFixed(6)}"`;
+    let elevation = '';
+    if (Number.isFinite(point.ele)) elevation = `<ele>${point.ele.toFixed(1)}</ele>`;
+    return `<trkpt ${attributes}>${elevation}</trkpt>`;
+  }).join('');
+  let description = '';
+  if (track.description) description = `<desc>${escapeXml(track.description)}</desc>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Trailthread" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${escapeXml(track.name || t('unnamedTrack'))}</name>${description}<trkseg>${points}</trkseg></trk></gpx>`;
+}
+
+/**
+ * Parses a KML document into Trailthread backup records and generic KML tracks.
+ * @param {string} text KML XML text.
+ * @param {string} fileName Source filename.
+ * @param {Map<string, Uint8Array>|null} archiveEntries Packaged KMZ resources, if any.
+ * @returns {Promise<{backupRecords: Array<object>, genericRecords: Array<object>}>} Import-ready records.
+ */
+async function parseKmlImport(text, fileName, archiveEntries = null) {
+  const xml = new DOMParser().parseFromString(text, 'application/xml');
+  if (xml.querySelector('parsererror')) throw new Error(t('kmlInvalidDocument'));
+  const backupRecords = [];
+  const genericRecords = [];
+  for (const placemark of xml.querySelectorAll('Placemark')) {
+    const encodedTrack = placemark.querySelector('Data[name="trailthread:track-json"] > value')?.textContent;
+    if (encodedTrack) {
+      try {
+        const record = JSON.parse(encodedTrack);
+        for (const photo of record.photos || []) {
+          if (archiveEntries?.has(photo.url)) {
+            const bytes = archiveEntries.get(photo.url);
+            photo.url = await blobToDataUrl(new Blob([bytes]));
+            photo.blobId = null;
+            photo.externalUrl = null;
+          }
+        }
+        backupRecords.push(record);
+        continue;
+      } catch (error) {
+        throw new Error(t('kmlMetadataUnreadable', { fileName }));
+      }
+    }
+    const coordinateNode = placemark.querySelector('LineString > coordinates, MultiGeometry LineString > coordinates');
+    if (!coordinateNode) continue;
+    const points = parseKmlCoordinates(coordinateNode.textContent);
+    if (!points.length) continue;
+    const name = cleanText(placemark.querySelector(':scope > name')?.textContent) || fileName.replace(/\.kml$/i, '') || t('unnamedTrack');
+    const description = cleanText(placemark.querySelector(':scope > description')?.textContent) || null;
+    genericRecords.push(buildTrackRecord({
+      gpxText: buildGpxFromKmlTrack({ name, description, points }),
+      fileName,
+      source: 'local',
+      type: 'unknown',
+      account: null,
+      description
+    }));
+  }
+  if (!backupRecords.length && !genericRecords.length) throw new Error(t('kmlNoTrackLines'));
+  return { backupRecords, genericRecords };
+}
+
+/**
+ * Loads KML or KMZ files selected through the general track import control.
+ * @param {Array<File>} files KML or KMZ files.
+ * @returns {Promise<{backupRecords: Array<object>, genericRecords: Array<object>}>} Import-ready records.
+ */
+async function importKmlFiles(files) {
+  const backupRecords = [];
+  const genericRecords = [];
+  for (const file of files) {
+    if (file.name.toLocaleLowerCase().endsWith('.kmz')) {
+      const entries = await readZipEntries(file);
+      const kmlEntry = [...entries.entries()].find(([name]) => name.toLocaleLowerCase().endsWith('.kml'));
+      if (!kmlEntry) throw new Error(t('kmzMissingKmlFile', { fileName: file.name }));
+      const result = await parseKmlImport(new TextDecoder().decode(kmlEntry[1]), file.name, entries);
+      backupRecords.push(...result.backupRecords);
+      genericRecords.push(...result.genericRecords);
+    } else {
+      const result = await parseKmlImport(await file.text(), file.name);
+      backupRecords.push(...result.backupRecords);
+      genericRecords.push(...result.genericRecords);
+    }
+  }
+  return { backupRecords, genericRecords };
+}
+
+/**
+ * Imports selected GPX, KML, KMZ and Trailthread backup files.
+ * @param {FileList|File[]} files Files selected through the local import control.
+ * @returns {Promise<void>} Resolves after all valid GPX files have been stored.
+ */
+async function importLocalFiles(files) {
+  const selectedFiles = [...files];
+  const gpxFiles = selectedFiles.filter((file) => file.name.toLocaleLowerCase().endsWith('.gpx'));
+  const kmlFiles = selectedFiles.filter((file) => {
+    const name = file.name.toLocaleLowerCase();
+    return name.endsWith('.kml') || name.endsWith('.kmz');
+  });
+  const packageFiles = selectedFiles.filter((file) => {
+    const name = file.name.toLocaleLowerCase();
+    return !name.endsWith('.gpx') && !name.endsWith('.kml') && !name.endsWith('.kmz');
+  });
+  let companionManifest = null;
+  const tourBackupRecords = [];
+  let invalidPackageFound = false;
+  for (const packageFile of packageFiles) {
+    try {
+      const parsed = await readJsonFile(packageFile);
+      if (isTrailthreadTourBackup(parsed)) {
+        tourBackupRecords.push(...parsed.tracks);
+        continue;
+      }
+      if (isKomootCompanionManifest(parsed)) {
+        companionManifest = parsed;
+        continue;
+      }
+      invalidPackageFound = true;
+    } catch (error) {
+      invalidPackageFound = true;
+    }
+  }
+  if (tourBackupRecords.length) {
+    const shouldImport = await confirmAction(t('confirmImportTours'));
+    if (!shouldImport) return;
+    await importTourBackupRecords(tourBackupRecords);
+  }
+  if (kmlFiles.length) {
+    const kmlImport = await importKmlFiles(kmlFiles);
+    if (kmlImport.backupRecords.length) await importTourBackupRecords(kmlImport.backupRecords);
+    if (kmlImport.genericRecords.length) await importTrackRecords(kmlImport.genericRecords);
+  }
+  if (!gpxFiles.length) {
+    if (companionManifest) setStatus('Bitte wähle das Komoot-Importpaket zusammen mit mindestens einer GPX-Datei aus.', true);
+    else if (invalidPackageFound) setStatus('Die ausgewählte Datei ist weder eine GPX-Datei noch eine Trailthread-Sicherung.', true);
+    return;
+  }
+  const records = [];
+  let enrichedCount = 0;
+  for (const file of gpxFiles) {
+    let tour = null;
+    if (companionManifest) tour = companionTourForFile(file, companionManifest.tours);
+    let account = null;
+    let source = 'local';
+    let type = 'unknown';
+    let description = null;
+    let photos = null;
+    let dateStart = null;
+    let sport = null;
+    if (tour) {
+      account = { sourceTrackId: cleanText(tour.tourId) || null };
+      source = 'komoot';
+      type = trackType(tour.type);
+      description = tour.description || null;
+      if (Array.isArray(tour.photos)) photos = tour.photos;
+      dateStart = tour.dateStart || null;
+      sport = tour.sport || null;
+    }
+    const record = buildTrackRecord({
+      gpxText: await file.text(),
+      fileName: file.name,
+      source,
+      type,
+      account,
+      description,
+      photos,
+      meta: { dateStart, sport }
+    });
+    if (tour && tour.tourUrl) record.komootUrl = cleanText(tour.tourUrl);
+    if (tour) enrichedCount += 1;
+    records.push(record);
+  }
+  const result = await importTrackRecords(records);
+  if (companionManifest && enrichedCount) setStatus(`${result.imported} GPX importiert, ${enrichedCount} mit Komoot-Metadaten und Bildern ergänzt.`);
+  if (companionManifest && !enrichedCount) setStatus(`${result.imported} GPX importiert. Keine Dateinamen passten zum Komoot-Importpaket.`, true);
+}
 
 async function proxyRequest(path, options = {}) {
   const url = `${proxyBaseUrl()}${path}`;
   let response;
   try {
+    const headers = {};
+    let body;
+    let targetAddressSpace;
+    if (options.body) {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(options.body);
+    }
+    if (shouldRequestLoopbackAccess()) targetAddressSpace = 'loopback';
     response = await fetch(url, {
       method: options.method ?? 'GET',
-      headers: options.body ? { 'Content-Type': 'application/json' } : {},
-      body: options.body ? JSON.stringify(options.body) : undefined,
-      targetAddressSpace: shouldRequestLoopbackAccess() ? 'loopback' : undefined
+      headers,
+      body,
+      targetAddressSpace
     });
   } catch (error) {
     throw new Error(normalizeProxyError(error));
@@ -3834,6 +5903,29 @@ async function proxyRequest(path, options = {}) {
   return payload;
 }
 async function ensureProxyAccountLogin(account) { if (!account) throw new Error(t('accountRequired')); await proxyRequest('/login', { method: 'POST', body: { email: account.email, password: account.password } }); }
+
+/**
+ * Shows a validation result in the account dialog.
+ * @param {string} message The text shown to the user.
+ * @returns {void}
+ */
+function setAccountStatus(message) {
+  if (!el.accountStatus) return;
+  el.accountStatus.textContent = message;
+  el.accountStatus.hidden = !message;
+}
+
+/**
+ * Creates a visible account-validation message from a proxy error.
+ * @param {unknown} error The error returned by the proxy request.
+ * @returns {string} A short message suitable for the account dialog.
+ */
+function accountLoginFailureMessage(error) {
+  const detail = `${error?.message ?? ''}`.trim();
+  if (!detail) return t('accountLoginFailed');
+  return `${t('accountLoginFailed')} (${detail})`;
+}
+
 async function checkProxy() {
   try {
     const payload = await proxyRequest('/health');
@@ -3849,8 +5941,84 @@ async function checkProxy() {
     return false;
   }
 }
-async function saveAccount() { const email = el.accountEmailInput.value.trim(); const password = el.accountPasswordInput.value; if (!email || !password) return; if (!await checkProxy()) return; try { const payload = await proxyRequest('/login', { method: 'POST', body: { email, password } }); const current = state.accounts.find((account) => account.email.toLowerCase() === email.toLowerCase()); const account = { id: current?.id ?? id('account'), email, password, label: payload.user?.name || email.split('@')[0] || t('accountLabelFallback'), remoteUserId: payload.user?.id ?? null, updatedAt: new Date().toISOString() }; await put(STORES.accounts, account); state.accounts = state.accounts.filter((item) => item.id !== account.id).concat(account).sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')); state.settings.activeAccountId = account.id; await saveSettings(); el.accountDialog.close(); el.accountEmailInput.value = ''; el.accountPasswordInput.value = ''; renderAll(); setStatus(t('accountStored')); setKomootStatus(t('connectedAs', { name: account.label })); } catch (error) { state.proxy.lastError = error.message; renderProxy(); setStatus(t('accountLoginFailed'), true); } }
-async function loadKomootTours() { const account = state.accounts.find((item) => item.id === (el.komootAccountSelect.value || state.settings.activeAccountId)); if (!account) { setKomootStatus(t('accountRequired'), true); return; } state.settings.activeAccountId = account.id; await saveSettings(); if (!await checkProxy()) return; try { const hadCache = !!komootCacheForAccount(account.id)?.tours?.length; const previousSelection = new Set(state.selectedKomootTourIds); setKomootProgress(komootProgressText().loadingTours, 20, false); await ensureProxyAccountLogin(account); setKomootProgress(komootProgressText().loadingTours, 55, false); const payload = await proxyRequest('/tours'); setKomootProgress(komootProgressText().loadingTours, 100, false); state.komootTours = (payload.tours ?? []).map((tour) => normalizeKomootTourSummary(tour, account)); const validIds = new Set(state.komootTours.map((tour) => tour.id)); state.selectedKomootTourIds = new Set([...previousSelection].filter((tourId) => validIds.has(tourId))); await persistKomootCache(account.id); renderKomoot(); setKomootStatus(t(hadCache ? 'komootRefreshedSummary' : 'komootLoadedSummary', { count: state.komootTours.length })); window.setTimeout(clearKomootProgress, 500); } catch (error) { clearKomootProgress(); state.proxy.lastError = error.message; renderProxy(); setKomootStatus(error.message, true); } }
+/**
+ * Verifies Komoot credentials through the local proxy and persists a confirmed account.
+ * @returns {Promise<void>} Resolves after the account is stored or a validation result is shown.
+ */
+async function saveAccount() {
+  const email = el.accountEmailInput.value.trim();
+  const password = el.accountPasswordInput.value;
+  setAccountStatus('');
+
+  if (!email || !password) {
+    setAccountStatus(t('accountLoginFailed'));
+    return;
+  }
+
+  if (!await checkProxy()) {
+    setAccountStatus(state.proxy.lastError || t('proxyOffline'));
+    return;
+  }
+
+  try {
+    const payload = await proxyRequest('/login', { method: 'POST', body: { email, password } });
+    const current = state.accounts.find((account) => account.email.toLowerCase() === email.toLowerCase());
+    const account = { id: current?.id ?? id('account'), email, password, label: payload.user?.name || email.split('@')[0] || t('accountLabelFallback'), remoteUserId: payload.user?.id ?? null, updatedAt: new Date().toISOString() };
+    await put(STORES.accounts, account);
+    state.accounts = state.accounts.filter((item) => item.id !== account.id).concat(account).sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+    state.settings.activeAccountId = account.id;
+    await saveSettings();
+    el.accountDialog.close();
+    el.accountEmailInput.value = '';
+    el.accountPasswordInput.value = '';
+    renderAll();
+    setStatus(t('accountStored'));
+    setKomootStatus(t('connectedAs', { name: account.label }));
+  } catch (error) {
+    state.proxy.lastError = error.message;
+    renderProxy();
+    setAccountStatus(accountLoginFailureMessage(error));
+    setStatus(t('accountLoginFailed'), true);
+  }
+}
+/**
+ * Loads all tours for the selected legacy proxy account and retains valid selections.
+ * @returns {Promise<void>} Resolves once the list is rendered or an error is shown.
+ */
+async function loadKomootTours() {
+  const selectedAccountId = el.komootAccountSelect.value || state.settings.activeAccountId;
+  const account = state.accounts.find((item) => item.id === selectedAccountId);
+  if (!account) {
+    setKomootStatus(t('accountRequired'), true);
+    return;
+  }
+  state.settings.activeAccountId = account.id;
+  await saveSettings();
+  if (!await checkProxy()) return;
+  try {
+    const hadCache = !!komootCacheForAccount(account.id)?.tours?.length;
+    const previousSelection = new Set(state.selectedKomootTourIds);
+    setKomootProgress(komootProgressText().loadingTours, 20, false);
+    await ensureProxyAccountLogin(account);
+    setKomootProgress(komootProgressText().loadingTours, 55, false);
+    const payload = await proxyRequest('/tours');
+    setKomootProgress(komootProgressText().loadingTours, 100, false);
+    state.komootTours = (payload.tours ?? []).map((tour) => normalizeKomootTourSummary(tour, account));
+    const validIds = new Set(state.komootTours.map((tour) => tour.id));
+    state.selectedKomootTourIds = new Set([...previousSelection].filter((tourId) => validIds.has(tourId)));
+    await persistKomootCache(account.id);
+    renderKomoot();
+    let statusKey = 'komootLoadedSummary';
+    if (hadCache) statusKey = 'komootRefreshedSummary';
+    setKomootStatus(t(statusKey, { count: state.komootTours.length }));
+    window.setTimeout(clearKomootProgress, 500);
+  } catch (error) {
+    clearKomootProgress();
+    state.proxy.lastError = error.message;
+    renderProxy();
+    setKomootStatus(error.message, true);
+  }
+}
 async function importKomootSelection() { if (!state.komootTours.length) { setKomootStatus(t('loadToursFirst'), true); return; } const ids = [...state.selectedKomootTourIds]; if (!ids.length) { setKomootStatus(t('selectToursFirst'), true); return; } const account = activeAccount(); if (!account) { setKomootStatus(t('accountRequired'), true); return; } if (!await checkProxy()) return; try { setKomootProgress(komootProgressText().importing, 15, false); await ensureProxyAccountLogin(account); setKomootProgress(komootProgressText().importing, 35, false); const payload = await proxyRequest('/import', { method: 'POST', body: { language: lang(), tourIds: ids } }); setKomootProgress(komootProgressText().importing, 80, false); const toursById = new Map(state.komootTours.map((tour) => [tour.id, tour])); const records = payload.items.map((item) => { const summary = toursById.get(item.id); return buildTrackRecord({ gpxText: item.gpx, fileName: item.fileName, source: 'komoot', type: summary?.type || 'unknown', account: { ...account, sourceTrackId: item.id }, description: item.description || null, photos: item.photos || null, meta: { dateStart: item.dateStart || summary?.dateStart || summary?.date || null, durationHours: item.durationHours ?? null, sport: item.sport || summary?.sport || null, surfaces: item.surfaces || null, wayTypes: item.wayTypes || null, surfaceSegments: item.surfaceSegments || null, wayTypeSegments: item.wayTypeSegments || null, directions: item.directions || null } }); }); const result = await importTrackRecords(records, true); setKomootProgress(komootProgressText().done, 100, false); setKomootStatus(t('komootImported', { count: result.imported })); window.setTimeout(clearKomootProgress, 500); } catch (error) { clearKomootProgress(); state.proxy.lastError = error.message; renderProxy(); setKomootStatus(error.message, true); } }
 
 function downloadBlob(name, blob) { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); URL.revokeObjectURL(url); }
@@ -3883,7 +6051,20 @@ async function readJsonFile(file) {
   const stream = file.stream().pipeThrough(new DecompressionStream('gzip'));
   return JSON.parse(await new Response(stream).text());
 }
-function exportAppBackup() { downloadJson(t('backupFileName'), { kind: 'gpx-bibliothek-backup', version: 1, appVersion: CURRENT_VERSION_INFO.appVersion, cacheVersion: CURRENT_VERSION_INFO.cacheVersion, exportedAt: new Date().toISOString(), settings: state.settings, accounts: state.accounts }); }
+/**
+ * Exports application settings without the retired password-based connector data.
+ * @returns {void} Starts the local JSON download.
+ */
+function exportAppBackup() {
+  downloadJson(t('backupFileName'), {
+    kind: 'gpx-bibliothek-backup',
+    version: 1,
+    appVersion: CURRENT_VERSION_INFO.appVersion,
+    cacheVersion: CURRENT_VERSION_INFO.cacheVersion,
+    exportedAt: new Date().toISOString(),
+    settings: state.settings
+  });
+}
 async function exportTracksBackup(tracks, fileName) {
   const serializedTracks = [];
   for (const track of tracks) serializedTracks.push(await serializeTrackForBackup(track));
@@ -3902,7 +6083,21 @@ async function exportSelectedTourBackup() {
   await exportTracksBackup(tracks, timestampedBackupFileName(t('selectedTourBackupFileName')));
   setStatus(t('exportSelectedTourBackupDone', { count: tracks.length }));
 }
-async function importAppBackup(file) { if (!await confirmAction(t('confirmImportBackup'))) return; const payload = await readJsonFile(file); if (payload.kind !== 'gpx-bibliothek-backup' || !Array.isArray(payload.accounts)) throw new Error(t('invalidBackup')); const merged = new Map(state.accounts.map((account) => [account.email.toLowerCase(), account])); payload.accounts.forEach((account) => merged.set(account.email.toLowerCase(), { ...account, id: account.id || id('account'), updatedAt: account.updatedAt || new Date().toISOString() })); state.accounts = [...merged.values()].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')); await putMany(STORES.accounts, state.accounts); state.settings = { ...state.settings, ...(payload.settings ?? {}) }; await saveSettings(); renderAll(); setStatus(t('backupImported')); }
+/**
+ * Imports application settings while discarding retired account and proxy fields from older backups.
+ * @param {File} file Selected Trailthread application backup.
+ * @returns {Promise<void>} Resolves after sanitized settings have been stored.
+ */
+async function importAppBackup(file) {
+  if (!await confirmAction(t('confirmImportBackup'))) return;
+  const payload = await readJsonFile(file);
+  if (payload.kind !== 'gpx-bibliothek-backup') throw new Error(t('invalidBackup'));
+  state.settings = { ...state.settings, ...(payload.settings ?? {}) };
+  await deactivateLegacyProxyConnector();
+  await saveSettings();
+  renderAll();
+  setStatus(t('backupImported'));
+}
 async function importTourBackup(file) { if (!await confirmAction(t('confirmImportTours'))) return; const payload = await readJsonFile(file); if (payload.kind !== 'gpx-bibliothek-touren' || !Array.isArray(payload.tracks)) throw new Error(t('invalidBackup')); await importTourBackupRecords(payload.tracks); }
 async function shareApp() {
   const payload = { title: 'Trailthread', text: t('shareAppText'), url: APP_SHARE_URL };
@@ -3933,9 +6128,67 @@ async function shareApp() {
     setStatus(t('shareUnavailable'), true);
   }
 }
-function selectAllKomootTours(listName) { const ids = state.komootTours.filter((tour) => tour.type === listName).map((tour) => tour.id); const allSelected = ids.length > 0 && ids.every((tourId) => state.selectedKomootTourIds.has(tourId)); const container = listName === 'recorded' ? el.recordedList : el.plannedList; if (allSelected) { ids.forEach((tourId) => state.selectedKomootTourIds.delete(tourId)); } else { ids.forEach((tourId) => state.selectedKomootTourIds.add(tourId)); } container?.querySelectorAll('.tour-item').forEach((item) => { const tourId = item.getAttribute('data-tour-id') || ''; const checked = state.selectedKomootTourIds.has(tourId); item.classList.toggle('is-selected', checked); const checkbox = item.querySelector('.tour-checkbox'); if (checkbox) checkbox.checked = checked; }); renderKomootSelectionUi(); void persistKomootCache(state.settings.activeAccountId); }
+/**
+ * Toggles all tours in one Komoot list and synchronizes the visible checkboxes.
+ * @param {'recorded'|'planned'} listName Type of Komoot tour list to toggle.
+ * @returns {void}
+ */
+function selectAllKomootTours(listName) {
+  const ids = state.komootTours.filter((tour) => tour.type === listName).map((tour) => tour.id);
+  const allSelected = ids.length > 0 && ids.every((tourId) => state.selectedKomootTourIds.has(tourId));
+  let container = el.plannedList;
+  if (listName === 'recorded') container = el.recordedList;
+  if (allSelected) ids.forEach((tourId) => state.selectedKomootTourIds.delete(tourId));
+  else ids.forEach((tourId) => state.selectedKomootTourIds.add(tourId));
+  container?.querySelectorAll('.tour-item').forEach((item) => {
+    const tourId = item.getAttribute('data-tour-id') || '';
+    const checked = state.selectedKomootTourIds.has(tourId);
+    item.classList.toggle('is-selected', checked);
+    const checkbox = item.querySelector('.tour-checkbox');
+    if (checkbox) checkbox.checked = checked;
+  });
+  renderKomootSelectionUi();
+  void persistKomootCache(state.settings.activeAccountId);
+}
 
-async function loadState() { state.db = await openDb(); const storedTracks = (await all(STORES.tracks)).map((track) => { const surfaceSegments = normalizeRangeSegments(track.surfaceSegments); const wayTypeSegments = normalizeRangeSegments(track.wayTypeSegments); return enrichTrackMetrics({ ...track, description: normalizeTrackDescription(track.description), dateStart: normalizeTrackDate(track.dateStart), surfaces: normalizeTagList(track.surfaces).length ? normalizeTagList(track.surfaces) : segmentValues(surfaceSegments), wayTypes: normalizeTagList(track.wayTypes).length ? normalizeTagList(track.wayTypes) : segmentValues(wayTypeSegments), surfaceSegments, wayTypeSegments, photos: normalizePhotos(track.photos), color: track.color || defaultTrackColor(track), lastChanged: trackLastChanged(track) || track.importedAt || isoNow(), favorite: !!track.favorite, tags: normalizeTagList(track.tags), directions: normalizeDirections(track.directions) }); }).sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? '')); state.tracks = await hydrateTracksPhotos(storedTracks); state.accounts = (await all(STORES.accounts)).sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')); const settings = await all(STORES.settings); state.settings = { ...state.settings, ...(settings[0] ?? {}), komootCaches: { ...(settings[0]?.komootCaches ?? {}) } }; if (!['library', 'komoot', 'replay'].includes(state.settings.activeWorkspace)) state.settings.activeWorkspace = 'library'; applyPaneWidths(); if (!state.settings.activeAccountId && state.accounts[0]) { state.settings.activeAccountId = state.accounts[0].id; await saveSettings(); } const activeKomootAccount = state.accounts.find((account) => account.id === state.settings.activeAccountId) ?? state.accounts[0] ?? null; if (activeKomootAccount) restoreKomootCache(activeKomootAccount); }
+/**
+ * Loads tracks and settings, then removes retired password-based connector data from IndexedDB.
+ * @returns {Promise<void>} Resolves when sanitized state is ready for rendering.
+ */
+async function loadState() {
+  state.db = await openDb();
+  const storedTracks = (await all(STORES.tracks)).map((track) => {
+    const surfaceSegments = normalizeRangeSegments(track.surfaceSegments);
+    const wayTypeSegments = normalizeRangeSegments(track.wayTypeSegments);
+    let surfaces = normalizeTagList(track.surfaces);
+    let wayTypes = normalizeTagList(track.wayTypes);
+    if (!surfaces.length) surfaces = segmentValues(surfaceSegments);
+    if (!wayTypes.length) wayTypes = segmentValues(wayTypeSegments);
+    return enrichTrackMetrics({
+      ...track,
+      description: normalizeTrackDescription(track.description),
+      dateStart: normalizeTrackDate(track.dateStart),
+      surfaces,
+      wayTypes,
+      surfaceSegments,
+      wayTypeSegments,
+      photos: normalizePhotos(track.photos),
+      color: track.color || defaultTrackColor(track),
+      lastChanged: trackLastChanged(track) || track.importedAt || isoNow(),
+      favorite: !!track.favorite,
+      tags: normalizeTagList(track.tags),
+      directions: normalizeDirections(track.directions)
+    });
+  }).sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? ''));
+  state.tracks = await hydrateTracksPhotos(storedTracks);
+  const settings = await all(STORES.settings);
+  state.settings = { ...state.settings, ...(settings[0] ?? {}) };
+  await deactivateLegacyProxyConnector();
+  if (!['library', 'replay'].includes(state.settings.activeWorkspace)) state.settings.activeWorkspace = 'library';
+  applyPaneWidths();
+  await saveSettings();
+}
+
 function bindEvents() {
   el.workspaceButtons.forEach((button) => button.addEventListener('click', async () => {
     state.settings.activeWorkspace = button.dataset.workspace;
@@ -3948,24 +6201,12 @@ function bindEvents() {
       }
     }
     renderWorkspace();
-    if (state.settings.activeWorkspace === 'komoot') await checkProxy();
     if (state.settings.activeWorkspace === 'replay') renderReplayWorkspace();
   }));
   el.settingsButton.addEventListener('click', () => el.settingsDialog.showModal());
   el.helpButton?.addEventListener('click', () => {
     el.helpDialog.showModal();
     void loadReadmeContent();
-  });
-  el.onboardingKomootButton?.addEventListener('click', async () => {
-    state.settings.activeWorkspace = 'komoot';
-    await saveSettings();
-    renderWorkspace();
-    await checkProxy();
-  });
-  el.onboardingReplayButton?.addEventListener('click', async () => {
-    const candidate = replayCandidateTrack();
-    if (!candidate) return;
-    await openReplayTrack(candidate.id);
   });
   el.replayJumpStartButton?.addEventListener('click', () => jumpReplayTo('start'));
   el.replayJumpHighButton?.addEventListener('click', () => jumpReplayTo('highest'));
@@ -3995,7 +6236,10 @@ function bindEvents() {
     scheduleMapLayoutRefresh();
   });
   document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => document.getElementById(button.dataset.closeDialog)?.close()));
-  el.addAccountButton.addEventListener('click', () => el.accountDialog.showModal());
+  el.addAccountButton.addEventListener('click', () => {
+    setAccountStatus('');
+    el.accountDialog.showModal();
+  });
   el.saveAccountButton.addEventListener('click', saveAccount);
   el.trackDetailEditButton?.addEventListener('click', () => {
     state.trackDetailUi.editing = true;
@@ -4016,7 +6260,10 @@ function bindEvents() {
     const nextTags = parseTagInput(el.trackDetailTagsInput?.value);
     const updatedTrack = touchTrack(track, { name: nextName, description: nextDescription || '', favorite: nextFavorite, tags: nextTags });
     await put(STORES.tracks, updatedTrack);
-    state.tracks = state.tracks.map((item) => item.id === updatedTrack.id ? updatedTrack : item);
+    state.tracks = state.tracks.map((item) => {
+      if (item.id === updatedTrack.id) return updatedTrack;
+      return item;
+    });
     state.trackDetailUi.editing = false;
     renderAll();
     renderTrackDetailDialog();
@@ -4040,6 +6287,12 @@ function bindEvents() {
   el.librarySortSelect.addEventListener('change', refreshLibraryFilterView);
   el.exportSelectedGpxButton.addEventListener('click', exportSelectedTracksGpx);
   el.exportSelectedMultiTrackGpxButton?.addEventListener('click', exportSelectedTracksMultiGpx);
+  el.exportSelectedKmzButton?.addEventListener('click', () => {
+    void exportSelectedTracksKmz('compatibility');
+  });
+  el.exportSelectedKmzProButton?.addEventListener('click', () => {
+    void exportSelectedTracksKmz('photo-overlay');
+  });
   el.mergeSelectedTracksButton?.addEventListener('click', openMergeDialog);
   el.mergeDialogSwapButton?.addEventListener('click', () => {
     if (state.mergeUi.orderedTrackIds.length !== 2) return;
@@ -4093,7 +6346,9 @@ function bindEvents() {
     renderMapSegmentButton();
     syncMap();
     renderProfile();
-    setStatus(state.settings.segmentOverlayMode ? t('mapSegments') : t('statusReady'));
+    let segmentStatus = t('statusReady');
+    if (state.settings.segmentOverlayMode) segmentStatus = t('mapSegments');
+    setStatus(segmentStatus);
   });
   el.prevTrackButton?.addEventListener('click', () => stepTrackSelection(-1));
   el.nextTrackButton?.addEventListener('click', () => stepTrackSelection(1));
@@ -4217,7 +6472,8 @@ function bindEvents() {
     if (sample) updateProfileHover(sample);
   });
   el.profileChart?.addEventListener('click', (event) => {
-    const photoMarker = event.target instanceof Element ? event.target.closest('.profile-photo-marker') : null;
+    let photoMarker = null;
+    if (event.target instanceof Element) photoMarker = event.target.closest('.profile-photo-marker');
     const track = state.tracks.find((item) => item.id === state.profileUi.trackId);
     if (photoMarker && track) {
       const index = Number(photoMarker.getAttribute('data-photo-index'));
@@ -4229,7 +6485,8 @@ function bindEvents() {
   });
   el.profileChart?.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
-    const photoMarker = event.target instanceof Element ? event.target.closest('.profile-photo-marker') : null;
+    let photoMarker = null;
+    if (event.target instanceof Element) photoMarker = event.target.closest('.profile-photo-marker');
     const track = state.tracks.find((item) => item.id === state.profileUi.trackId);
     if (!photoMarker || !track) return;
     event.preventDefault();
@@ -4239,7 +6496,8 @@ function bindEvents() {
   el.profileChart?.addEventListener('pointerleave', clearProfileHover);
   el.photoDialogPrev?.addEventListener('click', () => stepPhotoDialog(-1));
   el.photoDialogNext?.addEventListener('click', () => stepPhotoDialog(1));
-  el.photoDialogClose?.addEventListener('click', () => el.photoDialog.close());
+  el.photoDialogClose?.addEventListener('click', closePhotoDialog);
+  el.photoDialogFullscreenButton?.addEventListener('click', () => void togglePhotoDialogFullscreen());
   el.photoDialogStage?.addEventListener('pointerdown', (event) => {
     state.photoDialogUi.swipeStartX = event.clientX;
   });
@@ -4248,23 +6506,24 @@ function bindEvents() {
     const delta = event.clientX - state.photoDialogUi.swipeStartX;
     state.photoDialogUi.swipeStartX = null;
     if (Math.abs(delta) < 40) return;
-    stepPhotoDialog(delta < 0 ? 1 : -1);
+    let direction = -1;
+    if (delta < 0) direction = 1;
+    stepPhotoDialog(direction);
   });
   el.photoDialog?.addEventListener('click', (event) => {
-    if (event.target === el.photoDialog) el.photoDialog.close();
+    if (event.target === el.photoDialog) closePhotoDialog();
   });
-  el.photoDialog?.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      stepPhotoDialog(-1);
-    }
-    if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      stepPhotoDialog(1);
-    }
-  });
+  document.addEventListener('keydown', handlePhotoDialogKeyboard);
   el.photoDialog?.addEventListener('close', () => {
     state.photoDialogUi.swipeStartX = null;
+    void exitPhotoDialogFullscreen();
+  });
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement !== el.photoDialogSheet) {
+      el.photoDialogSheet?.classList.remove('is-fullscreen');
+      el.photoDialog?.classList.remove('is-fullscreen');
+    }
+    renderPhotoDialogFullscreenControl();
   });
   state.map?.on('click', () => {
     setHighlightedTrack(null);
@@ -4296,6 +6555,6 @@ async function registerServiceWorker() {
     setUpdateStatus(t('statusSwRegisterFailed', { message: error.message }), false, true);
   }
 }
-async function init() { await loadState(); applyPaneWidths(); renderI18n(); initMap(); bindEvents(); renderAll(); syncMap(); fitSelection(); scheduleMapLayoutRefresh(); setStatus(t('statusReady')); setKomootStatus(t('statusProxyRequired')); await registerServiceWorker(); if (state.settings.activeWorkspace === 'komoot') await checkProxy(); }
+async function init() { await loadState(); applyPaneWidths(); renderI18n(); applyKomootExtensionConfiguration(); initMap(); bindEvents(); renderAll(); syncMap(); fitSelection(); scheduleMapLayoutRefresh(); setStatus(t('statusReady')); await registerServiceWorker(); }
 init().catch((error) => { console.error(error); setStatus(error.message || t('statusError'), true); });
 

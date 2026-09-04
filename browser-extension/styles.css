@@ -1,0 +1,47 @@
+.trailthread-komoot-toolbar {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2147483647;
+  display: grid;
+  gap: 8px;
+  width: min(330px, calc(100vw - 40px));
+  padding: 16px;
+  border: 1px solid #1c493e;
+  border-radius: 14px;
+  color: #ecfff6;
+  background: #0e2620;
+  box-shadow: 0 16px 50px rgb(0 0 0 / 32%);
+  font: 14px/1.35 system-ui, sans-serif;
+}
+
+.trailthread-komoot-title { font-size: 17px; }
+.trailthread-komoot-summary, .trailthread-komoot-status { color: #bbd8cd; }
+.trailthread-komoot-status { height: 6.75em; margin: 0; overflow-y: auto; }
+.trailthread-komoot-download-gpx, .trailthread-komoot-download-backup, .trailthread-komoot-load-all, .trailthread-komoot-select-all, .trailthread-komoot-cancel {
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #062018;
+  background: #71e3b5;
+  font: inherit;
+  font-weight: 700;
+}
+
+.trailthread-komoot-load-all, .trailthread-komoot-select-all, .trailthread-komoot-cancel { color: #ecfff6; background: #30554a; }
+.trailthread-komoot-download-gpx:disabled, .trailthread-komoot-download-backup:disabled, .trailthread-komoot-load-all:disabled, .trailthread-komoot-select-all:disabled { cursor: not-allowed; opacity: .45; }
+.trailthread-komoot-selection {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  margin: 6px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  color: #062018;
+  background: #71e3b5;
+  font: 12px/1.2 system-ui, sans-serif;
+}

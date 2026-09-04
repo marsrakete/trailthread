@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Trailthread Komoot Exporthelfer",
+  "version": "0.1.65",
+  "description": "Ergänzt eigene Komoot-Tourlisten um eine lokale Auswahl und erstellt Trailthread-Sicherungen mit GPX und Bildern.",
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "permissions": ["tabs", "downloads"],
+  "host_permissions": ["https://www.komoot.com/*", "https://komoot.com/*", "https://www.komoot.de/*", "https://komoot.de/*", "https://api.komoot.de/*", "https://*.komoot.net/*", "https://d2exd72xrrp1s7.cloudfront.net/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Trailthread Komoot",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.komoot.com/*", "https://komoot.com/*", "https://www.komoot.de/*", "https://komoot.de/*"],
+      "js": ["content-komoot.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

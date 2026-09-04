@@ -1,7 +1,7 @@
 {
   "name": "Trailthread",
   "short_name": "Trailthread",
-  "description": "Trailthread fuer grosse Displays mit GPX-Bibliothek, Komoot-Workspace, Replay und Touren-Backups.",
+  "description": "Trailthread für große Displays mit GPX-Bibliothek, Komoot-Workspace, Replay und Touren-Backups.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0b1413",

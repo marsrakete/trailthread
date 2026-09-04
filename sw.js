@@ -7,6 +7,7 @@ const APP_SHELL = [
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./config.js",
   "./version.js",
   "./manifest.json",
   "./README.md",
@@ -47,6 +48,15 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(request.url);
   const sameOrigin = requestUrl.origin === self.location.origin;
+  const isExternalMapResource = requestUrl.origin === "https://tile.openstreetmap.org"
+    || requestUrl.origin === "https://a.tile.openstreetmap.org"
+    || requestUrl.origin === "https://tiles.mapterhorn.com";
+  const isLocalProxyResource = requestUrl.origin === "http://localhost:8787";
+
+  if (isExternalMapResource || isLocalProxyResource) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   if (sameOrigin && requestUrl.pathname.endsWith("/version.js")) {
     event.respondWith(

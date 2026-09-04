@@ -14,12 +14,27 @@ if (-not $phpCommand) {
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $router = Join-Path $root "start-komoot-proxy.php"
+$caBundlePath = "C:\PHP\extras\ssl\cacert.pem"
+
+$phpArguments = @()
+if (Test-Path $caBundlePath -PathType Leaf) {
+  $phpArguments += "-d"
+  $phpArguments += "curl.cainfo=$caBundlePath"
+  $phpArguments += "-d"
+  $phpArguments += "openssl.cafile=$caBundlePath"
+  Write-Host "TLS-CA-Bundle: $caBundlePath"
+} else {
+  Write-Warning "Kein TLS-CA-Bundle unter $caBundlePath gefunden. HTTPS-Logins bei Komoot können fehlschlagen."
+}
 
 $env:KOMOOT_PROXY_PORT = "$Port"
 $env:KOMOOT_PROXY_MODE = $Mode
 $env:KOMOOT_PROXY_DEBUG = if ($DebugLog) { "1" } else { "0" }
 
-Write-Host "TrailCanvas Komoot Proxy (PHP) laeuft auf http://localhost:$Port/ (mode: $Mode)"
-Write-Host "Zum Beenden Strg+C druecken."
+Write-Host "TrailCanvas Komoot Proxy (PHP) läuft auf http://localhost:$Port/ (mode: $Mode)"
+Write-Host "Zum Beenden Strg+C drücken."
 
-& $phpCommand.Source -S "localhost:$Port" $router
+$phpArguments += "-S"
+$phpArguments += "localhost:$Port"
+$phpArguments += $router
+& $phpCommand.Source @phpArguments

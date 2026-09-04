@@ -119,6 +119,24 @@ function basic_auth_headers(string $user, string $password): array
     return ['Authorization: Basic ' . base64_encode($user . ':' . $password)];
 }
 
+/**
+ * Maps known upstream client errors to their original HTTP response status.
+ *
+ * @param Throwable $error The exception raised while handling a proxy request.
+ * @return int The HTTP status sent back to the browser.
+ */
+function proxy_error_status(Throwable $error): int
+{
+    $message = $error->getMessage();
+    if ($message === 'Not logged in') {
+        return 401;
+    }
+    if (preg_match('/^HTTP (4\\d\\d)$/', $message, $matches)) {
+        return (int) $matches[1];
+    }
+    return 500;
+}
+
 function request_json(string $url, array $headers = []): array
 {
     log_debug("Upstream GET $url");
@@ -379,7 +397,7 @@ function real_cover_images(array $session, string $tourId): array
 function description_locale(string $language): array
 {
     if (str_starts_with($language, 'de')) {
-        return ['locale' => 'de_DE', 'distance' => 'Distanz', 'duration' => 'Geschaetzte Dauer', 'up' => 'Hoehenmeter bergauf', 'down' => 'Hoehenmeter bergab'];
+        return ['locale' => 'de_DE', 'distance' => 'Distanz', 'duration' => 'Geschätzte Dauer', 'up' => 'Höhenmeter bergauf', 'down' => 'Höhenmeter bergab'];
     }
     if (str_starts_with($language, 'fr')) {
         return ['locale' => 'fr_FR', 'distance' => 'Distance', 'duration' => 'Duree estimee', 'up' => 'Denivele positif', 'down' => 'Denivele negatif'];
@@ -663,5 +681,5 @@ try {
     }
 } catch (Throwable $e) {
     log_debug('Request failed on ' . $path . ' :: ' . $e->getMessage(), 'ERROR');
-    json_response(['ok' => false, 'mode' => $mode, 'error' => $e->getMessage()], $e->getMessage() === 'Not logged in' ? 401 : 500);
+    json_response(['ok' => false, 'mode' => $mode, 'error' => $e->getMessage()], proxy_error_status($e));
 }

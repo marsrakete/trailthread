@@ -1,0 +1,17 @@
+:root {
+  color: #ecfff6;
+  background: #0e2620;
+  font: 14px/1.4 system-ui, sans-serif;
+}
+
+body { margin: 0; min-width: 300px; }
+.popup-card { display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 10px; box-sizing: border-box; width: 320px; height: 310px; padding: 16px; }
+.popup-intro, .popup-hint { margin: 0; color: #bbd8cd; }
+.popup-hint { font-size: 12px; }
+.popup-progress { display: grid; grid-template-rows: 1fr auto auto; gap: 8px; min-height: 0; margin: 0; }
+.popup-progress div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px; min-height: 20px; }
+.popup-progress dt { color: #8fb8aa; }
+.popup-progress dd { margin: 0; overflow-wrap: anywhere; }
+.popup-status { overflow-y: auto; }
+.popup-cancel { border: 1px solid #5e9785; border-radius: 8px; padding: 8px 10px; color: #ecfff6; background: #30554a; font: inherit; cursor: pointer; }
+.popup-cancel:hover { background: #3d695c; }

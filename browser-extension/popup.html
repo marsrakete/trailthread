@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="popup.css">
+    <title>Trailthread Komoot</title>
+  </head>
+  <body>
+    <main id="popup-root"></main>
+    <template id="trailthread-komoot-popup-template">
+      <section class="popup-card">
+        <strong>Trailthread Komoot</strong>
+        <p class="popup-intro">Die Exportleiste erscheint direkt auf Komoot-Tourlisten und Tourseiten.</p>
+        <dl class="popup-progress" aria-live="polite">
+          <div>
+            <dt>Status</dt>
+            <dd class="popup-status">Prüfe den aktiven Tab …</dd>
+          </div>
+          <div>
+            <dt>Fortschritt</dt>
+            <dd class="popup-count">Kein Export aktiv.</dd>
+          </div>
+          <div>
+            <dt>Tour</dt>
+            <dd class="popup-tour">–</dd>
+          </div>
+        </dl>
+        <button class="popup-cancel" type="button" hidden>Export abbrechen</button>
+        <p class="popup-hint">Die Erweiterung lädt GPX-Dateien und Bilder im Hintergrund. Deshalb erscheinen diese Anfragen nicht zwingend in der Netzwerk-Konsole der Komoot-Seite.</p>
+      </section>
+    </template>
+    <script src="popup.js"></script>
+  </body>
+</html>
