@@ -6,7 +6,7 @@ Diese Liste sammelt nächste sinnvolle Ausbaustufen für Trailthread. Sie ist be
 
 - `erledigt`: Heatmap
 - `erledigt`: Directions übersetzen
-- `offen`: Abgleich Gemacht / Geplant
+- `offen`: Abgleich Geplant / Gemacht
 - `offen`: Animierter Verlauf im aktiven Track
 - `offen`: Strava Anbindung für Import und Upload
 
@@ -29,8 +29,9 @@ Die Browser-Erweiterung ist der aktuelle Komoot-Weg. Die ältere Proxy-Anbindung
 ## Code-Aufräumen Nach AGENTS-Review
 
 - `erledigt`: Die sichtbaren KML/KMZ-Importfehler wurden aus dem Datenpfad in `translations.js` ausgelagert und für Deutsch, Englisch und Französisch ergänzt.
+- `erledigt`: Die Analyse in der Track-Großansicht wird über `<template>`-Fragmente und `textContent` gerendert; der Höhenprofil-SVG-Pfad nutzt strukturierte SVG-Knoten.
 - `offen`: Die besonders langen, kompakten Bereiche in [app.js](/C:/Projekte/trailthread/app.js:42) und den Render-/Event-Handlern in kleine, klar abgegrenzte Funktionen aufteilen. Dabei verschachtelte Ternaries und Einzeiler schrittweise durch lesbare `if`/`else`-Blöcke ersetzen.
-- `offen`: Wiederkehrende UI-Markups, die in JavaScript als große HTML-Strings erzeugt werden, auf vorhandene `<template>`-Elemente oder strukturierte DOM-Erzeugung umstellen. XML-Serialisierung für KML/KMZ bleibt davon ausgenommen.
+- `offen`: Verbleibende UI-HTML-Zusammenbauten prüfen und wiederkehrende Oberflächen auf vorhandene `<template>`-Elemente oder strukturierte DOM-Erzeugung umstellen. XML-Serialisierung für KML/KMZ sowie kontrolliertes Markdown/Mermaid-Rendering bleiben davon ausgenommen.
 
 ## Nächste Ideen
 
@@ -47,12 +48,12 @@ Nutzen:
 - Wiederholte Lieblingsrouten werden sofort sichtbar
 - Viel genutzte Korridore und Hotspots lassen sich leichter erkennen
 
-### 2. Abgleich Gemacht / Geplant `offen`
+### 2. Abgleich Geplant / Gemacht `offen`
 
-Geplante und gemachte Tracks derselben Runde sollen besser miteinander verglichen werden können.
+Geplante und gemachte Tracks derselben Runde sollen unabhängig von ihrer Importquelle besser miteinander verglichen werden können. Komoot-Verknüpfungen können dabei später als zusätzlicher Hinweis dienen, sind aber keine Voraussetzung.
 
 Mögliche Richtung:
-- passende geplante und gemachte Runde automatisch erkennen
+- passende geplante und gemachte Runde aus GPX-, FIT-, Komoot-, Strava- oder anderen importierten Tracks automatisch erkennen
 - Start, Ziel, Distanz und Streckenverlauf vergleichen
 - Abweichungen sichtbar machen
 
@@ -81,6 +82,7 @@ Mögliche Richtung:
 - animierter Flow entlang des aktiven Tracks
 - dezente Bewegung statt unruhiger Effekte
 - nur für den gerade hervorgehobenen Track
+- Geschwindigkeitsstufen im Replay prüfen: `1×` soll bei zeitbasierten Aufzeichnungen Echtzeit bedeuten; schnellere Stufen bauen darauf auf
 
 Nutzen:
 - Aktiver Track hebt sich klarer von anderen ab
@@ -101,9 +103,25 @@ Nutzen:
 - Einfacherer Austausch zwischen Trailthread und Strava
 - Spannender Ausbaupfad für Import, Export und späteren Sync
 
-### 6. FIT-Sensordaten Zu Bestehendem Track Ergänzen `offen`
+### 6. FIT-Dateien Importieren Und Exportieren `offen`
 
-Zeitgleich zu einer Komoot-Tour aufgezeichnete FIT-Dateien sollen gezielt Messwerte an einen bestehenden Trailthread-Track ergänzen können.
+FIT-Aufzeichnungen sollen zunächst wie GPX als eigenständige Trailthread-Tracks importiert und wieder als standardkonforme FIT-Aktivität exportiert werden.
+
+Mögliche Richtung:
+- lokal gebündelten, offlinefähigen FIT-Decoder und -Encoder verwenden
+- FIT-Dateien mit mindestens zwei GPS-Records als Karte und Track importieren
+- FIT-Dateien ohne ausreichend Positionsdaten klar als nicht importierbare Sensor- oder Indoor-Aufzeichnung melden
+- Zeit, Höhe sowie vorhandene Kadenz, Temperatur und Herzfrequenz in BPM im Track erhalten
+- ausgewählte Trailthread-Tracks mit Geometrie als FIT-Aktivität exportieren
+- FIT-Bibliothek, Lizenzhinweis und PWA-Cache versioniert mitliefern
+
+Nutzen:
+- Garmin-, Polar-, Suunto- und ähnliche FIT-Aufzeichnungen werden ohne GPX-Zwischenschritt nutzbar
+- Trailthread bleibt bei Import und Export vollständig offlinefähig
+
+### 7. FIT-Sensordaten Zu Bestehendem Track Ergänzen `offen`
+
+Zeitgleich zu einer Komoot-Tour aufgezeichnete FIT-Dateien sollen in einem zweiten Schritt gezielt Messwerte an einen bestehenden Trailthread-Track ergänzen können.
 
 Mögliche Richtung:
 - FIT-Datei an einem ausgewählten vorhandenen Track importieren, ohne dessen GPX-Geometrie zu ersetzen
@@ -117,6 +135,22 @@ Nutzen:
 - Komoot-Track bleibt die Routenbasis, FIT liefert die fehlenden Sensorwerte
 - Fahrraddaten aus Garmin und ähnlichen Geräten werden ohne vollständigen Track-Neuimport nutzbar
 - Nutzer behalten die Kontrolle darüber, welche persönlichen Gesundheits- und Leistungsdaten gespeichert werden
+
+### 8. Fotos Zu Bestehendem Track Hinzufuegen `offen`
+
+Lokale Bilddateien sollen gezielt zu einem vorhandenen Trailthread-Track hochgeladen und anhand ihrer EXIF-GPS-Daten auf der Route positioniert werden.
+
+Mögliche Richtung:
+- Fotos im Bearbeiten-Modus eines Tracks auswählen und lokal in der Browserdatenbank speichern
+- EXIF-GPS-Koordinaten und Aufnahmezeit aus JPEG- und vergleichbaren Bilddateien auslesen
+- Foto am naechstgelegenen Trackpunkt positionieren und als Kartenpunkt sowie im Hoehenprofil anzeigen
+- Abstand zwischen Foto-Position und Route berechnen und bei deutlicher Abweichung vor der Übernahme warnen
+- bei fehlenden Geo-Daten eine manuelle Positionierung auf der Karte anbieten
+- Originalbild, EXIF-Metadaten und die zugeordnete Trackposition im Touren-Backup erhalten
+
+Nutzen:
+- Eigene Fotos koennen auch ohne Komoot-Import sinnvoll mit einer Tour verbunden werden
+- Fehlplatzierte oder ungenaue GPS-Daten werden sichtbar, statt unbemerkt falsche POIs zu erzeugen
 
 ## Hinweis
 

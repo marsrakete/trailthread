@@ -40,7 +40,7 @@ Wichtig für den Unterschied zwischen normalem GPX-Export und Trailthread-Backup
 - Ein GPX enthält üblicherweise Trackpunkte, Zeit, Höhe und einfache Metadaten.
 - Fotos werden dabei normalerweise nicht in die GPX-Datei eingebettet.
 - Eigene Tags haben in GPX ebenfalls keinen einheitlichen Standardplatz pro Track.
-- Genau deshalb gibt es in Trailthread zusätzlich das Touren-Backup: Es bewahrt auch Fotos, Beschreibungen, eigene Tags und weitere App-Daten eines Tracks.
+- Genau deshalb gibt es in Trailthread zusätzlich das Touren-Backup: Es bewahrt auch Fotos, Beschreibungen, eigene Tags und weitere App-Daten eines Tracks. Einzelne Fotos lassen sich in der Track-Großansicht im Bearbeiten-Modus samt ihrem Kartenpunkt zum Löschen vormerken und erst mit Speichern löschen.
 - Bei Komoot-Importen bleiben auch die rohen Timeline-Daten erhalten. Trailthread zeigt daraus lesbare Hinweise und setzt Marker nur für Einträge mit Koordinate oder eindeutigem Distanzbezug zum Track.
 
 App-Backup:
@@ -84,6 +84,7 @@ Der Bibliotheksbutton `Wegtypen aus OSM analysieren` fragt bei Bedarf nur Wege m
 - `app.js` und `sw.js` lesen `appVersion`, `cacheVersion` und Label aus dieser einen Datei.
 - In den Einstellungen zeigt der Bereich `Aktualisierungen` die lokale Version an und kann eine neuere `version.js` per `cache: "no-cache"` prüfen.
 - Wenn `appVersion` oder `cacheVersion` abweichen, wird ein Reload angeboten, damit die neue Offline-Version aktiv wird.
+- `node scripts/check-version.js` prüft die Versionsformate sowie die Lade- und Cache-Kopplung von `version.js`, `index.html`, `app.js` und `sw.js`.
 
 ## UTF-8-Prüfung
 
@@ -93,7 +94,7 @@ Der Bibliotheksbutton `Wegtypen aus OSM analysieren` fragt bei Bedarf nur Wege m
 
 ## Historischer Komoot-Proxy
 
-Der PHP-Proxy und die beiden PowerShell-Skripte bleiben als historische Referenz im Repository. Sie sind **obsolet** und werden von Trailthread nicht mehr gestartet, angesprochen oder mit Zugangsdaten versorgt. Die aktive Komoot-Integration ist ausschließlich die Browser-Erweiterung.
+Der PHP-Proxy und die beiden PowerShell-Skripte liegen als historische Referenz unter `archiv/`. Sie sind **obsolet** und werden von Trailthread nicht mehr gestartet, angesprochen oder mit Zugangsdaten versorgt. Die aktive Komoot-Integration ist ausschließlich die Browser-Erweiterung.
 
 Das frühere Proxy-Konzept basierte auf lokal gespeicherten Komoot-Passwörtern. Wenn künftig eine offizielle Komoot- oder Strava-Schnittstelle verfügbar ist, soll sie als neuer OAuth-basierter Connector entstehen, nicht durch Reaktivierung des Passwort-Proxys.
 

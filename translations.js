@@ -2,11 +2,11 @@ export const translations = {
   de: {
     brandEyebrow: "Tracks, Karten, Erinnerungen", brandLead: "Trailthread hält links deine Tourenwerkzeuge bereit, ordnet mittig die Bibliothek und macht rechts Karte und Replay zum Outdoor-Cockpit.",
     workspaceTitle: "Arbeitsbereiche", workspaceDescription: "Bibliothek für Verwaltung, Komoot für Downloads und Replay für Wiedergabe.",
-    workspaceLibrary: "Bibliothek", workspaceKomoot: "Komoot-Download", workspaceReplay: "Replay", settingsButton: "Einstellungen", helpButton: "Hilfe", helpTitle: "README", helpLoading: "README wird geladen...", helpFailed: "README konnte nicht geladen werden.",
+    workspaceLibrary: "Bibliothek", workspaceKomoot: "Komoot-Download", workspaceReplay: "Replay", settingsButton: "Einstellungen", helpButton: "Hilfe", helpTitle: "Hilfe", helpLoading: "Hilfe wird geladen...", helpFallback: "Deine Hilfe ist gerade auf Englisch verfuegbar.", helpFailed: "Hilfe konnte nicht geladen werden.",
     accountsTitle: "Konten", accountsDescription: "Mehrere Komoot-Konten bleiben lokal gespeichert, inklusive Passwort für den lokalen Proxy.", addAccount: "Konto hinzufügen",
     supportEyebrow: "Support", supportNote: "Wenn dir Trailthread hilft und du die Weiterentwicklung unterstützen möchtest, freue ich mich über einen Kaffee.",
     libraryTitle: "Bibliothek", libraryEmpty: "Noch keine Tracks gespeichert.", filterAll: "Alle Touren", filterRecorded: "Gemacht", filterPlanned: "Geplant", filterAllFavorites: "Alle Favoriten", filterFavoritesOnly: "Nur Favoriten", filterNoFavorites: "Ohne Favoriten", filterAllSports: "Alle Sportarten", filterAllTags: "Alle Tags", filterAllDetails: "Alle Details", sortRecent: "Zuletzt importiert", sortDate: "Datum", sortName: "Name", sortDistance: "Distanz", addFiles: "Tracks importieren", exportTours: "Touren-Backup", exportSelectedTours: "Auswahl sichern", mergeSelectedTracks: "2 Tracks zusammenführen",
-  mapKicker: "Karte", mapTitle: "", statusReady: "Bereit", fitSelection: "Auf Auswahl zoomen", showAllTrackPhotos: "Fotos aller aktivierten Tracks", showTracksAgain: "Tracks wieder anzeigen", mapHeatmap: "Heatmap", mapSegmentLegendTitle: "Segment-Legende", heatmapHelpTitle: "Was zeigt die Heatmap?", heatmapHelpText: "Sie fasst die aktuell aktiven Tracks zusammen. Je wärmer und dichter ein Abschnitt oder Punkt erscheint, desto häufiger kommt er in deiner Auswahl vor.", heatmapHelpLow: "selten genutzt", heatmapHelpMid: "regelmäßig genutzt", heatmapHelpHigh: "sehr häufig genutzt", heatmapNeedsMultipleTracks: "Die Heatmap braucht mindestens zwei aktive Tracks.", prevTrack: "←", nextTrack: "→", selectAll: "Alle auswählen", clearSelection: "Keine auswählen", deleteSelected: "Auswahl löschen", selectionTitle: "Aktiv auf Karte", distanceTitle: "Gesamtdistanz", pointsTitle: "Punkte", profileTitle: "Höhenprofil", profileAltitudeRange: "Höhe", profileAscent: "Bergauf", profileDescent: "Bergab", profileHintNoTrack: "Wähle oder klicke einen Track an, um hier das Profil zu sehen.", profileHintNoElevation: "Dieser Track enthält keine Höhendaten.",
+  mapKicker: "Karte", mapTitle: "", statusReady: "Bereit", fitSelection: "Auf Auswahl zoomen", showAllTrackPhotos: "Fotos aller ausgewählten Tracks", showTracksAgain: "Tracks wieder anzeigen", hideMapPhotos: "Keine Fotos anzeigen", showMapPhotos: "Fotos anzeigen", mapHeatmap: "Heatmap", mapSegmentLegendTitle: "Segment-Legende", heatmapHelpTitle: "Was zeigt die Heatmap?", heatmapHelpText: "Sie fasst die aktuell aktiven Tracks zusammen. Je wärmer und dichter ein Abschnitt oder Punkt erscheint, desto häufiger kommt er in deiner Auswahl vor.", heatmapHelpLow: "selten genutzt", heatmapHelpMid: "regelmäßig genutzt", heatmapHelpHigh: "sehr häufig genutzt", heatmapNeedsMultipleTracks: "Die Heatmap braucht mindestens zwei aktive Tracks.", prevTrack: "←", nextTrack: "→", selectAll: "Alle auswählen", clearSelection: "Keine auswählen", deleteSelected: "Auswahl löschen", selectionTitle: "Aktiv auf Karte", distanceTitle: "Gesamtdistanz", pointsTitle: "Punkte", profileTitle: "Höhenprofil", profileAltitudeRange: "Höhe", profileAscent: "Bergauf", profileDescent: "Bergab", profileHintNoTrack: "Wähle oder klicke einen Track an, um hier das Profil zu sehen.", profileHintNoElevation: "Dieser Track enthält keine Höhendaten.",
     komootWorkspaceKicker: "Proxy-gestützter Download", komootWorkspaceTitle: "Komoot-Workspace", komootProxyHint: "Proxy noch nicht geprüft", komootDownloadTitle: "Download", komootDownloadDescription: "Wähle ein gespeichertes Konto, prüfe den Proxy und lade dann geplante und gemachte Touren.", komootLoadTours: "Touren laden", komootRefreshTours: "Touren aktualisieren", komootImportSelected: "Auswahl downloaden und in Bibliothek übernehmen", komootDiagProxy: "Proxy", komootDiagMode: "Modus", komootDiagChecked: "Letzter Check", komootDiagError: "Letzter Fehler", recordedTitle: "Gemachte Touren", recordedEmpty: "Noch keine gemachten Touren geladen.", plannedTitle: "Geplante Touren", plannedEmpty: "Noch keine geplanten Touren geladen.",
     replayKicker: "Zeitliche Wiedergabe", replayEmptyTitle: "Noch kein Track im Replay", replayEmptySubtitle: "Öffne einen Track aus der Bibliothek, um ihn in 2D oder 3D entlang der Strecke abzuspielen.", replayPlay: "Start", replayStop: "Stop", replayBack: "Zurück", replayForward: "Vor", replayRestart: "Zum Start", replaySpeed: "Tempo", replayMode: "Modus", replayModeTime: "Zeit", replayModeDistance: "Distanz", replayDisplay: "Anzeige", replayFollowCamera: "Kamera folgt", replayShowPhotos: "Fotos", replayShowProfile: "Profil", replayCamera2d: "2D-Kamera", replayCamera3d: "3D-Kamera", replayCameraCenter: "Zentriert", replayCameraAhead: "Vorausschau", replayCameraOverview: "Übersicht", replayCameraFollow: "Verfolger", replayCameraTop: "Top-down", replayCameraOrbit: "Orbit", replayProfileTitle: "Replay-Profil", replayProfileHint: "Wähle einen Track für das Replay.", replayUnavailable3d: "3D ist in diesem Browser nicht verfügbar.", replayOpen: "Im Replay öffnen", replayTrackSubtitle: "{source} · {date} · {account}",
     selectionPanelTitle: "Kartenauswahl", selectionPanelDescription: "Nur diese Tracks bleiben gleichzeitig sichtbar und zoombar.", inboxTitle: "Neu einsortiert", inboxEmpty: "Neue oder frisch importierte Tracks erscheinen hier.", onboardingTitle: "Schnell starten", onboardingDescription: "Importiere zuerst GPX-Dateien oder verbinde Komoot. Sobald ein Track da ist, kannst du ihn direkt im Replay abspielen.", onboardingImport: "GPX importieren", onboardingKomoot: "Komoot verbinden", onboardingReplay: "Replay öffnen", onboardingHint: "Tipp: Die App arbeitet lokal. Tracks, Fotos und Backups bleiben auf diesem Gerät.",
@@ -21,11 +21,11 @@ export const translations = {
   },
   en: {
     brandEyebrow: "Tracks, maps, memories", brandLead: "Trailthread keeps tour tools on the left, organizes the library in the middle, and turns the map plus replay on the right into an outdoor cockpit.",
-    workspaceTitle: "Workspaces", workspaceDescription: "Library for management, Komoot for downloads, and replay for playback.", workspaceLibrary: "Library", workspaceKomoot: "Komoot download", workspaceReplay: "Replay", settingsButton: "Settings", helpButton: "Help", helpTitle: "README", helpLoading: "Loading README...", helpFailed: "README could not be loaded.",
+    workspaceTitle: "Workspaces", workspaceDescription: "Library for management, Komoot for downloads, and replay for playback.", workspaceLibrary: "Library", workspaceKomoot: "Komoot download", workspaceReplay: "Replay", settingsButton: "Settings", helpButton: "Help", helpTitle: "Help", helpLoading: "Loading help...", helpFallback: "Help is currently available in English.", helpFailed: "Help could not be loaded.",
     accountsTitle: "Accounts", accountsDescription: "Multiple Komoot accounts stay stored locally, including the password for the local proxy.", addAccount: "Add account",
     supportEyebrow: "Support", supportNote: "If Trailthread helps you and you want to support further development, I would appreciate a coffee.",
     libraryTitle: "Library", libraryEmpty: "No tracks stored yet.", filterAll: "All tours", filterRecorded: "Recorded", filterPlanned: "Planned", filterAllFavorites: "All favorites", filterFavoritesOnly: "Favorites only", filterNoFavorites: "No favorites", filterAllSports: "All sports", filterAllTags: "All tags", filterAllDetails: "All details", sortRecent: "Recently imported", sortDate: "Date", sortName: "Name", sortDistance: "Distance", addFiles: "Import GPX", exportTours: "Tour backup", exportSelectedTours: "Backup selection", mergeSelectedTracks: "Merge 2 tracks",
-  mapKicker: "Map", mapTitle: "", statusReady: "Ready", fitSelection: "Fit selection", showAllTrackPhotos: "Photos from all active tracks", showTracksAgain: "Show tracks again", mapHeatmap: "Heatmap", mapSegmentLegendTitle: "Segment legend", heatmapHelpTitle: "What does the heatmap show?", heatmapHelpText: "It combines the currently active tracks. The warmer and denser a segment or point looks, the more often it appears in your current selection.", heatmapHelpLow: "rarely used", heatmapHelpMid: "regularly used", heatmapHelpHigh: "used very often", heatmapNeedsMultipleTracks: "The heatmap needs at least two active tracks.", prevTrack: "←", nextTrack: "→", selectAll: "Select all", clearSelection: "Select none", deleteSelected: "Delete selection", selectionTitle: "Active on map", distanceTitle: "Total distance", pointsTitle: "Points", profileTitle: "Elevation profile", profileAltitudeRange: "Altitude", profileAscent: "Ascent", profileDescent: "Descent", profileHintNoTrack: "Select or click a track to see its profile here.", profileHintNoElevation: "This track does not contain elevation data.",
+  mapKicker: "Map", mapTitle: "", statusReady: "Ready", fitSelection: "Fit selection", showAllTrackPhotos: "Photos from all selected tracks", showTracksAgain: "Show tracks again", hideMapPhotos: "Hide photos", showMapPhotos: "Show photos", mapHeatmap: "Heatmap", mapSegmentLegendTitle: "Segment legend", heatmapHelpTitle: "What does the heatmap show?", heatmapHelpText: "It combines the currently active tracks. The warmer and denser a segment or point looks, the more often it appears in your current selection.", heatmapHelpLow: "rarely used", heatmapHelpMid: "regularly used", heatmapHelpHigh: "used very often", heatmapNeedsMultipleTracks: "The heatmap needs at least two active tracks.", prevTrack: "←", nextTrack: "→", selectAll: "Select all", clearSelection: "Select none", deleteSelected: "Delete selection", selectionTitle: "Active on map", distanceTitle: "Total distance", pointsTitle: "Points", profileTitle: "Elevation profile", profileAltitudeRange: "Altitude", profileAscent: "Ascent", profileDescent: "Descent", profileHintNoTrack: "Select or click a track to see its profile here.", profileHintNoElevation: "This track does not contain elevation data.",
     komootWorkspaceKicker: "Proxy backed download", komootWorkspaceTitle: "Komoot workspace", komootProxyHint: "Proxy not checked yet", komootDownloadTitle: "Download", komootDownloadDescription: "Choose a saved account, verify the proxy, then load planned and recorded tours.", komootLoadTours: "Load tours", komootRefreshTours: "Refresh tours", komootImportSelected: "Download selection into library", komootDiagProxy: "Proxy", komootDiagMode: "Mode", komootDiagChecked: "Last check", komootDiagError: "Last error", recordedTitle: "Recorded tours", recordedEmpty: "No recorded tours loaded yet.", plannedTitle: "Planned tours", plannedEmpty: "No planned tours loaded yet.",
     replayKicker: "Timed playback", replayEmptyTitle: "No track loaded for replay", replayEmptySubtitle: "Open a track from the library to replay it in 2D or 3D along the route.", replayPlay: "Play", replayStop: "Stop", replayBack: "Back", replayForward: "Forward", replayRestart: "Back to start", replaySpeed: "Speed", replayMode: "Mode", replayModeTime: "Time", replayModeDistance: "Distance", replayDisplay: "Display", replayFollowCamera: "Follow camera", replayShowPhotos: "Photos", replayShowProfile: "Profile", replayCamera2d: "2D camera", replayCamera3d: "3D camera", replayCameraCenter: "Centered", replayCameraAhead: "Look ahead", replayCameraOverview: "Overview", replayCameraFollow: "Follow", replayCameraTop: "Top-down", replayCameraOrbit: "Orbit", replayProfileTitle: "Replay profile", replayProfileHint: "Choose a track for replay.", replayUnavailable3d: "3D is not available in this browser.", replayOpen: "Open in replay", replayTrackSubtitle: "{source} · {date} · {account}",
     selectionPanelTitle: "Map selection", selectionPanelDescription: "Only these tracks stay visible and zoomable together.", inboxTitle: "Recently sorted in", inboxEmpty: "New or freshly imported tracks appear here.", onboardingTitle: "Quick start", onboardingDescription: "Import GPX files first or connect Komoot. As soon as a track exists, you can open it in replay.", onboardingImport: "Import GPX", onboardingKomoot: "Connect Komoot", onboardingReplay: "Open replay", onboardingHint: "Tip: The app works locally. Tracks, photos, and backups stay on this device.",
@@ -40,11 +40,11 @@ export const translations = {
   },
   fr: {
     brandEyebrow: "Traces, cartes, souvenirs", brandLead: "Trailthread garde les outils de tour a gauche, organise la bibliotheque au centre et transforme carte et replay a droite en cockpit outdoor.",
-    workspaceTitle: "Espaces", workspaceDescription: "Bibliotheque pour gerer, Komoot pour telecharger et replay pour relire.", workspaceLibrary: "Bibliotheque", workspaceKomoot: "Telechargement Komoot", workspaceReplay: "Replay", settingsButton: "Reglages", helpButton: "Aide", helpTitle: "README", helpLoading: "Chargement du README...", helpFailed: "Le README n'a pas pu etre charge.",
+    workspaceTitle: "Espaces", workspaceDescription: "Bibliotheque pour gerer, Komoot pour telecharger et replay pour relire.", workspaceLibrary: "Bibliotheque", workspaceKomoot: "Telechargement Komoot", workspaceReplay: "Replay", settingsButton: "Reglages", helpButton: "Aide", helpTitle: "Aide", helpLoading: "Chargement de l aide...", helpFallback: "L aide est actuellement disponible en anglais.", helpFailed: "L aide n a pas pu etre chargee.",
     accountsTitle: "Comptes", accountsDescription: "Plusieurs comptes Komoot restent stockes localement, mot de passe compris pour le proxy local.", addAccount: "Ajouter un compte",
     supportEyebrow: "Support", supportNote: "Si Trailthread vous aide et que vous souhaitez soutenir son evolution, je serai ravi d'avoir un cafe.",
     libraryTitle: "Bibliotheque", libraryEmpty: "Aucune trace enregistree.", filterAll: "Toutes les tours", filterRecorded: "Effectuees", filterPlanned: "Planifiees", filterAllFavorites: "Tous les favoris", filterFavoritesOnly: "Favoris seulement", filterNoFavorites: "Sans favoris", filterAllSports: "Tous les sports", filterAllTags: "Tous les tags", filterAllDetails: "Tous les details", sortRecent: "Importees recemment", sortDate: "Date", sortName: "Nom", sortDistance: "Distance", addFiles: "Importer GPX", exportTours: "Sauvegarde tours", exportSelectedTours: "Sauvegarder la selection", mergeSelectedTracks: "Fusionner 2 traces",
-  mapKicker: "Carte", mapTitle: "", statusReady: "Pret", fitSelection: "Cadrer la selection", showAllTrackPhotos: "Photos de toutes les traces actives", showTracksAgain: "Reafficher les traces", mapHeatmap: "Heatmap", mapSegmentLegendTitle: "Legende des segments", heatmapHelpTitle: "Que montre la heatmap ?", heatmapHelpText: "Elle regroupe les traces actives du moment. Plus un segment ou un point parait chaud et dense, plus il revient souvent dans votre selection.", heatmapHelpLow: "rarement utilise", heatmapHelpMid: "utilise regulierement", heatmapHelpHigh: "utilise tres souvent", heatmapNeedsMultipleTracks: "La heatmap a besoin d'au moins deux traces actives.", prevTrack: "←", nextTrack: "→", selectAll: "Tout selectionner", clearSelection: "Ne rien selectionner", deleteSelected: "Supprimer la selection", selectionTitle: "Actif sur la carte", distanceTitle: "Distance totale", pointsTitle: "Points", profileTitle: "Profil d'altitude", profileAltitudeRange: "Altitude", profileAscent: "Montee", profileDescent: "Descente", profileHintNoTrack: "Selectionnez ou cliquez une trace pour voir son profil ici.", profileHintNoElevation: "Cette trace ne contient pas de donnees d'altitude.",
+  mapKicker: "Carte", mapTitle: "", statusReady: "Pret", fitSelection: "Cadrer la selection", showAllTrackPhotos: "Photos de toutes les traces selectionnees", showTracksAgain: "Reafficher les traces", hideMapPhotos: "Masquer les photos", showMapPhotos: "Afficher les photos", mapHeatmap: "Heatmap", mapSegmentLegendTitle: "Legende des segments", heatmapHelpTitle: "Que montre la heatmap ?", heatmapHelpText: "Elle regroupe les traces actives du moment. Plus un segment ou un point parait chaud et dense, plus il revient souvent dans votre selection.", heatmapHelpLow: "rarement utilise", heatmapHelpMid: "utilise regulierement", heatmapHelpHigh: "utilise tres souvent", heatmapNeedsMultipleTracks: "La heatmap a besoin d'au moins deux traces actives.", prevTrack: "←", nextTrack: "→", selectAll: "Tout selectionner", clearSelection: "Ne rien selectionner", deleteSelected: "Supprimer la selection", selectionTitle: "Actif sur la carte", distanceTitle: "Distance totale", pointsTitle: "Points", profileTitle: "Profil d'altitude", profileAltitudeRange: "Altitude", profileAscent: "Montee", profileDescent: "Descente", profileHintNoTrack: "Selectionnez ou cliquez une trace pour voir son profil ici.", profileHintNoElevation: "Cette trace ne contient pas de donnees d'altitude.",
     komootWorkspaceKicker: "Telechargement avec proxy", komootWorkspaceTitle: "Espace Komoot", komootProxyHint: "Proxy non verifie", komootDownloadTitle: "Telechargement", komootDownloadDescription: "Choisissez un compte enregistre, verifiez le proxy puis chargez les tours planifiees et effectuees.", komootLoadTours: "Charger les tours", komootRefreshTours: "Actualiser les tours", komootImportSelected: "Telecharger la selection dans la bibliotheque", komootDiagProxy: "Proxy", komootDiagMode: "Mode", komootDiagChecked: "Dernier controle", komootDiagError: "Derniere erreur", recordedTitle: "Tours effectuees", recordedEmpty: "Aucune tour effectuee chargee.", plannedTitle: "Tours planifiees", plannedEmpty: "Aucune tour planifiee chargee.",
     replayKicker: "Lecture temporelle", replayEmptyTitle: "Aucune trace chargee", replayEmptySubtitle: "Ouvrez une trace depuis la bibliotheque pour la relire en 2D ou 3D le long de l'itineraire.", replayPlay: "Lecture", replayStop: "Stop", replayBack: "Retour", replayForward: "Avancer", replayRestart: "Retour au debut", replaySpeed: "Vitesse", replayMode: "Mode", replayModeTime: "Temps", replayModeDistance: "Distance", replayDisplay: "Affichage", replayFollowCamera: "Camera suiveuse", replayShowPhotos: "Photos", replayShowProfile: "Profil", replayCamera2d: "Camera 2D", replayCamera3d: "Camera 3D", replayCameraCenter: "Centree", replayCameraAhead: "Anticipation", replayCameraOverview: "Vue d'ensemble", replayCameraFollow: "Suivi", replayCameraTop: "Top-down", replayCameraOrbit: "Orbit", replayProfileTitle: "Profil replay", replayProfileHint: "Choisissez une trace pour le replay.", replayUnavailable3d: "La 3D n'est pas disponible dans ce navigateur.", replayOpen: "Ouvrir dans replay", replayTrackSubtitle: "{source} · {date} · {account}",
     selectionPanelTitle: "Selection carte", selectionPanelDescription: "Seules ces traces restent visibles et zoomables ensemble.", inboxTitle: "Recemment ranges", inboxEmpty: "Les nouvelles traces importees apparaissent ici.", onboardingTitle: "Demarrage rapide", onboardingDescription: "Importez d'abord des fichiers GPX ou connectez Komoot. Des qu'une trace existe, vous pouvez l'ouvrir en replay.", onboardingImport: "Importer GPX", onboardingKomoot: "Connecter Komoot", onboardingReplay: "Ouvrir le replay", onboardingHint: "Astuce : l'application fonctionne localement. Les traces, photos et sauvegardes restent sur cet appareil.",
@@ -58,6 +58,27 @@ export const translations = {
     confirmDeleteSelected: "Supprimer les traces selectionnees ?", confirmDeleteAccount: "Supprimer ce compte ?", confirmImportBackup: "Importer la sauvegarde et remplacer les comptes avec le meme e-mail ?", confirmImportTours: "Importer les tours et ignorer les doublons ?", confirmBackupOverwriteOlder: "La trace \"{name}\" dans la sauvegarde est plus ancienne que la trace existante avec le meme ID. Ecraser quand meme ?", confirmBackupOverwriteNewer: "La trace \"{name}\" dans la sauvegarde est plus recente que la trace existante avec le meme ID. Ecraser la trace actuelle ?", backupFileName: "trailthread-backup.json", tourBackupFileName: "trailthread-tours.json.gz", selectedTourBackupFileName: "trailthread-selection-tours.json.gz", librarySummary: "{count} traces enregistrees.", recentSummary: "{count} traces recemment importees.", noSelection: "Aucune trace active.", accountLabelFallback: "Compte Komoot", reloadPhotos: "Recharger les photos manquantes", reloadPhotosDone: "Les photos manquantes ont ete rechargees.", reloadPhotosNone: "Aucune photo manquante.", reloadPhotosFailed: "Les photos n'ont pas pu etre rechargees.", exportTrackGpx: "Exporter en GPX", exportSelectedGpx: "Exporter la selection GPX", exportSelectedGpxFileName: "trailthread-selection.zip", exportSelectedGpxEmpty: "Veuillez d'abord selectionner au moins une trace.", exportSelectedGpxDone: "{count} traces exportees en ZIP.", exportSelectedMultiTrackGpx: "Comme GPX multi-trace", exportSelectedMultiTrackGpxFileName: "trailthread-selection-multitrack.gpx", exportSelectedMultiTrackGpxDone: "{count} traces exportees en GPX multi-trace.", exportSelectedTourBackupEmpty: "Veuillez d'abord selectionner au moins une trace pour la sauvegarde.", exportSelectedTourBackupDone: "{count} traces exportees dans la sauvegarde des tours.", mergeSelectedTracksNeedTwo: "Veuillez selectionner exactement deux traces avec des points.", mergeSelectedTracksDone: "Une nouvelle trace a ete enregistree a partir des 2 traces selectionnees.", mergeSelectedTracksConflictTitle: "Nom de trace deja present", mergeSelectedTracksConflictMessage: "Une trace nommee \"{name}\" existe deja. Voulez-vous l'ecraser ou creer une nouvelle trace ?", mergeSelectedTracksOverwrite: "Ecraser", mergeSelectedTracksCreateNew: "Creer une nouvelle", shareAppText: "Decouvrez Trailthread : traces, cartes, souvenirs.", shareCopied: "Le lien de l'application a ete copie dans le presse-papiers.", shareUnavailable: "Le partage n'est pas pris en charge dans ce navigateur."
   }
 };
+
+Object.assign(translations.de, {
+  exportSelectedFit: 'Als FIT-Aktivitäten',
+  exportSelectedFitEmpty: 'Bitte zuerst mindestens einen Track mit GPS-Punkten auswählen.',
+  exportSelectedFitFileName: 'trailthread-auswahl-fit.zip',
+  exportSelectedFitDone: '{count} Tracks als FIT-Aktivitäten exportiert.',
+});
+
+Object.assign(translations.en, {
+  exportSelectedFit: 'As FIT activities',
+  exportSelectedFitEmpty: 'Select at least one track with GPS points first.',
+  exportSelectedFitFileName: 'trailthread-selection-fit.zip',
+  exportSelectedFitDone: '{count} tracks exported as FIT activities.',
+});
+
+Object.assign(translations.fr, {
+  exportSelectedFit: 'Comme activites FIT',
+  exportSelectedFitEmpty: 'Selectionnez d abord au moins une trace avec des points GPS.',
+  exportSelectedFitFileName: 'trailthread-selection-fit.zip',
+  exportSelectedFitDone: '{count} traces exportees comme activites FIT.',
+});
 
 Object.assign(translations.de, {
   mergeDialogTitle: "Tracks zusammenführen",
@@ -388,7 +409,11 @@ Object.assign(translations.de, {
   osmWayTypesRequestRejected: "Die OSM-Abfrage wurde momentan abgewiesen. Bitte warte etwa 30 Sekunden und versuche es erneut.",
   osmWayTypesWaitingToRetry: "OSM ist ausgelastet. Trailthread wartet 30 Sekunden und versucht die Abfrage einmal erneut...",
   osmWayTypesServiceUnavailable: "Der OSM-Dienst ist gerade nicht verfügbar. Bitte versuche es später erneut.",
-  osmWayTypesInvalidResponse: "Die OSM-Antwort konnte nicht gelesen werden."
+  osmWayTypesInvalidResponse: "Die OSM-Antwort konnte nicht gelesen werden.",
+  osmWayTypesConsentTitle: "OSM-Wegtypen online analysieren?",
+  osmWayTypesConsentMessage: "Für die Wegtypenanalyse sendet Trailthread bis zu 300 ausgedünnte GPS-Koordinaten entlang dieses Tracks an den öffentlichen Overpass-Dienst von OpenStreetMap. Der Dienst kann daraus Teile deiner Route und deine IP-Adresse ableiten. Es werden keine GPX-, FIT- oder Fotodateien übertragen. Die Analyseergebnisse werden anschließend nur lokal gespeichert.",
+  osmWayTypesConsentConfirm: "OSM-Analyse erlauben",
+  osmWayTypesConsentDeclined: "Die OSM-Analyse wurde nicht gestartet. Es wurden keine Trackdaten übertragen."
 });
 
 Object.assign(translations.en, {
@@ -409,7 +434,11 @@ Object.assign(translations.en, {
   osmWayTypesRequestRejected: "The OSM request is currently being rejected. Wait about 30 seconds, then try again.",
   osmWayTypesWaitingToRetry: "OSM is busy. Trailthread waits 30 seconds, then retries the request once...",
   osmWayTypesServiceUnavailable: "The OSM service is currently unavailable. Please try again later.",
-  osmWayTypesInvalidResponse: "The OSM response could not be read."
+  osmWayTypesInvalidResponse: "The OSM response could not be read.",
+  osmWayTypesConsentTitle: "Analyse OSM way types online?",
+  osmWayTypesConsentMessage: "To analyse way types, Trailthread sends up to 300 thinned GPS coordinates along this track to OpenStreetMap's public Overpass service. The service can infer parts of your route and your IP address. No GPX, FIT or photo files are sent. The results are then stored locally only.",
+  osmWayTypesConsentConfirm: "Allow OSM analysis",
+  osmWayTypesConsentDeclined: "The OSM analysis did not start. No track data was sent."
 });
 
 Object.assign(translations.fr, {
@@ -430,5 +459,96 @@ Object.assign(translations.fr, {
   osmWayTypesRequestRejected: "La requete OSM est actuellement refusee. Attendez environ 30 secondes puis reessayez.",
   osmWayTypesWaitingToRetry: "OSM est surcharge. Trailthread attend 30 secondes puis reessaie la requete une fois...",
   osmWayTypesServiceUnavailable: "Le service OSM est actuellement indisponible. Reessayez plus tard.",
-  osmWayTypesInvalidResponse: "La reponse OSM est illisible."
+  osmWayTypesInvalidResponse: "La reponse OSM est illisible.",
+  osmWayTypesConsentTitle: "Analyser les types de voie OSM en ligne ?",
+  osmWayTypesConsentMessage: "Pour analyser les types de voie, Trailthread envoie jusqu a 300 coordonnees GPS espacees le long de cette trace au service public Overpass d OpenStreetMap. Le service peut en deduire des parties de votre itineraire et votre adresse IP. Aucun fichier GPX, FIT ou photo n est transmis. Les resultats sont ensuite enregistres uniquement en local.",
+  osmWayTypesConsentConfirm: "Autoriser l analyse OSM",
+  osmWayTypesConsentDeclined: "L analyse OSM n a pas demarre. Aucune donnee de trace n a ete envoyee."
+});
+
+Object.assign(translations.de, {
+  deleteTrackPhoto: "Foto löschen",
+  deleteTrackPhotoTitle: "Foto löschen",
+  confirmDeleteTrackPhoto: "Dieses Foto und den zugehörigen Kartenpunkt zum Löschen vormerken? Die Löschung erfolgt erst beim Speichern.",
+  deleteTrackPhotoConfirm: "Zum Löschen vormerken",
+  deleteTrackPhotoCancel: "Nein",
+  trackPhotoMarkedForDeletion: "Foto zum Löschen vorgemerkt."
+});
+
+Object.assign(translations.en, {
+  deleteTrackPhoto: "Delete photo",
+  deleteTrackPhotoTitle: "Delete photo",
+  confirmDeleteTrackPhoto: "Mark this photo and its associated map marker for deletion? It will be deleted when you save.",
+  deleteTrackPhotoConfirm: "Mark for deletion",
+  deleteTrackPhotoCancel: "No",
+  trackPhotoMarkedForDeletion: "Photo marked for deletion."
+});
+
+Object.assign(translations.fr, {
+  deleteTrackPhoto: "Supprimer la photo",
+  deleteTrackPhotoTitle: "Supprimer la photo",
+  confirmDeleteTrackPhoto: "Marquer cette photo et son repere sur la carte pour suppression ? La suppression aura lieu lors de l enregistrement.",
+  deleteTrackPhotoConfirm: "Marquer pour suppression",
+  deleteTrackPhotoCancel: "Non",
+  trackPhotoMarkedForDeletion: "Photo marquee pour suppression."
+});
+
+Object.assign(translations.de, {
+  discardTrackChangesTitle: "Änderungen verwerfen?",
+  confirmDiscardTrackChanges: "Ungespeicherte Änderungen gehen beim Schließen verloren.",
+  discardTrackChangesConfirm: "Änderungen verwerfen",
+  discardTrackChangesCancel: "Weiter bearbeiten"
+});
+
+Object.assign(translations.en, {
+  discardTrackChangesTitle: "Discard changes?",
+  confirmDiscardTrackChanges: "Closing now will lose unsaved changes.",
+  discardTrackChangesConfirm: "Discard changes",
+  discardTrackChangesCancel: "Keep editing"
+});
+
+Object.assign(translations.fr, {
+  discardTrackChangesTitle: "Abandonner les modifications ?",
+  confirmDiscardTrackChanges: "Les modifications non enregistrees seront perdues a la fermeture.",
+  discardTrackChangesConfirm: "Abandonner les modifications",
+  discardTrackChangesCancel: "Continuer la modification"
+});
+
+Object.assign(translations.de, {
+  replayPause: "Pause"
+});
+
+Object.assign(translations.en, {
+  replayPause: "Pause"
+});
+
+Object.assign(translations.fr, {
+  replayPause: "Pause"
+});
+
+Object.assign(translations.de, {
+  libraryFiltersButton: "Filter",
+  libraryFiltersTitle: "Tracks filtern"
+});
+
+Object.assign(translations.en, {
+  libraryFiltersButton: "Filters",
+  libraryFiltersTitle: "Filter tracks"
+});
+
+Object.assign(translations.fr, {
+  libraryFiltersButton: "Filtres",
+  libraryFiltersTitle: "Filtrer les traces"
+});
+
+Object.assign(translations.de, {
+  profileSegmentDetails: "Verteilung: {type}"
+});
+
+Object.assign(translations.en, {
+  profileSegmentDetails: "Distribution: {type}"
+});
+
+Object.assign(translations.fr, {
+  profileSegmentDetails: "Repartition : {type}"
 });

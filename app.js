@@ -1,4 +1,8 @@
 import { translations } from "./translations.js";
+import { importKomootSelection } from "./modules/komoot-import.js";
+import { createTrackDetailController } from "./modules/track-detail.js";
+import { createReplayWorkspaceController } from "./modules/replay-workspace.js";
+import { createKomootWorkspaceController } from "./modules/komoot-workspace.js";
 
 const DB_NAME = "gpx-bibliothek";
 const DB_VERSION = 4;
@@ -25,14 +29,8 @@ const LIBRARY_DESCRIPTION_PREVIEW_LENGTH = 300;
 const LIBRARY_DESCRIPTION_MAX_LENGTH = 5000;
 const REPLAY_DISTANCE_SECONDS = 1200;
 const APP_SHARE_URL = "https://marsrakete.github.io/trailthread/";
-const OSM_OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
-const OSM_ANALYSIS_SAMPLE_DISTANCE_M = 160;
-const OSM_ANALYSIS_MAX_SAMPLES = 300;
-const OSM_ANALYSIS_QUERY_CHUNK_SIZE = 60;
-const OSM_ANALYSIS_MATCH_DISTANCE_M = 55;
-const OSM_ANALYSIS_RETRY_DELAY_MS = 30000;
 
-const state = { db: null, map: null, replayMap2d: null, replayMap3d: null, replayMap3dReady: false, layers: new Map(), heatmapLayer: null, heatmapStats: null, tracks: [], accounts: [], settings: { id: "app", language: "auto", activeWorkspace: "library", activeAccountId: null, leftPaneWidth: 180, middlePaneWidth: 400, sidebarCompact: false, libraryCompact: false, photoOverlayOnly: false, heatmapMode: false, segmentOverlayMode: false, replayDirectionOverlayCollapsed: false, trackLineWeight: 6, komootCaches: {} }, selectedTrackIds: new Set(), highlightedTrackId: null, libraryUi: { focusTrackId: null, scrollTop: 0 }, mergeUi: { orderedTrackIds: [] }, profileUi: { trackId: null, samples: [], plot: null, hoverMarker: null }, photoDialogUi: { trackId: null, photos: [], index: 0, swipeStartX: null }, trackDetailUi: { trackId: null, editing: false }, resizeUi: { handle: null, startX: 0, leftPaneWidth: 180, middlePaneWidth: 400, rafId: null }, komootTours: [], selectedKomootTourIds: new Set(), komootUi: { focusTourId: null, focusList: null, scrollTopByList: { recorded: 0, planned: 0 }, focusOffsetByList: { recorded: null, planned: null }, progress: { active: false, label: '', value: 0, indeterminate: false } }, replay: { activeTrackId: null, replayTrack: null, view: '2d', mode: 'distance', playing: false, speed: 4, cursor: 0, followCamera: true, showPhotos: true, showProfile: true, cameraMode2d: 'center', cameraMode3d: 'orbit', rafId: null, lastFrameAt: 0, layers2d: { route: null, played: null, marker: null, photos: null }, sources3dReady: false, marker3d: null, lastApplied2DMode: null, last2DCameraAppliedAt: 0, profileRender: { key: null, geometry: null } }, proxy: { online: false, mode: null, lastCheckAt: null, lastError: null } };
+const state = { db: null, map: null, replayMap2d: null, replayMap3d: null, replayMap3dReady: false, layers: new Map(), heatmapLayer: null, heatmapStats: null, tracks: [], accounts: [], settings: { id: "app", language: "auto", activeWorkspace: "library", activeAccountId: null, leftPaneWidth: 180, middlePaneWidth: 400, sidebarCompact: false, libraryCompact: false, layoutMigrationVersion: 0, photoOverlayOnly: false, hideMapPhotos: false, heatmapMode: false, segmentOverlayMode: false, replayDirectionOverlayCollapsed: false, trackLineWeight: 6, komootCaches: {} }, selectedTrackIds: new Set(), highlightedTrackId: null, libraryUi: { focusTrackId: null, scrollTop: 0 }, mergeUi: { orderedTrackIds: [] }, profileUi: { trackId: null, samples: [], plot: null, hoverMarker: null }, photoDialogUi: { trackId: null, photos: [], index: 0, swipeStartX: null }, trackDetailUi: { trackId: null, editing: false }, resizeUi: { handle: null, startX: 0, leftPaneWidth: 180, middlePaneWidth: 400, rafId: null }, komootTours: [], selectedKomootTourIds: new Set(), komootUi: { focusTourId: null, focusList: null, scrollTopByList: { recorded: 0, planned: 0 }, focusOffsetByList: { recorded: null, planned: null }, progress: { active: false, label: '', value: 0, indeterminate: false } }, replay: { activeTrackId: null, replayTrack: null, view: '2d', mode: 'distance', playing: false, speed: 4, cursor: 0, followCamera: true, showPhotos: true, showProfile: true, cameraMode2d: 'center', cameraMode3d: 'orbit', rafId: null, lastFrameAt: 0, layers2d: { route: null, played: null, marker: null, photos: null }, sources3dReady: false, marker3d: null, lastApplied2DMode: null, last2DCameraAppliedAt: 0, profileRender: { key: null, geometry: null } }, proxy: { online: false, mode: null, lastCheckAt: null, lastError: null } };
 
 const libraryDerivedCache = {
   tracksRef: null,
@@ -46,9 +44,21 @@ const libraryDerivedCache = {
   selectSignatures: { sport: '', tag: '', meta: '' }
 };
 
+/**
+ * Creates the mobile library filter dialog from its document template.
+ * @returns {void}
+ */
+function createMobileLibraryFilterDialog() {
+  const template = document.querySelector('#mobile-library-filter-dialog-template');
+  if (!template || document.querySelector('#mobile-library-filter-dialog')) return;
+  document.body.append(template.content.cloneNode(true));
+}
+
+createMobileLibraryFilterDialog();
+
 const el = {
-workspaceButtons: [...document.querySelectorAll('.workspace-button[data-workspace]')], settingsButton: document.querySelector('#open-settings-button'), helpButton: document.querySelector('#open-help-button'), toggleSidebarCompactButton: document.querySelector('#toggle-sidebar-compact-button'), toggleLibraryCompactButton: document.querySelector('#toggle-library-compact-button'), libraryWorkspace: document.querySelector('#library-workspace'), komootWorkspace: document.querySelector('#komoot-workspace'), replayWorkspace: document.querySelector('#replay-workspace'), statusToast: document.querySelector('#status-toast'), komootStatusPill: document.querySelector('#komoot-status-pill'), addAccountButton: document.querySelector('#add-account-button'), accountsList: document.querySelector('#accounts-list'), fileInput: document.querySelector('#file-input'), exportSelectedGpxButton: document.querySelector('#export-selected-gpx-button'), exportSelectedGpxMenu: document.querySelector('#export-selected-gpx-menu'), exportSelectedMultiTrackGpxButton: document.querySelector('#export-selected-multitrack-gpx-button'), mergeSelectedTracksButton: document.querySelector('#merge-selected-tracks-button'), trackList: document.querySelector('#track-list'), librarySearchInput: document.querySelector('#library-search-input'), libraryTypeFilter: document.querySelector('#library-type-filter'), libraryFavoriteFilter: document.querySelector('#library-favorite-filter'), librarySportFilter: document.querySelector('#library-sport-filter'), libraryTagFilter: document.querySelector('#library-tag-filter'), libraryMetaFilter: document.querySelector('#library-meta-filter'), librarySortSelect: document.querySelector('#library-sort-select'), fitAllButton: document.querySelector('#fit-all-button'), mapPhotoModeButton: document.querySelector('#map-photo-mode-button'), prevTrackButton: document.querySelector('#prev-track-button'), nextTrackButton: document.querySelector('#next-track-button'), resizeHandles: [...document.querySelectorAll('[data-resize-handle]')], toggleSelectionButton: document.querySelector('#toggle-selection-button'), libraryToggleSelectionButton: document.querySelector('#library-toggle-selection-button'), selectionStats: document.querySelector('#selection-stats'), distanceStats: document.querySelector('#distance-stats'), pointStats: document.querySelector('#point-stats'), profileTrackName: document.querySelector('#profile-track-name'), profileDistance: document.querySelector('#profile-distance'), profileElevationRange: document.querySelector('#profile-elevation-range'), profileAscent: document.querySelector('#profile-ascent'), profileDescent: document.querySelector('#profile-descent'), profileAvgSpeed: document.querySelector('#profile-avg-speed'), profileSegmentSummary: document.querySelector('#profile-segment-summary'), profileSurfaceBreakdown: document.querySelector('#profile-surface-breakdown'), profileWaytypeBreakdown: document.querySelector('#profile-waytype-breakdown'), profileEmpty: document.querySelector('#profile-empty'), profileChartShell: document.querySelector('#profile-chart-shell'), profileChart: document.querySelector('#profile-chart'), profileCursorInfo: document.querySelector('#profile-cursor-info'), profileCursorAfter: document.querySelector('#profile-cursor-after'), profileCursorAltitude: document.querySelector('#profile-cursor-altitude'), profileCursorGrade: document.querySelector('#profile-cursor-grade'), selectionList: document.querySelector('#selection-list'), recentList: document.querySelector('#staging-list'), recentSummary: document.querySelector('#staging-summary'), librarySummary: document.querySelector('#library-summary'), komootAccountSelect: document.querySelector('#komoot-account-select'), komootLoadButton: document.querySelector('#komoot-load-button'), komootImportButton: document.querySelector('#komoot-import-button'), komootProgress: document.querySelector('#komoot-progress'), komootProgressLabel: document.querySelector('#komoot-progress-label'), komootProgressValue: document.querySelector('#komoot-progress-value'), komootProgressBar: document.querySelector('#komoot-progress-bar'), recordedList: document.querySelector('#recorded-tour-list'), plannedList: document.querySelector('#planned-tour-list'), recordedSummary: document.querySelector('#recorded-summary'), plannedSummary: document.querySelector('#planned-summary'), recordedSelectAllButton: document.querySelector('#recorded-select-all-button'), plannedSelectAllButton: document.querySelector('#planned-select-all-button'), diagProxy: document.querySelector('#komoot-diag-proxy'), diagMode: document.querySelector('#komoot-diag-mode'), diagChecked: document.querySelector('#komoot-diag-checked'), diagError: document.querySelector('#komoot-diag-error'), replayTrackTitle: document.querySelector('#replay-track-title'), replayTrackSubtitle: document.querySelector('#replay-track-subtitle'), replayViewButtons: [...document.querySelectorAll('[data-replay-view]')], replayRestartButton: document.querySelector('#replay-restart-button'), replayPlayButton: document.querySelector('#replay-play-button'), replayPauseButton: document.querySelector('#replay-pause-button'), replayBackButton: document.querySelector('#replay-back-button'), replayForwardButton: document.querySelector('#replay-forward-button'), replayJumpStartButton: document.querySelector('#replay-jump-start-button'), replayJumpHighButton: document.querySelector('#replay-jump-high-button'), replayJumpPhotoButton: document.querySelector('#replay-jump-photo-button'), replayJumpEndButton: document.querySelector('#replay-jump-end-button'), replaySpeedSelect: document.querySelector('#replay-speed-select'), replayModeButtons: [...document.querySelectorAll('[data-replay-mode]')], replayCamera2dRow: document.querySelector('#replay-camera-2d-row'), replayCamera3dRow: document.querySelector('#replay-camera-3d-row'), replayCamera2dButtons: [...document.querySelectorAll('[data-replay-camera-2d]')], replayCameraButtons: [...document.querySelectorAll('[data-replay-camera]')], replayFollowCameraInput: document.querySelector('#replay-follow-camera-input'), replayShowPhotosInput: document.querySelector('#replay-show-photos-input'), replayShowProfileInput: document.querySelector('#replay-show-profile-input'), replayMap2d: document.querySelector('#replay-map-2d'), replayMap3d: document.querySelector('#replay-map-3d'), replayDirectionOverlay: document.querySelector('#replay-direction-overlay'), replayDirectionOverlayToggle: document.querySelector('#replay-direction-overlay-toggle'), replayDirectionOverlayIcon: document.querySelector('#replay-direction-overlay-icon'), replayDistanceValue: document.querySelector('#replay-distance-value'), replayAltitudeValue: document.querySelector('#replay-altitude-value'), replayGradeValue: document.querySelector('#replay-grade-value'), replayTimeValue: document.querySelector('#replay-time-value'), replayProfilePanel: document.querySelector('#replay-profile-panel'), replayProfileTrackName: document.querySelector('#replay-profile-track-name'), replayAscentValue: document.querySelector('#replay-ascent-value'), replayDescentValue: document.querySelector('#replay-descent-value'), replaySpeedValue: document.querySelector('#replay-speed-value'), replayPointValue: document.querySelector('#replay-point-value'), replayDirectionValue: document.querySelector('#replay-direction-value'), replayProfileEmpty: document.querySelector('#replay-profile-empty'), replayProfileChartShell: document.querySelector('#replay-profile-chart-shell'), replayProfileChart: document.querySelector('#replay-profile-chart'), accountDialog: document.querySelector('#account-dialog'), accountEmailInput: document.querySelector('#account-email-input'), accountPasswordInput: document.querySelector('#account-password-input'), saveAccountButton: document.querySelector('#save-account-button'), settingsDialog: document.querySelector('#settings-dialog'), helpDialog: document.querySelector('#help-dialog'), helpStatus: document.querySelector('#help-status'), helpContent: document.querySelector('#help-content'), exportBackupButton: document.querySelector('#export-backup-button'), backupInput: document.querySelector('#backup-input'), exportTourBackupButton: document.querySelector('#export-tour-backup-button'), settingsExportTourBackupButton: document.querySelector('#settings-export-tour-backup-button'), tourBackupInput: document.querySelector('#tour-backup-input'), languageSelect: document.querySelector('#language-select'), trackWidthInput: document.querySelector('#track-width-input'), trackWidthValue: document.querySelector('#track-width-value'), trackItemTemplate: document.querySelector('#track-item-template'), accountItemTemplate: document.querySelector('#account-item-template'), tourItemTemplate: document.querySelector('#tour-item-template'), stagingItemTemplate: document.querySelector('#staging-item-template'), trackDetailDialog: document.querySelector('#track-detail-dialog'), trackDetailTitle: document.querySelector('#track-detail-title'), trackDetailSubtitle: document.querySelector('#track-detail-subtitle'), trackDetailEditBlock: document.querySelector('#track-detail-edit-block'), trackDetailNameInput: document.querySelector('#track-detail-name-input'), trackDetailFavoriteInput: document.querySelector('#track-detail-favorite-input'), trackDetailTagsInput: document.querySelector('#track-detail-tags-input'), trackDetailDescriptionInput: document.querySelector('#track-detail-description-input'), trackDetailFacts: document.querySelector('#track-detail-facts'), trackDetailDescription: document.querySelector('#track-detail-description'), trackDetailAnalysis: document.querySelector('#track-detail-analysis'), trackDetailPhotos: document.querySelector('#track-detail-photos'), trackDetailEditButton: document.querySelector('#track-detail-edit-button'), trackDetailSaveButton: document.querySelector('#track-detail-save-button'), trackDetailCancelButton: document.querySelector('#track-detail-cancel-button'),
-  photoDialog: document.querySelector('#photo-dialog'), photoDialogTitle: document.querySelector('#photo-dialog-title'), photoDialogSubtitle: document.querySelector('#photo-dialog-subtitle'), photoDialogStage: document.querySelector('#photo-dialog-stage'), photoDialogImage: document.querySelector('#photo-dialog-image'), photoDialogCaption: document.querySelector('#photo-dialog-caption'), photoDialogMeta: document.querySelector('#photo-dialog-meta'), photoDialogThumbs: document.querySelector('#photo-dialog-thumbs'), photoDialogPrev: document.querySelector('#photo-dialog-prev'), photoDialogNext: document.querySelector('#photo-dialog-next'), photoDialogClose: document.querySelector('#photo-dialog-close'), photoDialogThumbTemplate: document.querySelector('#photo-dialog-thumb-template'), trackPhotoThumbTemplate: document.querySelector('#track-photo-thumb-template'), trackFactTemplate: document.querySelector('#track-fact-template'), trackQuickBadgeTemplate: document.querySelector('#track-quick-badge-template'), trackAnalysisGridTemplate: document.querySelector('#track-analysis-grid-template'), trackAnalysisCardTemplate: document.querySelector('#track-analysis-card-template'), analysisPillTemplate: document.querySelector('#analysis-pill-template'), trackTimelineTemplate: document.querySelector('#track-timeline-template'), trackTimelineItemTemplate: document.querySelector('#track-timeline-item-template'), timelineMapMarkerTemplate: document.querySelector('#timeline-map-marker-template'), timelineMapPopupTemplate: document.querySelector('#timeline-map-popup-template'), replayProfileChartTemplate: document.querySelector('#replay-profile-chart-template'), profileSegmentChipTemplate: document.querySelector('#profile-segment-chip-template'), accountStatus: document.querySelector('#account-status'),
+workspaceButtons: [...document.querySelectorAll('.workspace-button[data-workspace]')], settingsButton: document.querySelector('#open-settings-button'), helpButton: document.querySelector('#open-help-button'), toggleSidebarCompactButton: document.querySelector('#toggle-sidebar-compact-button'), toggleLibraryCompactButton: document.querySelector('#toggle-library-compact-button'), libraryWorkspace: document.querySelector('#library-workspace'), komootWorkspace: document.querySelector('#komoot-workspace'), replayWorkspace: document.querySelector('#replay-workspace'), statusToast: document.querySelector('#status-toast'), komootStatusPill: document.querySelector('#komoot-status-pill'), addAccountButton: document.querySelector('#add-account-button'), accountsList: document.querySelector('#accounts-list'), fileInput: document.querySelector('#file-input'), exportSelectedGpxButton: document.querySelector('#export-selected-gpx-button'), exportSelectedGpxMenu: document.querySelector('#export-selected-gpx-menu'), exportSelectedMultiTrackGpxButton: document.querySelector('#export-selected-multitrack-gpx-button'), mergeSelectedTracksButton: document.querySelector('#merge-selected-tracks-button'), trackList: document.querySelector('#track-list'), librarySearchInput: document.querySelector('#library-search-input'), libraryTypeFilter: document.querySelector('#library-type-filter'), libraryFavoriteFilter: document.querySelector('#library-favorite-filter'), librarySportFilter: document.querySelector('#library-sport-filter'), libraryTagFilter: document.querySelector('#library-tag-filter'), libraryMetaFilter: document.querySelector('#library-meta-filter'), librarySortSelect: document.querySelector('#library-sort-select'), fitAllButton: document.querySelector('#fit-all-button'), mapPhotoModeButton: document.querySelector('#map-photo-mode-button'), prevTrackButton: document.querySelector('#prev-track-button'), nextTrackButton: document.querySelector('#next-track-button'), resizeHandles: [...document.querySelectorAll('[data-resize-handle]')], toggleSelectionButton: document.querySelector('#toggle-selection-button'), libraryToggleSelectionButton: document.querySelector('#library-toggle-selection-button'), selectionStats: document.querySelector('#selection-stats'), distanceStats: document.querySelector('#distance-stats'), pointStats: document.querySelector('#point-stats'), profileTrackName: document.querySelector('#profile-track-name'), profileDistance: document.querySelector('#profile-distance'), profileElevationRange: document.querySelector('#profile-elevation-range'), profileAscent: document.querySelector('#profile-ascent'), profileDescent: document.querySelector('#profile-descent'), profileAvgSpeed: document.querySelector('#profile-avg-speed'), profileSegmentSummary: document.querySelector('#profile-segment-summary'), profileEmpty: document.querySelector('#profile-empty'), profileChartShell: document.querySelector('#profile-chart-shell'), profileChart: document.querySelector('#profile-chart'), profileCursorInfo: document.querySelector('#profile-cursor-info'), profileCursorAfter: document.querySelector('#profile-cursor-after'), profileCursorAltitude: document.querySelector('#profile-cursor-altitude'), profileCursorGrade: document.querySelector('#profile-cursor-grade'), selectionList: document.querySelector('#selection-list'), recentList: document.querySelector('#staging-list'), recentSummary: document.querySelector('#staging-summary'), librarySummary: document.querySelector('#library-summary'), komootAccountSelect: document.querySelector('#komoot-account-select'), komootLoadButton: document.querySelector('#komoot-load-button'), komootImportButton: document.querySelector('#komoot-import-button'), komootProgress: document.querySelector('#komoot-progress'), komootProgressLabel: document.querySelector('#komoot-progress-label'), komootProgressValue: document.querySelector('#komoot-progress-value'), komootProgressBar: document.querySelector('#komoot-progress-bar'), recordedList: document.querySelector('#recorded-tour-list'), plannedList: document.querySelector('#planned-tour-list'), recordedSummary: document.querySelector('#recorded-summary'), plannedSummary: document.querySelector('#planned-summary'), recordedSelectAllButton: document.querySelector('#recorded-select-all-button'), plannedSelectAllButton: document.querySelector('#planned-select-all-button'), diagProxy: document.querySelector('#komoot-diag-proxy'), diagMode: document.querySelector('#komoot-diag-mode'), diagChecked: document.querySelector('#komoot-diag-checked'), diagError: document.querySelector('#komoot-diag-error'), replayTrackTitle: document.querySelector('#replay-track-title'), replayTrackSubtitle: document.querySelector('#replay-track-subtitle'), replayViewButtons: [...document.querySelectorAll('[data-replay-view]')], replayRestartButton: document.querySelector('#replay-restart-button'), replayPlayButton: document.querySelector('#replay-play-button'), replayPauseButton: document.querySelector('#replay-pause-button'), replayBackButton: document.querySelector('#replay-back-button'), replayForwardButton: document.querySelector('#replay-forward-button'), replayJumpStartButton: document.querySelector('#replay-jump-start-button'), replayJumpHighButton: document.querySelector('#replay-jump-high-button'), replayJumpPhotoButton: document.querySelector('#replay-jump-photo-button'), replayJumpEndButton: document.querySelector('#replay-jump-end-button'), replaySpeedSelect: document.querySelector('#replay-speed-select'), replayModeButtons: [...document.querySelectorAll('[data-replay-mode]')], replayCamera2dRow: document.querySelector('#replay-camera-2d-row'), replayCamera3dRow: document.querySelector('#replay-camera-3d-row'), replayCamera2dButtons: [...document.querySelectorAll('[data-replay-camera-2d]')], replayCameraButtons: [...document.querySelectorAll('[data-replay-camera]')], replayFollowCameraInput: document.querySelector('#replay-follow-camera-input'), replayShowPhotosInput: document.querySelector('#replay-show-photos-input'), replayShowProfileInput: document.querySelector('#replay-show-profile-input'), replayMap2d: document.querySelector('#replay-map-2d'), replayMap3d: document.querySelector('#replay-map-3d'), replayDirectionOverlay: document.querySelector('#replay-direction-overlay'), replayDirectionOverlayToggle: document.querySelector('#replay-direction-overlay-toggle'), replayDirectionOverlayIcon: document.querySelector('#replay-direction-overlay-icon'), replayDistanceValue: document.querySelector('#replay-distance-value'), replayAltitudeValue: document.querySelector('#replay-altitude-value'), replayGradeValue: document.querySelector('#replay-grade-value'), replayTimeValue: document.querySelector('#replay-time-value'), replayProfilePanel: document.querySelector('#replay-profile-panel'), replayProfileTrackName: document.querySelector('#replay-profile-track-name'), replayAscentValue: document.querySelector('#replay-ascent-value'), replayDescentValue: document.querySelector('#replay-descent-value'), replaySpeedValue: document.querySelector('#replay-speed-value'), replayPointValue: document.querySelector('#replay-point-value'), replayDirectionValue: document.querySelector('#replay-direction-value'), replayProfileEmpty: document.querySelector('#replay-profile-empty'), replayProfileChartShell: document.querySelector('#replay-profile-chart-shell'), replayProfileChart: document.querySelector('#replay-profile-chart'), accountDialog: document.querySelector('#account-dialog'), accountEmailInput: document.querySelector('#account-email-input'), accountPasswordInput: document.querySelector('#account-password-input'), saveAccountButton: document.querySelector('#save-account-button'), settingsDialog: document.querySelector('#settings-dialog'), helpDialog: document.querySelector('#help-dialog'), helpStatus: document.querySelector('#help-status'), helpContent: document.querySelector('#help-content'), exportBackupButton: document.querySelector('#export-backup-button'), backupInput: document.querySelector('#backup-input'), exportTourBackupButton: document.querySelector('#export-tour-backup-button'), settingsExportTourBackupButton: document.querySelector('#settings-export-tour-backup-button'), tourBackupInput: document.querySelector('#tour-backup-input'), languageSelect: document.querySelector('#language-select'), trackWidthInput: document.querySelector('#track-width-input'), trackWidthValue: document.querySelector('#track-width-value'), trackItemTemplate: document.querySelector('#track-item-template'), accountItemTemplate: document.querySelector('#account-item-template'), tourItemTemplate: document.querySelector('#tour-item-template'), stagingItemTemplate: document.querySelector('#staging-item-template'), trackDetailDialog: document.querySelector('#track-detail-dialog'), trackDetailTitle: document.querySelector('#track-detail-title'), trackDetailSubtitle: document.querySelector('#track-detail-subtitle'), trackDetailEditBlock: document.querySelector('#track-detail-edit-block'), trackDetailNameInput: document.querySelector('#track-detail-name-input'), trackDetailFavoriteInput: document.querySelector('#track-detail-favorite-input'), trackDetailTagsInput: document.querySelector('#track-detail-tags-input'), trackDetailDescriptionInput: document.querySelector('#track-detail-description-input'), trackDetailFacts: document.querySelector('#track-detail-facts'), trackDetailDescription: document.querySelector('#track-detail-description'), trackDetailAnalysis: document.querySelector('#track-detail-analysis'), trackDetailPhotos: document.querySelector('#track-detail-photos'), trackDetailEditButton: document.querySelector('#track-detail-edit-button'), trackDetailSaveButton: document.querySelector('#track-detail-save-button'), trackDetailCancelButton: document.querySelector('#track-detail-cancel-button'),
+  photoDialog: document.querySelector('#photo-dialog'), photoDialogTitle: document.querySelector('#photo-dialog-title'), photoDialogSubtitle: document.querySelector('#photo-dialog-subtitle'), photoDialogStage: document.querySelector('#photo-dialog-stage'), photoDialogImage: document.querySelector('#photo-dialog-image'), photoDialogCaption: document.querySelector('#photo-dialog-caption'), photoDialogMeta: document.querySelector('#photo-dialog-meta'), photoDialogThumbs: document.querySelector('#photo-dialog-thumbs'), photoDialogPrev: document.querySelector('#photo-dialog-prev'), photoDialogNext: document.querySelector('#photo-dialog-next'), photoDialogClose: document.querySelector('#photo-dialog-close'), photoDialogThumbTemplate: document.querySelector('#photo-dialog-thumb-template'), trackPhotoThumbTemplate: document.querySelector('#track-photo-thumb-template'), trackFactTemplate: document.querySelector('#track-fact-template'), trackQuickBadgeTemplate: document.querySelector('#track-quick-badge-template'), trackAnalysisGridTemplate: document.querySelector('#track-analysis-grid-template'), trackAnalysisCardTemplate: document.querySelector('#track-analysis-card-template'), analysisPillTemplate: document.querySelector('#analysis-pill-template'), trackTimelineTemplate: document.querySelector('#track-timeline-template'), trackTimelineItemTemplate: document.querySelector('#track-timeline-item-template'), timelineMapMarkerTemplate: document.querySelector('#timeline-map-marker-template'), timelineMapPopupTemplate: document.querySelector('#timeline-map-popup-template'), replayProfileChartTemplate: document.querySelector('#replay-profile-chart-template'), accountStatus: document.querySelector('#account-status'),
   confirmDialog: document.querySelector('#confirm-dialog'), confirmDialogTitle: document.querySelector('#confirm-dialog-title'), confirmDialogMessage: document.querySelector('#confirm-dialog-message'), confirmDialogConfirm: document.querySelector('#confirm-dialog-confirm'), confirmDialogCancel: document.querySelector('#confirm-dialog-cancel'), mergeDialog: document.querySelector('#merge-dialog'), mergeDialogFirstName: document.querySelector('#merge-track-first-name'), mergeDialogFirstMeta: document.querySelector('#merge-track-first-meta'), mergeDialogSecondName: document.querySelector('#merge-track-second-name'), mergeDialogSecondMeta: document.querySelector('#merge-track-second-meta'), mergeDialogSwapButton: document.querySelector('#merge-dialog-swap-button'), mergeDialogConfirm: document.querySelector('#merge-dialog-confirm')
 };
 
@@ -67,7 +77,27 @@ Object.assign(el, {
   exportSelectedTourBackupButton: document.querySelector('#export-selected-tour-backup-button'),
   exportSelectedKmzButton: document.querySelector('#export-selected-kmz-button'),
   exportSelectedKmzProButton: document.querySelector('#export-selected-kmz-pro-button'),
-  settingsExportSelectedTourBackupButton: document.querySelector('#settings-export-selected-tour-backup-button')
+  settingsExportSelectedTourBackupButton: document.querySelector('#settings-export-selected-tour-backup-button'),
+  trackDetailPhotoTemplate: document.querySelector('#track-detail-photo-template'),
+  trackAnalysisActionTemplate: document.querySelector('#track-analysis-action-template'),
+  trackDetailCloseButton: document.querySelector('#track-detail-close-button'),
+  trackDetailStatus: document.querySelector('#track-detail-status'),
+  profileSegmentDialog: document.querySelector('#profile-segment-dialog'),
+  profileSegmentDialogTitle: document.querySelector('#profile-segment-dialog-title'),
+  profileSegmentDetailList: document.querySelector('#profile-segment-detail-list'),
+  profileSegmentDistributionTemplate: document.querySelector('#profile-segment-distribution-template'),
+  profileSegmentDetailTemplate: document.querySelector('#profile-segment-detail-template'),
+  libraryControls: document.querySelector('#library-controls'),
+  libraryToolbar: document.querySelector('#library-toolbar'),
+  openLibraryFiltersButton: document.querySelector('#open-library-filters-button'),
+  showMobileSidebarButton: document.querySelector('#show-mobile-sidebar-button'),
+  mobileLibraryFilterDialog: document.querySelector('#mobile-library-filter-dialog'),
+  mobileLibraryFilterControls: document.querySelector('#mobile-library-filter-controls')
+});
+
+Object.assign(el, {
+  exportSelectedFitButton: document.querySelector('#export-selected-fit-button'),
+  mapPhotoVisibilityButton: document.querySelector('#map-photo-visibility-button')
 });
 
 let helpCache = { path: null, text: '' };
@@ -80,6 +110,33 @@ let lastAutoUpdateCheckAt = 0;
 let komootRestoreRaf = 0;
 let statusToastTimer = 0;
 let osmAnalysisTrackId = null;
+let osmAnalysisModulePromise = null;
+let fitIoModulePromise = null;
+let trackDetailRemovedPhotoIndexes = new Set();
+
+const trackDetailController = createTrackDetailController({
+  state,
+  el,
+  cleanText,
+  translate: t,
+  parseTagInput,
+  normalizeTagList,
+  confirmAction,
+  renderTrackDetailDialog,
+  setStatus,
+  getRemovedPhotoIndexes: () => trackDetailRemovedPhotoIndexes,
+  setRemovedPhotoIndexes: (indexes) => {
+    trackDetailRemovedPhotoIndexes = indexes;
+  },
+});
+
+const komootWorkspaceController = createKomootWorkspaceController({
+  state,
+  proxyBaseUrl,
+  shouldRequestLoopbackAccess,
+  normalizeProxyError,
+  translate: t,
+});
 
 /**
  * Resolves the currently active application language with a browser-language fallback.
@@ -361,13 +418,124 @@ function normalizeTrackDescription(value, fallback = null) {
   if (secondary && !looksLikeGeneratedMetricText(secondary)) return secondary;
   return null;
 }
-function reqToPromise(request) { return new Promise((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
-function openDb() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onerror = () => reject(request.error); request.onupgradeneeded = () => { const db = request.result; if (request.transaction && request.oldVersion < 4 && db.objectStoreNames.contains(STORES.tracks)) db.deleteObjectStore(STORES.tracks); if (!db.objectStoreNames.contains(STORES.tracks)) db.createObjectStore(STORES.tracks, { keyPath: 'id' }); if (!db.objectStoreNames.contains(STORES.photos)) db.createObjectStore(STORES.photos, { keyPath: 'id' }); if (!db.objectStoreNames.contains(STORES.accounts)) db.createObjectStore(STORES.accounts, { keyPath: 'id' }); if (!db.objectStoreNames.contains(STORES.settings)) db.createObjectStore(STORES.settings, { keyPath: 'id' }); }; request.onsuccess = () => resolve(request.result); }); }
-async function all(store) { return reqToPromise(state.db.transaction(store, 'readonly').objectStore(store).getAll()); }
-async function get(store, key) { return reqToPromise(state.db.transaction(store, 'readonly').objectStore(store).get(key)); }
-async function put(store, value) { const tx = state.db.transaction(store, 'readwrite'); tx.objectStore(store).put(value); return new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
-async function putMany(store, values) { const tx = state.db.transaction(store, 'readwrite'); values.forEach((value) => tx.objectStore(store).put(value)); return new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
-async function del(store, key) { const tx = state.db.transaction(store, 'readwrite'); tx.objectStore(store).delete(key); return new Promise((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+/**
+ * Converts an IndexedDB request into an awaitable promise.
+ * @param {IDBRequest} request IndexedDB request to observe.
+ * @returns {Promise<unknown>} Resolves with the request result.
+ */
+function reqToPromise(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Creates an IndexedDB object store when it is not yet part of the schema.
+ * @param {IDBDatabase} database Database currently being upgraded.
+ * @param {string} storeName Name of the object store to ensure.
+ * @returns {void} Does not return a value.
+ */
+function createStoreIfMissing(database, storeName) {
+  if (database.objectStoreNames.contains(storeName)) {
+    return;
+  }
+
+  database.createObjectStore(storeName, { keyPath: 'id' });
+}
+
+/**
+ * Opens Trailthread's IndexedDB database and performs required schema upgrades.
+ * @returns {Promise<IDBDatabase>} Resolves with the opened database.
+ */
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+
+      if (request.transaction && request.oldVersion < 4 && database.objectStoreNames.contains(STORES.tracks)) {
+        database.deleteObjectStore(STORES.tracks);
+      }
+
+      createStoreIfMissing(database, STORES.tracks);
+      createStoreIfMissing(database, STORES.photos);
+      createStoreIfMissing(database, STORES.accounts);
+      createStoreIfMissing(database, STORES.settings);
+    };
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+/**
+ * Reads all records from an IndexedDB object store.
+ * @param {string} store Name of the object store to read.
+ * @returns {Promise<unknown[]>} Resolves with all stored records.
+ */
+async function all(store) {
+  const request = state.db.transaction(store, 'readonly').objectStore(store).getAll();
+  return reqToPromise(request);
+}
+
+/**
+ * Reads one record from an IndexedDB object store.
+ * @param {string} store Name of the object store to read.
+ * @param {IDBValidKey} key Key of the requested record.
+ * @returns {Promise<unknown>} Resolves with the stored record, if present.
+ */
+async function get(store, key) {
+  const request = state.db.transaction(store, 'readonly').objectStore(store).get(key);
+  return reqToPromise(request);
+}
+
+/**
+ * Waits until an IndexedDB write transaction has finished.
+ * @param {IDBTransaction} transaction Transaction to observe.
+ * @returns {Promise<void>} Resolves after the transaction commits.
+ */
+function transactionToPromise(transaction) {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+/**
+ * Stores one record in an IndexedDB object store.
+ * @param {string} store Name of the target object store.
+ * @param {unknown} value Record to store.
+ * @returns {Promise<void>} Resolves after the record has been committed.
+ */
+async function put(store, value) {
+  const transaction = state.db.transaction(store, 'readwrite');
+  transaction.objectStore(store).put(value);
+  return transactionToPromise(transaction);
+}
+
+/**
+ * Stores several records together in one IndexedDB transaction.
+ * @param {string} store Name of the target object store.
+ * @param {unknown[]} values Records to store.
+ * @returns {Promise<void>} Resolves after all records have been committed.
+ */
+async function putMany(store, values) {
+  const transaction = state.db.transaction(store, 'readwrite');
+  values.forEach((value) => transaction.objectStore(store).put(value));
+  return transactionToPromise(transaction);
+}
+
+/**
+ * Deletes one record from an IndexedDB object store.
+ * @param {string} store Name of the target object store.
+ * @param {IDBValidKey} key Key of the record to delete.
+ * @returns {Promise<void>} Resolves after the deletion has been committed.
+ */
+async function del(store, key) {
+  const transaction = state.db.transaction(store, 'readwrite');
+  transaction.objectStore(store).delete(key);
+  return transactionToPromise(transaction);
+}
 /**
  * Deletes every record in one IndexedDB object store.
  * @param {string} store Name of the object store to clear.
@@ -390,7 +558,15 @@ async function getMany(store, keys) {
   const values = await Promise.all(requests);
   return values.filter(Boolean);
 }
-async function saveSettings() { await put(STORES.settings, { ...state.settings, id: 'app' }); }
+/**
+ * Persists application settings together with the current track selection and map focus.
+ * @returns {Promise<void>} Resolves after IndexedDB has stored the settings record.
+ */
+async function saveSettings() {
+  state.settings.selectedTrackIds = [...state.selectedTrackIds];
+  state.settings.highlightedTrackId = state.highlightedTrackId;
+  await put(STORES.settings, { ...state.settings, id: 'app' });
+}
 /**
  * Removes the retired password-based proxy connector data from local storage and app state.
  * @returns {Promise<void>} Resolves after all stored accounts and related settings are cleared.
@@ -508,6 +684,23 @@ function endPaneResize() {
 }
 
 /**
+ * Mirrors a status message inside the open track detail dialog.
+ * @param {string} message Visible status text.
+ * @param {boolean} error Whether the status should use error styling.
+ * @param {boolean} visible Whether the dialog status should be visible.
+ * @returns {void} Does not return a value.
+ */
+function setTrackDetailStatus(message, error, visible) {
+  if (!el.trackDetailDialog?.open || !el.trackDetailStatus) {
+    return;
+  }
+
+  el.trackDetailStatus.textContent = message;
+  el.trackDetailStatus.hidden = !visible;
+  el.trackDetailStatus.classList.toggle('is-error', !!error);
+}
+
+/**
  * Shows a short status toast and optionally keeps it visible until a later status replaces it.
  * @param {string} message Visible status text.
  * @param {boolean} error Whether the toast should use its error styling and longer default duration.
@@ -524,6 +717,7 @@ function setStatus(message, error = false, persistent = false) {
   el.statusToast.hidden = false;
   el.statusToast.classList.toggle('is-error', !!error);
   el.statusToast.classList.add('is-visible');
+  setTrackDetailStatus(message, error, true);
   if (persistent) return;
   let visibleDuration = 2600;
   if (error) visibleDuration = 4200;
@@ -532,6 +726,7 @@ function setStatus(message, error = false, persistent = false) {
     window.setTimeout(() => {
       if (!el.statusToast.classList.contains('is-visible')) el.statusToast.hidden = true;
     }, 180);
+    setTrackDetailStatus('', false, false);
   }, visibleDuration);
 }
 function setKomootStatus(message, error = false) {
@@ -751,8 +946,23 @@ function setUpdateStatus(message, showReload = false, error = false) {
   el.reloadAppButton.classList.toggle('button-primary', Boolean(showReload));
   el.reloadAppButton.classList.toggle('button-ghost', !showReload);
 }
-async function loadReadmeContent() {
-  const path = "./README.md";
+/**
+ * Returns the localized Markdown help file for the currently active application language.
+ * @returns {string} Relative path to the selected help file.
+ */
+function helpContentPath() {
+  const language = lang();
+  if (language === 'en') return './HELP.en.md';
+  if (language === 'fr') return './HELP.fr.md';
+  return './HELP.de.md';
+}
+
+/**
+ * Loads and renders the localized user guide in the help dialog, using English as a fallback.
+ * @returns {Promise<void>} Resolves after the help content or its fallback has been rendered.
+ */
+async function loadHelpContent() {
+  const path = helpContentPath();
   if (helpCache.path === path && helpCache.text) {
     el.helpStatus.textContent = "";
     el.helpContent.innerHTML = renderMarkdownAsHtml(helpCache.text);
@@ -763,7 +973,7 @@ async function loadReadmeContent() {
   el.helpContent.replaceChildren();
   try {
     const response = await fetch(path, { cache: "no-cache" });
-    if (!response.ok) throw new Error("README unavailable");
+    if (!response.ok) throw new Error("Help unavailable");
     const text = await response.text();
     helpCache = { path, text };
     el.helpStatus.textContent = "";
@@ -771,6 +981,20 @@ async function loadReadmeContent() {
     void renderHelpMermaidBlocks();
   } catch (error) {
     console.error(error);
+    if (path !== './HELP.en.md') {
+      try {
+        const fallbackResponse = await fetch('./HELP.en.md', { cache: 'no-cache' });
+        if (!fallbackResponse.ok) throw new Error('Fallback help unavailable');
+        const fallbackText = await fallbackResponse.text();
+        helpCache = { path: './HELP.en.md', text: fallbackText };
+        el.helpStatus.textContent = t('helpFallback');
+        el.helpContent.innerHTML = renderMarkdownAsHtml(fallbackText);
+        void renderHelpMermaidBlocks();
+        return;
+      } catch (fallbackError) {
+        console.error(fallbackError);
+      }
+    }
     el.helpStatus.textContent = t('helpFailed');
     if (!(helpCache.path === path && helpCache.text)) el.helpContent.replaceChildren();
   }
@@ -1204,6 +1428,16 @@ async function deleteTrackPhotoBlobs(track) {
   }
   revokeTrackPhotoUrls(track);
 }
+
+/**
+ * Deletes the persisted image Blob and temporary object URL for one removed track photo.
+ * @param {object} photo Photo record that is no longer part of its track.
+ * @returns {Promise<void>} Resolves after the local image data has been removed.
+ */
+async function deleteTrackPhotoBlob(photo) {
+  if (photo?.blobId) await del(STORES.photos, photo.blobId);
+  if (photo?.objectUrl) URL.revokeObjectURL(photo.objectUrl);
+}
 function collectGpxPhotos(xml) {
   const photos = [];
   const selectors = [
@@ -1552,8 +1786,31 @@ const DETAIL_VALUE_LABELS = {
   path: { de: 'Pfad', en: 'Path', fr: 'Sentier' },
   street: { de: 'Strasse', en: 'Street', fr: 'Rue' },
   road: { de: 'Strasse', en: 'Road', fr: 'Route' },
+  motorway: { de: 'Autobahn', en: 'Motorway', fr: 'Autoroute' },
+  motorway_link: { de: 'Autobahnauffahrt', en: 'Motorway link', fr: 'Bretelle d autoroute' },
+  trunk: { de: 'Schnellstrasse', en: 'Trunk road', fr: 'Voie rapide' },
+  trunk_link: { de: 'Schnellstrassenauffahrt', en: 'Trunk link', fr: 'Bretelle de voie rapide' },
+  primary: { de: 'Hauptstrasse', en: 'Primary road', fr: 'Route principale' },
+  primary_link: { de: 'Hauptstrassenauffahrt', en: 'Primary link', fr: 'Bretelle de route principale' },
+  secondary: { de: 'Verbindungsstrasse', en: 'Secondary road', fr: 'Route secondaire' },
+  secondary_link: { de: 'Verbindungsstrassenauffahrt', en: 'Secondary link', fr: 'Bretelle de route secondaire' },
+  tertiary: { de: 'Nebenstrasse', en: 'Tertiary road', fr: 'Route tertiaire' },
+  tertiary_link: { de: 'Nebenstrassenauffahrt', en: 'Tertiary link', fr: 'Bretelle de route tertiaire' },
+  unclassified: { de: 'Nebenstrasse', en: 'Unclassified road', fr: 'Route non classee' },
+  residential: { de: 'Wohnstrasse', en: 'Residential street', fr: 'Rue residentielle' },
+  living_street: { de: 'Verkehrsberuhigter Bereich', en: 'Living street', fr: 'Zone de rencontre' },
+  pedestrian: { de: 'Fussgaengerzone', en: 'Pedestrian zone', fr: 'Zone pietonne' },
   service_road: { de: 'Serviceweg', en: 'Service road', fr: 'Voie de service' },
+  service: { de: 'Serviceweg', en: 'Service road', fr: 'Voie de service' },
+  busway: { de: 'Busspur', en: 'Busway', fr: 'Voie de bus' },
+  bus_guideway: { de: 'Busspur', en: 'Bus guideway', fr: 'Voie guidee de bus' },
   footpath: { de: 'Fussweg', en: 'Footpath', fr: 'Chemin pieton' },
+  footway: { de: 'Fussweg', en: 'Footway', fr: 'Chemin pieton' },
+  bridleway: { de: 'Reitweg', en: 'Bridleway', fr: 'Chemin cavalier' },
+  steps: { de: 'Treppe', en: 'Steps', fr: 'Escaliers' },
+  corridor: { de: 'Durchgang', en: 'Corridor', fr: 'Passage' },
+  construction: { de: 'Baustelle', en: 'Construction', fr: 'En travaux' },
+  proposed: { de: 'Geplante Strasse', en: 'Proposed road', fr: 'Route projetee' },
   singletrack: { de: 'Singletrail', en: 'Singletrack', fr: 'Singletrack' },
   way: { de: 'Pfad', en: 'Path', fr: 'Sentier' },
   trail_d1: { de: 'Wanderpfad', en: 'Hiking trail', fr: 'Sentier de randonnee' },
@@ -1683,285 +1940,78 @@ function segmentValues(segments) {
 }
 
 /**
- * Builds evenly spaced reference points so a long track does not create one OSM request per GPX point.
- * @param {Array<object>} points Track points with latitude and longitude values.
- * @returns {Array<{pointIndex: number, lat: number, lng: number}>} Bounded set of valid route reference points.
+ * Loads the optional OSM analysis module once it is first needed.
+ * @returns {Promise<typeof import('./modules/osm-analysis.js')>} Lazy-loaded OSM analysis module.
  */
-function buildOsmAnalysisSamples(points) {
-  if (!Array.isArray(points) || points.length < 2) return [];
-  const validPoints = [];
-  points.forEach((point, pointIndex) => {
-    if (!Number.isFinite(point?.lat) || !Number.isFinite(point?.lng)) return;
-    validPoints.push({ pointIndex, lat: point.lat, lng: point.lng });
-  });
-  if (validPoints.length < 2) return [];
-  let totalDistanceM = 0;
-  for (let index = 1; index < validPoints.length; index += 1) {
-    totalDistanceM += haversine(validPoints[index - 1], validPoints[index]) * 1000;
+function loadOsmAnalysisModule() {
+  if (!osmAnalysisModulePromise) {
+    osmAnalysisModulePromise = import('./modules/osm-analysis.js');
   }
-  let minimumDistanceM = OSM_ANALYSIS_SAMPLE_DISTANCE_M;
-  if (totalDistanceM / minimumDistanceM > OSM_ANALYSIS_MAX_SAMPLES - 1) {
-    minimumDistanceM = totalDistanceM / (OSM_ANALYSIS_MAX_SAMPLES - 1);
-  }
-  const samples = [validPoints[0]];
-  let distanceSinceSampleM = 0;
-  for (let index = 1; index < validPoints.length - 1; index += 1) {
-    distanceSinceSampleM += haversine(validPoints[index - 1], validPoints[index]) * 1000;
-    if (distanceSinceSampleM < minimumDistanceM) continue;
-    samples.push(validPoints[index]);
-    distanceSinceSampleM = 0;
-  }
-  const lastPoint = validPoints.at(-1);
-  if (samples.at(-1)?.pointIndex !== lastPoint.pointIndex) samples.push(lastPoint);
-  return samples;
+
+  return osmAnalysisModulePromise;
 }
 
 /**
- * Splits reference points into small, sequential Overpass query groups.
- * @param {Array<object>} samples OSM analysis reference points.
- * @returns {Array<Array<object>>} Batches safe to send one after another.
+ * Loads the optional FIT import and export module on first use.
+ * @returns {Promise<typeof import('./modules/fit-io.js')>} Lazy-loaded FIT module.
  */
-function splitOsmAnalysisSamples(samples) {
-  const chunks = [];
-  for (let start = 0; start < samples.length; start += OSM_ANALYSIS_QUERY_CHUNK_SIZE) {
-    chunks.push(samples.slice(start, start + OSM_ANALYSIS_QUERY_CHUNK_SIZE));
-  }
-  return chunks;
+function loadFitIoModule() {
+  if (!fitIoModulePromise) fitIoModulePromise = import('./modules/fit-io.js');
+  return fitIoModulePromise;
 }
 
 /**
- * Creates an Overpass query for highway-tagged ways near one batch of track reference points.
- * @param {Array<{lat: number, lng: number}>} samples Reference points of one query batch.
- * @returns {string} Overpass QL query requesting tags and geometry only.
- */
-function buildOsmWayTypeQuery(samples) {
-  const clauses = samples.map((sample) => `way(around:${OSM_ANALYSIS_MATCH_DISTANCE_M},${sample.lat.toFixed(6)},${sample.lng.toFixed(6)})[highway];`).join('\n');
-  return `[out:json][timeout:25];\n(\n${clauses}\n);\nout tags geom;`;
-}
-
-/**
- * Converts an Overpass HTTP status into a helpful retry instruction instead of exposing a technical status alone.
- * @param {number} status HTTP status returned by the OSM service.
- * @returns {string} Localized explanation with a safe next action.
- */
-function osmWayTypesRequestError(status) {
-  if (status === 429) return t('osmWayTypesRateLimited');
-  if (status === 406) return t('osmWayTypesRequestRejected');
-  if (status >= 500) return t('osmWayTypesServiceUnavailable');
-  return t('osmWayTypesRequestFailed', { status });
-}
-
-/**
- * Pauses a retry without blocking the browser event loop.
- * @param {number} durationMs Time to wait in milliseconds.
- * @returns {Promise<void>} Resolves after the requested delay.
- */
-function waitForOsmAnalysisRetry(durationMs) {
-  return new Promise((resolve) => window.setTimeout(resolve, durationMs));
-}
-
-/**
- * Requests nearby OSM ways for one group of reference points.
- * @param {Array<{lat: number, lng: number}>} samples Reference points of one query batch.
- * @returns {Promise<Array<object>>} OSM way elements with tags and geometry.
- */
-async function fetchOsmWayTypeWays(samples) {
-  const url = `${OSM_OVERPASS_ENDPOINT}?data=${encodeURIComponent(buildOsmWayTypeQuery(samples))}`;
-  let retryAvailable = true;
-  while (true) {
-    const response = await fetch(url, { cache: 'no-store' });
-    if (response.ok) {
-      let payload = null;
-      try {
-        payload = await response.json();
-      } catch {
-        throw new Error(t('osmWayTypesInvalidResponse'));
-      }
-      if (!Array.isArray(payload?.elements)) throw new Error(t('osmWayTypesInvalidResponse'));
-      return payload.elements.filter((element) => element?.type === 'way' && element?.tags?.highway && Array.isArray(element?.geometry));
-    }
-    const canRetry = response.status === 429 || response.status === 406;
-    if (!canRetry || !retryAvailable) throw new Error(osmWayTypesRequestError(response.status));
-    retryAvailable = false;
-    setStatus(t('osmWayTypesWaitingToRetry'), false, true);
-    await waitForOsmAnalysisRetry(OSM_ANALYSIS_RETRY_DELAY_MS);
-  }
-}
-
-/**
- * Calculates the shortest local planar distance from a point to one OSM line segment.
- * @param {{lat: number, lng: number}} point Track reference point.
- * @param {{lat: number, lon: number}} start First OSM geometry coordinate.
- * @param {{lat: number, lon: number}} end Second OSM geometry coordinate.
- * @returns {number} Distance in meters.
- */
-function osmPointToSegmentDistanceM(point, start, end) {
-  const metersPerLatitudeDegree = 110540;
-  const metersPerLongitudeDegree = 111320 * Math.cos(point.lat * Math.PI / 180);
-  const endX = (end.lon - start.lon) * metersPerLongitudeDegree;
-  const endY = (end.lat - start.lat) * metersPerLatitudeDegree;
-  const pointX = (point.lng - start.lon) * metersPerLongitudeDegree;
-  const pointY = (point.lat - start.lat) * metersPerLatitudeDegree;
-  const segmentLengthSquared = endX * endX + endY * endY;
-  if (segmentLengthSquared === 0) return Math.hypot(pointX, pointY);
-  let projection = (pointX * endX + pointY * endY) / segmentLengthSquared;
-  if (projection < 0) projection = 0;
-  if (projection > 1) projection = 1;
-  return Math.hypot(pointX - projection * endX, pointY - projection * endY);
-}
-
-/**
- * Finds the closest highway-tagged OSM way for one sampled track point.
- * @param {{lat: number, lng: number}} sample Track reference point.
- * @param {Array<object>} ways OSM ways returned for the sample batch.
- * @returns {string|null} OSM highway value, or null when no way is close enough.
- */
-function closestOsmWayType(sample, ways) {
-  let closestValue = null;
-  let closestDistanceM = OSM_ANALYSIS_MATCH_DISTANCE_M;
-  ways.forEach((way) => {
-    const value = cleanText(way?.tags?.highway).toLowerCase();
-    const geometry = way?.geometry;
-    if (!value || !Array.isArray(geometry) || geometry.length < 2) return;
-    for (let index = 1; index < geometry.length; index += 1) {
-      const distanceM = osmPointToSegmentDistanceM(sample, geometry[index - 1], geometry[index]);
-      if (distanceM > closestDistanceM) continue;
-      closestDistanceM = distanceM;
-      closestValue = value;
-    }
-  });
-  return closestValue;
-}
-
-/**
- * Turns sampled OSM way matches into contiguous point-index ranges understood by Trailthread's segment renderers.
- * @param {Array<{pointIndex: number, value: string|null}>} matches Ordered sampled OSM way matches.
- * @param {number} pointCount Number of points in the original track.
- * @param {boolean} complete Whether every planned OSM query group completed successfully.
- * @returns {Array<object>} Normalized point-indexed way-type segments.
- */
-function buildOsmWayTypeSegments(matches, pointCount, complete = true) {
-  const segments = [];
-  let activeSegment = null;
-  matches.forEach((match, index) => {
-    if (!match.value) {
-      activeSegment = null;
-      return;
-    }
-    let from = 0;
-    let to = pointCount - 1;
-    if (index > 0) from = Math.floor((matches[index - 1].pointIndex + match.pointIndex) / 2);
-    if (index < matches.length - 1) to = Math.floor((match.pointIndex + matches[index + 1].pointIndex) / 2);
-    if (!complete && index === matches.length - 1) to = Math.min(pointCount - 1, match.pointIndex + 1);
-    if (to <= from && from < pointCount - 1) to = from + 1;
-    if (to <= from) return;
-    if (activeSegment && activeSegment.value === match.value && activeSegment.to >= from - 1) {
-      activeSegment.to = to;
-      return;
-    }
-    activeSegment = { from, to, value: match.value, raw: match.value };
-    segments.push(activeSegment);
-  });
-  return normalizeRangeSegments(segments);
-}
-
-/**
- * Persists complete or partial OSM way-type segments and makes the analysed track visible on the map.
- * @param {object} track Track receiving the derived OSM data.
- * @param {Array<object>} samples All reference points planned for the analysis.
- * @param {Array<{pointIndex: number, value: string|null}>} matches Successfully processed OSM matches.
- * @param {number} totalGroups Number of query groups planned for the analysis.
- * @param {boolean} complete Whether all query groups completed.
- * @returns {Promise<{track: object, segments: Array<object>}|null>} Stored result, or null without usable segments.
- */
-async function persistOsmWayTypeAnalysis(track, samples, matches, totalGroups, complete) {
-  const wayTypeSegments = buildOsmWayTypeSegments(matches, track.points.length, complete);
-  if (!wayTypeSegments.length) return null;
-  const updatedTrack = touchTrack(track, {
-    wayTypes: segmentValues(wayTypeSegments),
-    wayTypeSegments,
-    osmWayTypeAnalysis: {
-      source: 'openstreetmap',
-      analyzedAt: isoNow(),
-      sampledPoints: samples.length,
-      matchedPoints: matches.filter((match) => !!match.value).length,
-      processedGroups: Math.ceil(matches.length / OSM_ANALYSIS_QUERY_CHUNK_SIZE),
-      totalGroups,
-      complete
-    }
-  });
-  await put(STORES.tracks, updatedTrack);
-  state.tracks = state.tracks.map((item) => {
-    if (item.id === updatedTrack.id) return updatedTrack;
-    return item;
-  });
-  state.selectedTrackIds.add(updatedTrack.id);
-  state.highlightedTrackId = updatedTrack.id;
-  if (!state.settings.segmentOverlayMode) {
-    state.settings.segmentOverlayMode = true;
-    await saveSettings();
-  }
-  renderAll();
-  syncMapForSelectionChange();
-  if (state.trackDetailUi.trackId === updatedTrack.id) renderTrackDetailDialog();
-  return { track: updatedTrack, segments: wayTypeSegments };
-}
-
-/**
- * Loads highway types from OSM for one local track and persists only the derived segment data.
+ * Starts the on-demand OSM way-type analysis for one local track.
  * @param {string} trackId Identifier of the track selected in the library.
- * @returns {Promise<void>} Resolves after the analysis result or error state is rendered.
+ * @returns {Promise<void>} Resolves after the analysis module has completed its work.
  */
 async function analyseTrackWayTypesFromOsm(trackId) {
-  const track = state.tracks.find((item) => item.id === trackId);
-  if (!track) return;
-  const samples = buildOsmAnalysisSamples(track.points);
-  if (samples.length < 2) {
-    setStatus(t('osmWayTypesNeedsTrack'), true);
-    return;
+  if (!state.settings.osmWayTypesConsent) {
+    const approved = await confirmAction(t('osmWayTypesConsentMessage'), {
+      title: t('osmWayTypesConsentTitle'),
+      confirmLabel: t('osmWayTypesConsentConfirm'),
+      cancelLabel: t('cancelButton'),
+    });
+    if (!approved) {
+      setStatus(t('osmWayTypesConsentDeclined'));
+      return;
+    }
+    state.settings.osmWayTypesConsent = true;
+    await saveSettings();
   }
-  osmAnalysisTrackId = trackId;
-  renderLibrary();
-  const matches = [];
-  const chunks = splitOsmAnalysisSamples(samples);
   try {
-    for (let index = 0; index < chunks.length; index += 1) {
-      setStatus(t('osmWayTypesProgress', { current: index + 1, total: chunks.length }), false, true);
-      const ways = await fetchOsmWayTypeWays(chunks[index]);
-      chunks[index].forEach((sample) => {
-        matches.push({ pointIndex: sample.pointIndex, value: closestOsmWayType(sample, ways) });
-      });
-    }
-    const result = await persistOsmWayTypeAnalysis(track, samples, matches, chunks.length, true);
-    if (!result) {
-      setStatus(t('osmWayTypesNoMatch'), true);
-      return;
-    }
-    setStatus(t('osmWayTypesDone', {
-      count: result.track.wayTypes.length,
-      segments: result.segments.length,
-      matched: result.track.osmWayTypeAnalysis.matchedPoints,
-      sampled: result.track.osmWayTypeAnalysis.sampledPoints
-    }));
+    const module = await loadOsmAnalysisModule();
+    await module.analyseTrackWayTypesFromOsm({
+      state,
+      haversine,
+      normalizeRangeSegments,
+      segmentValues,
+      touchTrack,
+      isoNow,
+      putTrack: (track) => put(STORES.tracks, track),
+      saveSettings,
+      renderAll,
+      syncMapForSelectionChange,
+      renderTrackDetailDialog,
+      renderLibrary,
+      setStatus,
+      translate: t,
+      cleanText,
+      setOsmAnalysisTrackId: (nextTrackId) => {
+        osmAnalysisTrackId = nextTrackId;
+      },
+    }, trackId);
   } catch (error) {
-    const hasCompleteExistingAnalysis = !!track.osmWayTypeAnalysis && track.osmWayTypeAnalysis.complete !== false;
-    let partialResult = null;
-    if (!hasCompleteExistingAnalysis) partialResult = await persistOsmWayTypeAnalysis(track, samples, matches, chunks.length, false);
-    if (partialResult) {
-      setStatus(t('osmWayTypesPartialSaved', {
-        count: partialResult.track.wayTypes.length,
-        segments: partialResult.segments.length,
-        processed: partialResult.track.osmWayTypeAnalysis.processedGroups,
-        total: partialResult.track.osmWayTypeAnalysis.totalGroups
-      }), true);
-      return;
-    }
+    console.error('The optional OSM analysis module could not be loaded.', error);
     setStatus(error?.message || t('osmWayTypesFailed'), true);
-  } finally {
-    osmAnalysisTrackId = null;
-    renderLibrary();
   }
 }
+
+/**
+ * Calculates percentage shares for normalized surface or way-type segments.
+ * @param {Array<object>} segments Raw segment ranges from a track.
+ * @returns {Array<{value: string, percent: number}>} Descending percentage shares by category.
+ */
 function segmentPercentages(segments) {
   const normalized = normalizeRangeSegments(segments);
   if (!normalized.length) return [];
@@ -1980,41 +2030,102 @@ function segmentPercentages(segments) {
     .sort((a, b) => b.percent - a.percent || a.value.localeCompare(b.value));
 }
 /**
- * Renders surface or way-type percentage chips into a profile breakdown container.
- * @param {HTMLElement|null} container Target element for the segment chips.
- * @param {Array<object>} segments Raw track segment ranges.
- * @param {'surface'|'waytype'} type Segment category that controls the swatch appearance.
+ * Returns a stable display color for a surface or way-type category.
+ * @param {string} value Source category value.
+ * @param {'surface'|'waytype'} type Segment category controlling the color system.
+ * @returns {string} CSS color used in the distribution and its detail view.
+ */
+function profileSegmentDistributionColor(value, type) {
+  if (type === 'surface') return surfaceSegmentColor(value);
+  const hue = hashString(`waytype:${value}`) % 360;
+  return `hsl(${hue} 72% 62%)`;
+}
+
+/**
+ * Opens the full surface or way-type distribution for a selected profile donut.
+ * @param {'surface'|'waytype'} type Segment category displayed by the dialog.
+ * @param {Array<{value: string, percent: number}>} items Percentage shares to list.
  * @returns {void}
  */
-function renderProfileSegmentBreakdown(container, segments, type) {
-  if (!container) return;
-  container.replaceChildren();
-  const items = segmentPercentages(segments);
-  if (!items.length) {
-    const empty = document.createElement('span');
-    empty.className = 'map-segment-empty';
-    empty.textContent = t('analysisNone');
-    container.append(empty);
-    return;
-  }
-  items.slice(0, 5).forEach(({ value, percent }) => {
-    const fragment = el.profileSegmentChipTemplate.content.cloneNode(true);
+function openProfileSegmentDialog(type, items) {
+  if (!el.profileSegmentDialog || !el.profileSegmentDialogTitle || !el.profileSegmentDetailList || !el.profileSegmentDetailTemplate) return;
+  let title = t('analysisWayTypeTitle');
+  if (type === 'surface') title = t('analysisSurfaceTitle');
+  el.profileSegmentDialogTitle.textContent = t('profileSegmentDetails', { type: title });
+  el.profileSegmentDetailList.replaceChildren();
+  items.forEach(({ value, percent }) => {
+    const fragment = el.profileSegmentDetailTemplate.content.cloneNode(true);
     const swatch = fragment.querySelector('.profile-segment-swatch-line');
-    const label = fragment.querySelector('.profile-segment-chip-label');
-    const percentage = fragment.querySelector('.profile-segment-chip-percent');
-    swatch.setAttribute('stroke', 'rgba(248, 251, 250, 0.92)');
+    const label = fragment.querySelector('.profile-segment-detail-label');
+    const percentage = fragment.querySelector('.profile-segment-detail-percent');
+    swatch.setAttribute('stroke', profileSegmentDistributionColor(value, type));
     swatch.setAttribute('stroke-width', '3');
     swatch.setAttribute('stroke-linecap', 'round');
-    swatch.setAttribute('stroke-dasharray', wayTypeSegmentDash(value));
-    if (type === 'surface') {
-      swatch.setAttribute('stroke', surfaceSegmentColor(value));
-      swatch.setAttribute('stroke-width', '4');
-      swatch.removeAttribute('stroke-dasharray');
-    }
+    if (type === 'waytype') swatch.setAttribute('stroke-dasharray', wayTypeSegmentDash(value));
+    if (type === 'surface') swatch.setAttribute('stroke-width', '4');
     label.textContent = displayDetailValue(value);
     percentage.textContent = `${percent}%`;
-    container.append(fragment);
+    el.profileSegmentDetailList.append(fragment);
   });
+  if (!el.profileSegmentDialog.open) el.profileSegmentDialog.showModal();
+}
+
+/**
+ * Renders one compact, clickable donut for a surface or way-type distribution.
+ * @param {HTMLElement} container Profile summary container receiving the donut.
+ * @param {Array<object>} segments Raw segment ranges from the current track.
+ * @param {'surface'|'waytype'} type Segment category shown by the donut.
+ * @returns {void}
+ */
+function renderProfileSegmentDistribution(container, segments, type) {
+  if (!el.profileSegmentDistributionTemplate) return;
+  const items = segmentPercentages(segments);
+  const fragment = el.profileSegmentDistributionTemplate.content.cloneNode(true);
+  const button = fragment.querySelector('.profile-distribution-button');
+  const label = fragment.querySelector('.profile-distribution-label');
+  const segmentsGroup = fragment.querySelector('.profile-distribution-donut-segments');
+  let title = t('analysisWayTypeTitle');
+  if (type === 'surface') title = t('analysisSurfaceTitle');
+  label.textContent = title;
+  button.setAttribute('aria-label', title);
+  if (!items.length) {
+    button.disabled = true;
+    button.setAttribute('title', t('analysisNone'));
+    container.append(fragment);
+    return;
+  }
+  let offset = 0;
+  const circumference = 2 * Math.PI * 40;
+  items.forEach(({ value, percent }) => {
+    const arcLength = circumference * (percent / 100);
+    const arc = createProfileSvgElement('circle', {
+      cx: 50,
+      cy: 50,
+      r: 40,
+      fill: 'none',
+      stroke: profileSegmentDistributionColor(value, type),
+      'stroke-width': 14,
+      'stroke-dasharray': `${arcLength} ${circumference}`,
+      'stroke-dashoffset': -offset,
+      transform: 'rotate(-90 50 50)'
+    });
+    segmentsGroup.append(arc);
+    offset += arcLength;
+  });
+  button.addEventListener('click', () => openProfileSegmentDialog(type, items));
+  container.append(fragment);
+}
+
+/**
+ * Renders the compact surface and way-type distribution controls for the active profile.
+ * @param {object} track Active track containing the derived segment ranges.
+ * @returns {void}
+ */
+function renderProfileSegmentSummary(track) {
+  if (!el.profileSegmentSummary) return;
+  el.profileSegmentSummary.replaceChildren();
+  renderProfileSegmentDistribution(el.profileSegmentSummary, track.surfaceSegments, 'surface');
+  renderProfileSegmentDistribution(el.profileSegmentSummary, track.wayTypeSegments, 'waytype');
 }
 function normalizeDirections(value) {
   if (!Array.isArray(value)) return [];
@@ -2268,6 +2379,26 @@ function createTrackPhotoThumbnail(photo, track, index) {
   const image = fragment.querySelector('.track-photo-thumb');
   populatePhotoThumbnailImage(image, photo, track, index);
   return { fragment, image };
+}
+
+/**
+ * Creates one detail-dialog photo card with an optional deletion control for editing.
+ * @param {object} photo Photo record to render.
+ * @param {object} track Owning track used for accessible fallback text.
+ * @param {number} index Zero-based position of the photo.
+ * @param {boolean} editing Whether the card is rendered in edit mode.
+ * @returns {{fragment: DocumentFragment, image: HTMLImageElement, deleteButton: HTMLButtonElement}} Cloned card and its interactive elements.
+ */
+function createTrackDetailPhotoCard(photo, track, index, editing) {
+  const fragment = el.trackDetailPhotoTemplate.content.cloneNode(true);
+  const image = fragment.querySelector('.track-detail-photo-image');
+  const deleteButton = fragment.querySelector('.track-detail-photo-delete');
+  populatePhotoThumbnailImage(image, photo, track, index);
+  deleteButton.hidden = !editing;
+  deleteButton.textContent = '×';
+  deleteButton.title = t('deleteTrackPhoto');
+  deleteButton.setAttribute('aria-label', t('deleteTrackPhoto'));
+  return { fragment, image, deleteButton };
 }
 
 function renderPhotoDialog() {
@@ -2620,11 +2751,11 @@ function createTrackAnalysisListCard(title, items, copy = '') {
   return card;
 }
 /**
- * Builds the complete track analysis fragment for the detail dialog via shared templates.
+ * Renders the complete track analysis fragment for the detail dialog via shared templates.
  * @param {object} track Track whose analysis cards should be rendered.
- * @returns {DocumentFragment} Fragment containing all analysis cards.
+ * @returns {DocumentFragment} Fragment containing all analysis cards and available analysis actions.
  */
-function trackAnalysisMarkup(track) {
+function renderTrackAnalysis(track) {
   const hasPhotos = Array.isArray(track.photos) && track.photos.length > 0;
   const hasElevation = Number.isFinite(track.elevationGainM) || Number.isFinite(track.elevationLossM) || Number.isFinite(track.elevationMinM) || Number.isFinite(track.elevationMaxM);
   const hasTiming = Array.isArray(track.points) && track.points.some((point) => !!point.time);
@@ -2689,15 +2820,37 @@ function trackAnalysisMarkup(track) {
       `${favoriteLabel} · ${t('analysisTagsLabel')}: ${customTagCount}`
     )
   );
+  const canAnalyseOsmWayTypes = Array.isArray(track.points) && track.points.length > 1;
+  if (canAnalyseOsmWayTypes) fragment.append(createTrackOsmWayTypeAction(track));
   return fragment;
 }
 
 /**
- * Builds the Komoot timeline section for the track detail dialog.
+ * Creates the OSM way-type analysis action for a track detail dialog.
+ * @param {object} track Track whose route points are sent to the OSM analysis.
+ * @returns {DocumentFragment} Action fragment with its localized state and click handler.
+ */
+function createTrackOsmWayTypeAction(track) {
+  const fragment = el.trackAnalysisActionTemplate.content.cloneNode(true);
+  const button = fragment.querySelector('.track-osm-waytype-button');
+  let label = t('osmWayTypesButton');
+  if (track.osmWayTypeAnalysis) label = t('osmWayTypesButtonAgain');
+  button.textContent = label;
+  button.title = t('osmWayTypesButtonTitle');
+  button.disabled = osmAnalysisTrackId === track.id;
+  if (button.disabled) button.textContent = t('osmWayTypesLoading');
+  button.addEventListener('click', () => {
+    void analyseTrackWayTypesFromOsm(track.id);
+  });
+  return fragment;
+}
+
+/**
+ * Renders the Komoot timeline section for the track detail dialog.
  * @param {object} track Track whose stored timeline should be displayed.
  * @returns {DocumentFragment} Timeline section fragment, or an empty fragment without timeline data.
  */
-function trackTimelineMarkup(track) {
+function renderTrackTimeline(track) {
   const entries = normalizeTrackTimeline(track);
   const fragment = document.createDocumentFragment();
   if (!entries.length) return fragment;
@@ -2734,6 +2887,36 @@ function trackTimelineMarkup(track) {
   return fragment;
 }
 
+/**
+ * Renders all visible track photos and their edit-mode deletion controls in the detail dialog.
+ * @param {object} track Track whose photos should be displayed.
+ * @param {boolean} editing Whether photo deletion controls should be shown.
+ * @returns {void}
+ */
+function renderTrackDetailPhotos(track, editing) {
+  el.trackDetailPhotos.replaceChildren();
+  let trackPhotos = [];
+  if (Array.isArray(track.photos)) trackPhotos = track.photos;
+  let visiblePhotoCount = 0;
+  trackPhotos.forEach((photo, index) => {
+    if (editing && trackDetailRemovedPhotoIndexes.has(index)) return;
+    const { fragment, image, deleteButton } = createTrackDetailPhotoCard(photo, track, index, editing);
+    image.addEventListener('click', () => openPhotoDialog(track, index));
+    if (editing) {
+      deleteButton.addEventListener('click', () => {
+        void markTrackDetailPhotoForDeletion(track.id, index);
+      });
+    }
+    el.trackDetailPhotos.append(fragment);
+    visiblePhotoCount += 1;
+  });
+  el.trackDetailPhotos.hidden = visiblePhotoCount === 0;
+}
+
+/**
+ * Renders the selected track's read-only data or active editing controls in the detail dialog.
+ * @returns {void}
+ */
 function renderTrackDetailDialog() {
   const track = state.tracks.find((item) => item.id === state.trackDetailUi.trackId);
   if (!track) return;
@@ -2748,19 +2931,11 @@ function renderTrackDetailDialog() {
   el.trackDetailFavoriteInput.checked = !!track.favorite;
   el.trackDetailTagsInput.value = normalizeTagList(track.tags).join(', ');
   el.trackDetailDescriptionInput.value = track.description || '';
-  el.trackDetailAnalysis.replaceChildren(trackAnalysisMarkup(track), trackTimelineMarkup(track));
+  el.trackDetailAnalysis.replaceChildren(renderTrackAnalysis(track), renderTrackTimeline(track));
   el.trackDetailEditButton.hidden = editing;
   el.trackDetailSaveButton.hidden = !editing;
   el.trackDetailCancelButton.hidden = !editing;
-  el.trackDetailPhotos.replaceChildren();
-  let trackPhotos = [];
-  if (Array.isArray(track.photos)) trackPhotos = track.photos;
-  trackPhotos.forEach((photo, index) => {
-    const { fragment, image } = createTrackPhotoThumbnail(photo, track, index);
-    image.addEventListener('click', () => openPhotoDialog(track, index));
-    el.trackDetailPhotos.append(fragment);
-  });
-  el.trackDetailPhotos.hidden = !(Array.isArray(track.photos) && track.photos.length);
+  renderTrackDetailPhotos(track, editing);
 }
 function renderPhotoGrid(container, track, limit = 4) {
   if (!container) return;
@@ -2890,20 +3065,42 @@ function renderTrackExtras(copyNode, track) {
   if (facts) renderTrackFacts(facts, track);
   renderPhotoGrid(photoStrip, track, 6);
 }
+/**
+ * Opens a track detail dialog through the dedicated detail workspace controller.
+ * @param {string} trackId Identifier of the track to display.
+ * @param {boolean} [startEditing=false] Whether editing should start immediately.
+ * @returns {void} Does not return a value.
+ */
 function openTrackDetail(trackId, startEditing = false) {
-  const track = state.tracks.find((item) => item.id === trackId);
-  if (!track) return;
-  state.trackDetailUi.trackId = track.id;
-  state.trackDetailUi.editing = !!startEditing;
-  renderTrackDetailDialog();
-  el.trackDetailDialog.showModal();
-  if (startEditing) {
-    queueMicrotask(() => {
-      el.trackDetailNameInput?.focus();
-      el.trackDetailNameInput?.select();
-    });
-  }
+  trackDetailController.open(trackId, startEditing);
 }
+
+/**
+ * Checks the detail controller for unsaved edit fields or marked photo removals.
+ * @returns {boolean} True when closing the dialog would discard changes.
+ */
+function trackDetailHasUnsavedChanges() {
+  return trackDetailController.hasUnsavedChanges();
+}
+
+/**
+ * Requests a safe close through the dedicated detail workspace controller.
+ * @returns {Promise<void>} Resolves after closing or retaining the edit form.
+ */
+async function requestTrackDetailClose() {
+  await trackDetailController.requestClose();
+}
+
+/**
+ * Marks one detail-dialog photo for deletion through the dedicated workspace controller.
+ * @param {string} trackId Identifier of the track that owns the photo.
+ * @param {number} photoIndex Zero-based position of the photo in the track.
+ * @returns {Promise<void>} Resolves after the detail dialog has refreshed.
+ */
+async function markTrackDetailPhotoForDeletion(trackId, photoIndex) {
+  await trackDetailController.markPhotoForDeletion(trackId, photoIndex);
+}
+
 function allFilteredSelected() { const tracks = filteredTracks(); return tracks.length > 0 && tracks.every((track) => state.selectedTrackIds.has(track.id)); }
 function renderToggleSelectionButton() {
   if (!el.libraryToggleSelectionButton) return;
@@ -2985,6 +3182,10 @@ function renderTrackWidthControl() {
   el.trackWidthInput.value = String(weight);
   el.trackWidthValue.textContent = trackWidthPresetLabel(weight);
 }
+/**
+ * Renders the control that switches from tracks to photos of every selected track.
+ * @returns {void}
+ */
 function renderMapPhotoModeButton() {
   if (!el.mapPhotoModeButton) return;
   const active = !!state.settings.photoOverlayOnly;
@@ -2992,6 +3193,19 @@ function renderMapPhotoModeButton() {
   if (active) el.mapPhotoModeButton.textContent = t('showTracksAgain');
   el.mapPhotoModeButton.classList.toggle('is-active', active);
   el.mapPhotoModeButton.disabled = !!state.settings.heatmapMode;
+}
+
+/**
+ * Renders the control that hides or restores all photo markers without changing track visibility.
+ * @returns {void}
+ */
+function renderMapPhotoVisibilityButton() {
+  if (!el.mapPhotoVisibilityButton) return;
+  const hidden = !!state.settings.hideMapPhotos;
+  el.mapPhotoVisibilityButton.textContent = t('hideMapPhotos');
+  if (hidden) el.mapPhotoVisibilityButton.textContent = t('showMapPhotos');
+  el.mapPhotoVisibilityButton.classList.toggle('is-active', hidden);
+  el.mapPhotoVisibilityButton.disabled = !!state.settings.heatmapMode;
 }
 function renderMapHeatmapButton() {
   if (!el.mapHeatmapButton) return;
@@ -3061,6 +3275,18 @@ function renderPaneCompactButtons() {
 }
 
 /**
+ * Restores the hidden mobile sidebar from the compact library header.
+ * @returns {Promise<void>} Resolves after the updated layout preference is stored.
+ */
+async function showMobileSidebar() {
+  state.settings.sidebarCompact = false;
+  applyPaneWidths();
+  renderPaneCompactButtons();
+  await saveSettings();
+  scheduleMapLayoutRefresh();
+}
+
+/**
  * Resolves the configured browser-extension download address against the current app URL.
  * @returns {string|null} Absolute package URL, or null when the configuration is invalid.
  */
@@ -3127,13 +3353,14 @@ function renderI18n() {
   el.nextTrackButton?.setAttribute('title', nextLabel);
   el.photoDialogClose?.setAttribute('aria-label', t('closeButton'));
   el.photoDialogClose?.setAttribute('title', t('closeButton'));
-  [['replayRestartButton', 'replayRestart'], ['replayBackButton', 'replayBack'], ['replayPlayButton', 'replayPlay'], ['replayPauseButton', 'replayStop'], ['replayForwardButton', 'replayForward']].forEach(([ref, key]) => {
+  [['replayRestartButton', 'replayRestart'], ['replayBackButton', 'replayBack'], ['replayForwardButton', 'replayForward']].forEach(([ref, key]) => {
     el[ref]?.setAttribute('aria-label', t(key));
     el[ref]?.setAttribute('title', t(key));
   });
   el.languageSelect.value = state.settings.language ?? 'auto';
   renderTrackWidthControl();
   renderMapPhotoModeButton();
+  renderMapPhotoVisibilityButton();
   renderMapHeatmapButton();
   renderMapSegmentButton();
   renderPaneCompactButtons();
@@ -3173,133 +3400,254 @@ function renderAccounts() {
   });
   el.komootAccountSelect.value = state.settings.activeAccountId ?? '';
 }
+/**
+ * Updates the library summary with the number of tracks matching the current filters.
+ * @param {Array<object>} tracks Filtered tracks shown in the library.
+ * @returns {void}
+ */
+function renderLibrarySummary(tracks) {
+  el.librarySummary.textContent = t('libraryEmpty');
+  if (tracks.length) el.librarySummary.textContent = t('librarySummary', { count: tracks.length });
+}
+
+/**
+ * Toggles one library track on the map or opens it directly in Replay.
+ * @param {object} track Track selected from a library card.
+ * @param {boolean} selected Whether the card was selected before the activation.
+ * @returns {void}
+ */
+function activateLibraryTrack(track, selected) {
+  preserveLibraryListState(track.id);
+  if (state.settings.activeWorkspace === 'replay') {
+    void openReplayTrack(track.id);
+    return;
+  }
+  if (selected) state.selectedTrackIds.delete(track.id);
+  else state.selectedTrackIds.add(track.id);
+  void saveSettings();
+  renderLibrary();
+  renderSelection();
+  syncMapForSelectionChange();
+}
+
+/**
+ * Stores a color chosen from a library card and updates only its map layer.
+ * @param {object} track Track whose color should be changed.
+ * @param {HTMLInputElement} colorInput Color picker holding the selected color.
+ * @param {HTMLElement} swatch Visible card color preview.
+ * @returns {Promise<void>} Resolves after the local track record was updated.
+ */
+async function updateLibraryTrackColor(track, colorInput, swatch) {
+  const updatedTrack = touchTrack(track, { color: colorInput.value });
+  await put(STORES.tracks, updatedTrack);
+  state.tracks = state.tracks.map((item) => {
+    if (item.id === updatedTrack.id) return updatedTrack;
+    return item;
+  });
+  swatch.style.background = updatedTrack.color;
+  updateTrackLayerStyle(updatedTrack.id);
+}
+
+/**
+ * Adds the selection, keyboard and color-picker behavior to one library track card.
+ * @param {HTMLElement} item Track card receiving the interaction handlers.
+ * @param {HTMLInputElement} checkbox Selection state control from the card template.
+ * @param {HTMLInputElement} colorInput Color picker from the card template.
+ * @param {HTMLElement} swatch Color preview from the card template.
+ * @param {object} track Track represented by the card.
+ * @returns {void}
+ */
+function bindLibraryTrackCardInteractions(item, checkbox, colorInput, swatch, track) {
+  item.addEventListener('click', (event) => {
+    if (event.target.closest('.track-actions')) return;
+    activateLibraryTrack(track, checkbox.checked);
+  });
+  item.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    activateLibraryTrack(track, checkbox.checked);
+  });
+  colorInput.addEventListener('input', (event) => {
+    event.stopPropagation();
+    void updateLibraryTrackColor(track, colorInput, swatch);
+  });
+}
+
+/**
+ * Configures the action buttons in one library track card.
+ * @param {object} buttons Action buttons cloned from the track card template.
+ * @param {object} track Track represented by the card.
+ * @param {string|null} originalTrackUrl Optional original Komoot URL for the track.
+ * @returns {void}
+ */
+function configureLibraryTrackActions(buttons, track, originalTrackUrl) {
+  const { komootLinkButton, focusButton, replayButton, editButton, exportButton, expandButton, deleteButton } = buttons;
+  komootLinkButton.hidden = !originalTrackUrl;
+  komootLinkButton.textContent = '↗';
+  komootLinkButton.title = t('openInKomoot');
+  komootLinkButton.setAttribute('aria-label', t('openInKomoot'));
+  if (originalTrackUrl) komootLinkButton.addEventListener('click', (event) => { event.stopPropagation(); window.open(originalTrackUrl, '_blank', 'noopener,noreferrer'); });
+  editButton.textContent = '✎';
+  editButton.title = t('editTrackButton');
+  editButton.setAttribute('aria-label', t('editTrackButton'));
+  editButton.addEventListener('click', (event) => { event.stopPropagation(); openTrackDetail(track.id, true); });
+  exportButton.textContent = '⇩';
+  exportButton.title = t('exportTrackGpx');
+  exportButton.setAttribute('aria-label', t('exportTrackGpx'));
+  exportButton.addEventListener('click', (event) => { event.stopPropagation(); exportTrackGpx(track.id); });
+  focusButton.textContent = '≣';
+  focusButton.title = t('focusTrack');
+  focusButton.setAttribute('aria-label', t('focusTrack'));
+  focusButton.addEventListener('click', (event) => { event.stopPropagation(); focusTrack(track.id); });
+  replayButton.textContent = '▶';
+  replayButton.title = t('replayOpen');
+  replayButton.setAttribute('aria-label', t('replayOpen'));
+  replayButton.addEventListener('click', async (event) => { event.stopPropagation(); await openReplayTrack(track.id); });
+  expandButton.textContent = '⤢';
+  expandButton.title = t('expandTrack');
+  expandButton.setAttribute('aria-label', t('expandTrack'));
+  expandButton.addEventListener('click', (event) => { event.stopPropagation(); openTrackDetail(track.id); });
+  deleteButton.title = t('deleteTrack');
+  deleteButton.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    preserveLibraryListState(null);
+    if (!await confirmAction(t('confirmDeleteSelected'))) return;
+    await deleteTracks([track.id]);
+  });
+}
+
+/**
+ * Creates a fully configured library card from the shared track item template.
+ * @param {object} track Track rendered by the library card.
+ * @returns {DocumentFragment} Ready-to-append track card fragment.
+ */
+function createLibraryTrackCard(track) {
+  const fragment = el.trackItemTemplate.content.cloneNode(true);
+  const item = fragment.querySelector('.track-item');
+  const checkbox = fragment.querySelector('.track-checkbox');
+  const swatch = fragment.querySelector('.track-swatch');
+  const colorInput = fragment.querySelector('.track-color-input');
+  const copy = fragment.querySelector('.track-copy');
+  const name = fragment.querySelector('.track-name');
+  const buttons = {
+    komootLinkButton: fragment.querySelector('.komoot-link-button'),
+    focusButton: fragment.querySelector('.focus-button'),
+    replayButton: fragment.querySelector('.replay-button'),
+    editButton: fragment.querySelector('.edit-button'),
+    exportButton: fragment.querySelector('.export-button'),
+    expandButton: fragment.querySelector('.expand-button'),
+    deleteButton: fragment.querySelector('.delete-button')
+  };
+  const selected = state.selectedTrackIds.has(track.id);
+  item.classList.toggle('is-selected', selected);
+  item.dataset.trackId = track.id;
+  item.tabIndex = 0;
+  checkbox.checked = selected;
+  checkbox.dataset.trackId = track.id;
+  swatch.style.background = track.color;
+  colorInput.value = track.color;
+  name.textContent = track.name;
+  renderTrackExtras(copy, track);
+  bindLibraryTrackCardInteractions(item, checkbox, colorInput, swatch, track);
+  let originalTrackUrl = track.komootUrl;
+  if (!originalTrackUrl) originalTrackUrl = komootTrackUrl(track);
+  configureLibraryTrackActions(buttons, track, originalTrackUrl);
+  return fragment;
+}
+
+/**
+ * Renders the filtered library track cards and preserves the list's visible position.
+ * @returns {void}
+ */
 function renderLibrary() {
   renderLibraryFilters();
-  const tracks = filteredTracks(); el.trackList.replaceChildren(); el.librarySummary.textContent = t('libraryEmpty');
-  if (tracks.length) el.librarySummary.textContent = t('librarySummary', { count: tracks.length });
-  tracks.forEach((track) => {
-    const frag = el.trackItemTemplate.content.cloneNode(true);
-    const item = frag.querySelector('.track-item');
-    const checkbox = frag.querySelector('.track-checkbox');
-    const swatch = frag.querySelector('.track-swatch');
-    const colorInput = frag.querySelector('.track-color-input');
-    const copy = frag.querySelector('.track-copy');
-    const name = frag.querySelector('.track-name');
-    const komootLinkButton = frag.querySelector('.komoot-link-button');
-    const focusButton = frag.querySelector('.focus-button');
-    const replayButton = frag.querySelector('.replay-button');
-    const editButton = frag.querySelector('.edit-button');
-    const exportButton = frag.querySelector('.export-button');
-    const osmWaytypeButton = frag.querySelector('.track-osm-waytype-button');
-    const expandButton = frag.querySelector('.expand-button');
-    const deleteButton = frag.querySelector('.delete-button');
-    item.classList.toggle('is-selected', state.selectedTrackIds.has(track.id));
-    item.dataset.trackId = track.id;
-    item.tabIndex = 0;
-    checkbox.checked = state.selectedTrackIds.has(track.id);
-    checkbox.dataset.trackId = track.id;
-    swatch.style.background = track.color;
-    colorInput.value = track.color;
-    name.textContent = track.name;
-    renderTrackExtras(copy, track);
-    const originalTrackUrl = track.komootUrl || komootTrackUrl(track);
-    item.addEventListener('click', (event) => {
-      if (event.target.closest('.track-actions')) return;
-      if (state.settings.activeWorkspace === 'replay') {
-        preserveLibraryListState(track.id);
-        openReplayTrack(track.id);
-        return;
-      }
-      preserveLibraryListState(track.id);
-      if (checkbox.checked) state.selectedTrackIds.delete(track.id);
-      else state.selectedTrackIds.add(track.id);
-      renderLibrary();
-      renderSelection();
-      syncMapForSelectionChange();
-    });
-    item.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      if (state.settings.activeWorkspace === 'replay') {
-        preserveLibraryListState(track.id);
-        openReplayTrack(track.id);
-        return;
-      }
-      preserveLibraryListState(track.id);
-      if (checkbox.checked) state.selectedTrackIds.delete(track.id);
-      else state.selectedTrackIds.add(track.id);
-      renderLibrary();
-      renderSelection();
-      syncMapForSelectionChange();
-    });
-    colorInput.addEventListener('input', async (event) => {
-      event.stopPropagation();
-      const updatedTrack = touchTrack(track, { color: colorInput.value });
-      await put(STORES.tracks, updatedTrack);
-      state.tracks = state.tracks.map((item) => {
-        if (item.id === updatedTrack.id) return updatedTrack;
-        return item;
-      });
-      swatch.style.background = updatedTrack.color;
-      updateTrackLayerStyle(updatedTrack.id);
-    });
-    komootLinkButton.hidden = !originalTrackUrl;
-    komootLinkButton.textContent = '↗';
-    komootLinkButton.title = t('openInKomoot');
-    komootLinkButton.setAttribute('aria-label', t('openInKomoot'));
-    if (originalTrackUrl) komootLinkButton.addEventListener('click', (event) => { event.stopPropagation(); window.open(originalTrackUrl, '_blank', 'noopener,noreferrer'); });
-    editButton.textContent = '✎';
-    editButton.title = t('editTrackButton');
-    editButton.setAttribute('aria-label', t('editTrackButton'));
-    editButton.addEventListener('click', (event) => { event.stopPropagation(); openTrackDetail(track.id, true); });
-    exportButton.textContent = '⇩';
-    exportButton.title = t('exportTrackGpx');
-    exportButton.setAttribute('aria-label', t('exportTrackGpx'));
-    exportButton.addEventListener('click', (event) => { event.stopPropagation(); exportTrackGpx(track.id); });
-    const canAnalyseOsmWayTypes = Array.isArray(track.points) && track.points.length > 1;
-    osmWaytypeButton.hidden = !canAnalyseOsmWayTypes;
-    let osmWaytypeButtonLabel = t('osmWayTypesButton');
-    if (track.osmWayTypeAnalysis) osmWaytypeButtonLabel = t('osmWayTypesButtonAgain');
-    osmWaytypeButton.textContent = osmWaytypeButtonLabel;
-    osmWaytypeButton.title = t('osmWayTypesButtonTitle');
-    osmWaytypeButton.disabled = osmAnalysisTrackId === track.id;
-    if (osmWaytypeButton.disabled) osmWaytypeButton.textContent = t('osmWayTypesLoading');
-    osmWaytypeButton.addEventListener('click', (event) => { event.stopPropagation(); analyseTrackWayTypesFromOsm(track.id); });
-    focusButton.textContent = '≣';
-    focusButton.title = t('focusTrack');
-    focusButton.setAttribute('aria-label', t('focusTrack'));
-    focusButton.addEventListener('click', (event) => { event.stopPropagation(); focusTrack(track.id); });
-    replayButton.textContent = '▶';
-    replayButton.title = t('replayOpen');
-    replayButton.setAttribute('aria-label', t('replayOpen'));
-    replayButton.addEventListener('click', async (event) => { event.stopPropagation(); await openReplayTrack(track.id); });
-    expandButton.textContent = '⤢';
-    expandButton.title = t('expandTrack');
-    expandButton.setAttribute('aria-label', t('expandTrack'));
-    expandButton.addEventListener('click', (event) => { event.stopPropagation(); openTrackDetail(track.id); });
-    deleteButton.title = t('deleteTrack');
-    deleteButton.addEventListener('click', async (event) => { event.stopPropagation(); preserveLibraryListState(null); if (!await confirmAction(t('confirmDeleteSelected'))) return; await deleteTracks([track.id]); });
-    el.trackList.append(frag);
-  });
+  const tracks = filteredTracks();
+  el.trackList.replaceChildren();
+  renderLibrarySummary(tracks);
+  tracks.forEach((track) => el.trackList.append(createLibraryTrackCard(track)));
   renderToggleSelectionButton();
   renderMergeSelectedTracksButton();
   restoreLibraryListState();
 }
-function renderSelection() {
-  const tracks = state.tracks.filter((track) => state.selectedTrackIds.has(track.id)); el.selectionStats.textContent = fmtNum(tracks.length); el.distanceStats.textContent = `${fmtKm(tracks.reduce((sum, track) => sum + (track.distanceKm ?? 0), 0))} km`; el.pointStats.textContent = fmtNum(tracks.reduce((sum, track) => sum + (track.pointCount ?? 0), 0));
+/**
+ * Updates the map overlay statistics for the currently selected tracks.
+ * @param {Array<object>} tracks Tracks currently selected for the map.
+ * @returns {void}
+ */
+function renderSelectionStatistics(tracks) {
+  el.selectionStats.textContent = fmtNum(tracks.length);
+  const distanceKm = tracks.reduce((sum, track) => sum + (track.distanceKm ?? 0), 0);
+  const pointCount = tracks.reduce((sum, track) => sum + (track.pointCount ?? 0), 0);
+  el.distanceStats.textContent = `${fmtKm(distanceKm)} km`;
+  el.pointStats.textContent = fmtNum(pointCount);
   const overlay = el.selectionStats?.closest('.map-overlay');
   if (overlay?.parentElement) overlay.parentElement.append(overlay);
-  renderMergeSelectedTracksButton();
+}
+
+/**
+ * Creates a compact read-only track item for selection and recent-track lists.
+ * @param {object} track Track supplying the visible metadata.
+ * @param {string|null|undefined} date Date value shown in the compact row.
+ * @returns {DocumentFragment} Ready-to-append compact track item fragment.
+ */
+function createCompactTrackListItem(track, date) {
+  const fragment = el.stagingItemTemplate.content.cloneNode(true);
+  const name = fragment.querySelector('.track-name');
+  const meta = fragment.querySelector('.track-meta');
+  const submeta = fragment.querySelector('.track-submeta');
+  name.textContent = track.name;
+  meta.textContent = t('trackMeta', {
+    distance: fmtKm(track.distanceKm),
+    points: fmtNum(track.pointCount),
+    type: trackTypeLabel(track.type)
+  });
+  submeta.textContent = t('trackSubmeta', {
+    date: fmtDate(date),
+    source: track.accountLabel || trackSourceLabel(track.source)
+  });
+  return fragment;
+}
+
+/**
+ * Renders the currently selected tracks in the compact selection list.
+ * @param {Array<object>} tracks Tracks selected for the map.
+ * @returns {void}
+ */
+function renderSelectionList(tracks) {
   if (!el.selectionList) return;
   el.selectionList.replaceChildren();
-  if (!tracks.length) { const li = document.createElement('li'); li.className = 'track-item compact-item'; li.textContent = t('noSelection'); el.selectionList.append(li); return; }
-  tracks.forEach((track) => { const frag = el.stagingItemTemplate.content.cloneNode(true); frag.querySelector('.track-name').textContent = track.name; frag.querySelector('.track-meta').textContent = t('trackMeta', { distance: fmtKm(track.distanceKm), points: fmtNum(track.pointCount), type: trackTypeLabel(track.type) }); frag.querySelector('.track-submeta').textContent = t('trackSubmeta', { date: fmtDate(track.dateStart), source: track.accountLabel || trackSourceLabel(track.source) }); el.selectionList.append(frag); });
+  if (!tracks.length) {
+    const item = document.createElement('li');
+    item.className = 'track-item compact-item';
+    item.textContent = t('noSelection');
+    el.selectionList.append(item);
+    return;
+  }
+  tracks.forEach((track) => el.selectionList.append(createCompactTrackListItem(track, track.dateStart)));
 }
+
+/**
+ * Renders map selection statistics and the matching compact track list.
+ * @returns {void}
+ */
+function renderSelection() {
+  const tracks = state.tracks.filter((track) => state.selectedTrackIds.has(track.id));
+  renderSelectionStatistics(tracks);
+  renderMergeSelectedTracksButton();
+  renderSelectionList(tracks);
+}
+
+/**
+ * Renders the most recently imported tracks in the compact recent-track list.
+ * @returns {void}
+ */
 function renderRecent() {
   if (!el.recentList || !el.recentSummary) return;
-  const tracks = recentTracks(); el.recentList.replaceChildren(); el.recentSummary.textContent = t('inboxEmpty');
+  const tracks = recentTracks();
+  el.recentList.replaceChildren();
+  el.recentSummary.textContent = t('inboxEmpty');
   if (tracks.length) el.recentSummary.textContent = t('recentSummary', { count: tracks.length });
-  tracks.forEach((track) => { const frag = el.stagingItemTemplate.content.cloneNode(true); frag.querySelector('.track-name').textContent = track.name; frag.querySelector('.track-meta').textContent = t('trackMeta', { distance: fmtKm(track.distanceKm), points: fmtNum(track.pointCount), type: trackTypeLabel(track.type) }); frag.querySelector('.track-submeta').textContent = t('trackSubmeta', { date: fmtDate(track.importedAt), source: track.accountLabel || trackSourceLabel(track.source) }); el.recentList.append(frag); });
+  tracks.forEach((track) => el.recentList.append(createCompactTrackListItem(track, track.importedAt)));
 }
 function preserveKomootListState(listName) {
   let container = el.plannedList;
@@ -3403,9 +3751,55 @@ function renderProxy() {
   if (state.proxy.lastCheckAt) el.diagChecked.textContent = new Date(state.proxy.lastCheckAt).toLocaleString(lang());
   el.diagError.textContent = state.proxy.lastError || t('noError');
 }
-function renderKomootProgress() { const progress = state.komootUi.progress; el.komootProgress.hidden = !progress.active; el.komootProgressLabel.textContent = progress.label || ''; el.komootProgressValue.textContent = `${Math.round(progress.value)}%`; if (progress.indeterminate) { el.komootProgressValue.textContent = '...'; el.komootProgressBar.removeAttribute('value'); } else { el.komootProgressBar.value = progress.value; } }
-function setKomootProgress(label, value = 0, indeterminate = false) { state.komootUi.progress = { active: true, label, value, indeterminate }; renderKomootProgress(); }
-function clearKomootProgress() { state.komootUi.progress = { active: false, label: '', value: 0, indeterminate: false }; renderKomootProgress(); }
+/**
+ * Renders the current progress state for a Komoot import or export.
+ * @returns {void} Does not return a value.
+ */
+function renderKomootProgress() {
+  const progress = state.komootUi.progress;
+  el.komootProgress.hidden = !progress.active;
+  el.komootProgressLabel.textContent = progress.label || '';
+
+  if (progress.indeterminate) {
+    el.komootProgressValue.textContent = '...';
+    el.komootProgressBar.removeAttribute('value');
+    return;
+  }
+
+  el.komootProgressValue.textContent = `${Math.round(progress.value)}%`;
+  el.komootProgressBar.value = progress.value;
+}
+
+/**
+ * Shows a determinate or indeterminate Komoot operation progress indicator.
+ * @param {string} label Translated status text describing the current operation.
+ * @param {number} [value=0] Completed percentage for determinate operations.
+ * @param {boolean} [indeterminate=false] Whether no reliable percentage is available.
+ * @returns {void} Does not return a value.
+ */
+function setKomootProgress(label, value = 0, indeterminate = false) {
+  state.komootUi.progress = {
+    active: true,
+    label,
+    value,
+    indeterminate,
+  };
+  renderKomootProgress();
+}
+
+/**
+ * Hides and resets the Komoot operation progress indicator.
+ * @returns {void} Does not return a value.
+ */
+function clearKomootProgress() {
+  state.komootUi.progress = {
+    active: false,
+    label: '',
+    value: 0,
+    indeterminate: false,
+  };
+  renderKomootProgress();
+}
 function ensureProfileHoverMarker() {
   if (state.profileUi.hoverMarker || !state.map) return state.profileUi.hoverMarker;
   state.profileUi.hoverMarker = L.circleMarker([0, 0], { radius: 7, weight: 3, color: 'rgba(14,18,17,0.95)', fillColor: '#ffffff', fillOpacity: 1, opacity: 1 }).addTo(state.map);
@@ -3448,19 +3842,37 @@ function createProfileSvgElement(name, attributes) {
 /**
  * Draws the dynamic crosshair and point for the hovered elevation sample.
  * @param {SVGGElement} container SVG group reserved for hover graphics.
+ * @param {{left: number, right: number, top: number, bottom: number}} plot Visible plot boundaries in SVG coordinates.
  * @param {number} x Horizontal chart coordinate.
  * @param {number} y Vertical chart coordinate.
  * @returns {void}
  */
-function renderProfileHoverGraphics(container, x, y) {
+function renderProfileHoverGraphics(container, plot, x, y) {
   container.replaceChildren();
   container.append(
-    createProfileSvgElement('line', { class: 'profile-hover-line', x1: x, y1: 22, x2: x, y2: 214 }),
-    createProfileSvgElement('line', { class: 'profile-hover-line', x1: 46, y1: y, x2: 954, y2: y }),
+    createProfileSvgElement('line', { class: 'profile-hover-line', x1: x, y1: plot.top, x2: x, y2: plot.bottom }),
+    createProfileSvgElement('line', { class: 'profile-hover-line', x1: plot.left, y1: y, x2: plot.right, y2: y }),
     createProfileSvgElement('circle', { class: 'profile-hover-dot', cx: x, cy: y, r: 6 })
   );
 }
 
+/**
+ * Returns a view box whose aspect ratio matches the currently displayed profile chart.
+ * @returns {{width: number, height: number}} SVG dimensions in view-box coordinates.
+ */
+function profileChartDimensions() {
+  const chartBounds = el.profileChart.getBoundingClientRect();
+  const height = 260;
+  let width = 1000;
+  if (chartBounds.width > 0 && chartBounds.height > 0) width = Math.round(height * chartBounds.width / chartBounds.height);
+  return { width, height };
+}
+
+/**
+ * Updates the map marker, profile crosshair and the hover information for one elevation sample.
+ * @param {TrackPoint} sample Track point selected from the elevation profile.
+ * @returns {void}
+ */
 function updateProfileHover(sample) {
   const marker = ensureProfileHoverMarker();
   marker.setLatLng([sample.lat, sample.lng]);
@@ -3468,7 +3880,7 @@ function updateProfileHover(sample) {
   if (!hover || !state.profileUi.plot) return;
   const x = state.profileUi.plot.x(sample.cumulativeKm);
   const y = state.profileUi.plot.y(sample.ele);
-  renderProfileHoverGraphics(hover, x, y);
+  renderProfileHoverGraphics(hover, state.profileUi.plot, x, y);
   if (!el.profileCursorInfo) return;
   let ascent = 0;
   if (Number.isFinite(sample.cumulativeAscentM)) ascent = Math.round(sample.cumulativeAscentM);
@@ -3481,11 +3893,20 @@ function updateProfileHover(sample) {
   el.profileCursorInfo.classList.toggle('is-right', x < 280);
   el.profileCursorInfo.hidden = false;
 }
+/**
+ * Centers the map on a profile sample and refreshes its profile hover state.
+ * @param {TrackPoint} sample Track point selected from the elevation profile.
+ * @returns {void}
+ */
 function focusProfileSample(sample) {
   if (!sample || !state.map) return;
   updateProfileHover(sample);
   state.map.panTo([sample.lat, sample.lng], { animate: true, duration: 0.35 });
 }
+/**
+ * Renders the selected track's elevation profile, axis labels, photo markers and summary values.
+ * @returns {void}
+ */
 function renderProfile() {
   const visibleIds = filteredTrackIdSet();
   let track = null;
@@ -3501,8 +3922,7 @@ function renderProfile() {
   state.profileUi.plot = null;
   clearProfileHover();
   if (el.profileSegmentSummary) el.profileSegmentSummary.hidden = true;
-  el.profileSurfaceBreakdown?.replaceChildren();
-  el.profileWaytypeBreakdown?.replaceChildren();
+  el.profileSegmentSummary?.replaceChildren();
   if (!track) {
     el.profileEmpty.hidden = false;
     el.profileEmpty.textContent = t('profileHintNoTrack');
@@ -3518,17 +3938,19 @@ function renderProfile() {
     el.profileChart.replaceChildren();
     return;
   }
+  el.profileChartShell.hidden = false;
   const hasSegmentSummary = state.settings.segmentOverlayMode && (normalizeRangeSegments(track.surfaceSegments).length || normalizeRangeSegments(track.wayTypeSegments).length);
   if (el.profileSegmentSummary) el.profileSegmentSummary.hidden = !hasSegmentSummary;
-  renderProfileSegmentBreakdown(el.profileSurfaceBreakdown, track.surfaceSegments, 'surface');
-  renderProfileSegmentBreakdown(el.profileWaytypeBreakdown, track.wayTypeSegments, 'waytype');
+  if (hasSegmentSummary) renderProfileSegmentSummary(track);
   const minEle = Math.min(...samples.map((point) => point.ele));
   const maxEle = Math.max(...samples.map((point) => point.ele));
   const maxDist = Math.max(track.distanceKm || samples.at(-1)?.cumulativeKm || 0, 0.1);
   const padX = 46;
   const padY = 22;
-  const width = 1000;
-  const height = 260;
+  const dimensions = profileChartDimensions();
+  const width = dimensions.width;
+  const height = dimensions.height;
+  el.profileChart.setAttribute('viewBox', `0 0 ${width} ${height}`);
   const plotWidth = width - padX * 2;
   const plotHeight = height - padY * 2 - 24;
   const elevSpan = Math.max(maxEle - minEle, 10);
@@ -3576,857 +3998,22 @@ function renderProfile() {
   el.profileEmpty.hidden = true;
   el.profileChartShell.hidden = false;
   state.profileUi.samples = samples;
-  state.profileUi.plot = { x, y };
+  state.profileUi.plot = { x, y, left: padX, right: width - padX, top: padY, bottom: padY + plotHeight };
 }
-function replayTrackSourceLabel(track) {
-  return track?.accountLabel || trackSourceLabel(track?.source);
-}
-function buildReplayTrack(track) {
-  if (!track?.points?.length) return null;
-  const samples = track.points.map((point, index, points) => {
-    const previous = points[Math.max(0, index - 1)];
-    const next = points[Math.min(points.length - 1, index + 1)];
-    let timeMs = null;
-    if (point.time) timeMs = parsePointTime(point.time);
-    let cumulativeKm = point.cumulativeKm;
-    if (cumulativeKm == null) {
-      cumulativeKm = 0;
-      if (index) cumulativeKm = previous.cumulativeKm + haversine(previous, point);
-    }
-    return {
-      index,
-      lat: point.lat,
-      lng: point.lng,
-      ele: point.ele ?? null,
-      cumulativeKm,
-      timeMs,
-      elapsedSec: null,
-      bearing: bearingDegrees(previous, next),
-      gradePercent: profileGradeAtPoint(points, index),
-      pointIndex: index
-    };
-  });
-  const firstTime = samples.find((sample) => sample.timeMs != null)?.timeMs ?? null;
-  const rawHasTime = firstTime != null && samples.some((sample) => sample.timeMs != null && sample.timeMs !== firstTime);
-  const totalDistanceKm = samples.at(-1)?.cumulativeKm ?? 0;
-  let rawDurationSec = null;
-  if (rawHasTime) rawDurationSec = Math.max(0, ((samples.at(-1)?.timeMs ?? firstTime) - firstTime) / 1000);
-  let fallbackDurationSec = null;
-  if (Number.isFinite(track?.durationHours) && track.durationHours > 0) fallbackDurationSec = track.durationHours * 3600;
-  const shouldUseFallbackDuration = Number.isFinite(fallbackDurationSec) && fallbackDurationSec > 0 && (
-    !rawHasTime ||
-    !Number.isFinite(rawDurationSec) ||
-    rawDurationSec <= 0 ||
-    rawDurationSec > 172800 ||
-    rawDurationSec > fallbackDurationSec * 4
-  );
-  const hasTime = rawHasTime || shouldUseFallbackDuration;
-  if (shouldUseFallbackDuration && totalDistanceKm > 0) {
-    samples.forEach((sample) => {
-      sample.elapsedSec = (sample.cumulativeKm / totalDistanceKm) * fallbackDurationSec;
-    });
-  } else if (rawHasTime) {
-    const knownTimedIndexes = samples
-      .map((sample, index) => ({ sample, index }))
-      .filter(({ sample }) => sample.timeMs != null)
-      .map(({ index }) => index);
-    samples.forEach((sample) => {
-      sample.elapsedSec = null;
-      if (sample.timeMs != null) sample.elapsedSec = Math.max(0, (sample.timeMs - firstTime) / 1000);
-    });
-    for (let anchorIndex = 0; anchorIndex < knownTimedIndexes.length - 1; anchorIndex += 1) {
-      const startIndex = knownTimedIndexes[anchorIndex];
-      const endIndex = knownTimedIndexes[anchorIndex + 1];
-      const startSample = samples[startIndex];
-      const endSample = samples[endIndex];
-      const distanceSpan = Math.max(0.000001, (endSample.cumulativeKm ?? 0) - (startSample.cumulativeKm ?? 0));
-      const timeSpan = Math.max(0, (endSample.elapsedSec ?? 0) - (startSample.elapsedSec ?? 0));
-      for (let index = startIndex + 1; index < endIndex; index += 1) {
-        const ratio = ((samples[index].cumulativeKm ?? 0) - (startSample.cumulativeKm ?? 0)) / distanceSpan;
-        samples[index].elapsedSec = (startSample.elapsedSec ?? 0) + (timeSpan * clamp(ratio, 0, 1));
-      }
-    }
-    const firstKnownIndex = knownTimedIndexes[0];
-    for (let index = 0; index < firstKnownIndex; index += 1) {
-      samples[index].elapsedSec = samples[firstKnownIndex].elapsedSec ?? 0;
-    }
-    const lastKnownIndex = knownTimedIndexes.at(-1);
-    for (let index = lastKnownIndex + 1; index < samples.length; index += 1) {
-      samples[index].elapsedSec = samples[lastKnownIndex].elapsedSec ?? 0;
-    }
-    let lastElapsed = 0;
-    samples.forEach((sample) => {
-      sample.elapsedSec = Math.max(lastElapsed, sample.elapsedSec ?? lastElapsed);
-      lastElapsed = sample.elapsedSec;
-    });
-  } else {
-    samples.forEach((sample) => {
-      sample.elapsedSec = sample.cumulativeKm;
-    });
-  }
-  const photoMarkers = (track.photos ?? []).map((photo, photoIndex) => {
-    const latLng = photoLatLng(photo);
-    if (!latLng) return null;
-    let bestIndex = 0;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    samples.forEach((sample, sampleIndex) => {
-      const delta = Math.hypot(sample.lat - latLng[0], sample.lng - latLng[1]);
-      if (delta < bestDistance) {
-        bestDistance = delta;
-        bestIndex = sampleIndex;
-      }
-    });
-    return { photoIndex, sampleIndex: bestIndex, distanceKm: samples[bestIndex]?.cumulativeKm ?? 0 };
-  }).filter(Boolean);
-  const normalizedDirections = normalizeDirections(track.directions);
-  let cumulativeDirectionKm = 0;
-  const directionMarkers = normalizedDirections.map((direction, directionIndex) => {
-    if (Number.isFinite(direction.prefixDistanceM) && direction.prefixDistanceM > 0) {
-      cumulativeDirectionKm += Number(direction.prefixDistanceM) / 1000;
-    }
-    const distanceKm = clamp(cumulativeDirectionKm, 0, totalDistanceKm);
-    if (Number.isFinite(direction.distanceM)) {
-      cumulativeDirectionKm += Math.max(0, Number(direction.distanceM)) / 1000;
-    } else if (totalDistanceKm) {
-      cumulativeDirectionKm = ((directionIndex + 1) / Math.max(1, normalizedDirections.length + 1)) * totalDistanceKm;
-    }
-    const sampleIndex = samples.reduce((best, sample, index) => {
-      if (Math.abs((sample.cumulativeKm ?? 0) - distanceKm) < Math.abs((samples[best]?.cumulativeKm ?? 0) - distanceKm)) return index;
-      return best;
-    }, 0);
-    return {
-      directionIndex,
-      sampleIndex,
-      distanceKm,
-      instruction: direction.instruction,
-      type: direction.type || null
-    };
-  }).filter(Boolean);
-  const replayTrack = {
-    trackId: track.id,
-    track,
-    samples,
-    totalDistanceKm,
-    totalDurationSec: totalDistanceKm,
-    totalAscentM: track.elevationGainM ?? 0,
-    totalDescentM: track.elevationLossM ?? 0,
-    modeAvailable: { time: hasTime, distance: true },
-    photoMarkers,
-    directionMarkers
-  };
-  if (hasTime) replayTrack.totalDurationSec = samples.at(-1)?.elapsedSec ?? 0;
-  return replayTrack;
-}
-function nextReplayDirection(replayTrack, frame) {
-  if (!replayTrack?.directionMarkers?.length || !frame) return null;
-  return replayTrack.directionMarkers.find((item) => item.distanceKm >= ((frame.cumulativeKm ?? 0) - 0.02)) ?? replayTrack.directionMarkers.at(-1) ?? null;
-}
-function replayDirectionText(replayTrack, frame) {
-  const nextDirection = nextReplayDirection(replayTrack, frame);
-  if (!nextDirection?.instruction) return '-';
-  const remainingKm = Math.max(0, (nextDirection.distanceKm ?? 0) - (frame?.cumulativeKm ?? 0));
-  const remainingMeters = Math.round(remainingKm * 1000);
-  if (remainingMeters > 30) return `${nextDirection.instruction} · ${t('replayDirectionIn', { distance: `${fmtNum(remainingMeters)} m` })}`;
-  return nextDirection.instruction;
-}
-function interpolateReplaySample(left, right, ratio) {
-  const safeRatio = clamp(ratio, 0, 1);
-  const lerp = (a, b) => a + (b - a) * safeRatio;
-  let elevation = left.ele ?? right.ele ?? null;
-  if (left.ele != null && right.ele != null) elevation = lerp(left.ele, right.ele);
-  return {
-    lat: lerp(left.lat, right.lat),
-    lng: lerp(left.lng, right.lng),
-    ele: elevation,
-    cumulativeKm: lerp(left.cumulativeKm, right.cumulativeKm),
-    elapsedSec: lerp(left.elapsedSec ?? 0, right.elapsedSec ?? 0),
-    bearing: lerp(left.bearing ?? 0, right.bearing ?? 0),
-    gradePercent: lerp(left.gradePercent ?? 0, right.gradePercent ?? 0),
-    pointIndex: right.pointIndex,
-    sampleIndex: left.index
-  };
-}
-function replayFrameAtCursor(replayTrack, mode, cursor) {
-  if (!replayTrack?.samples?.length) return null;
-  let metric = 'cumulativeKm';
-  if (mode === 'time' && replayTrack.modeAvailable.time) metric = 'elapsedSec';
-  const samples = replayTrack.samples;
-  const clampedCursor = clamp(cursor, 0, replayMetricMax(replayTrack, mode));
-  for (let index = 1; index < samples.length; index += 1) {
-    const previous = samples[index - 1];
-    const current = samples[index];
-    if (clampedCursor <= current[metric]) {
-      const span = (current[metric] - previous[metric]) || 1;
-      const ratio = (clampedCursor - previous[metric]) / span;
-      return interpolateReplaySample(previous, current, ratio);
-    }
-  }
-  const last = samples.at(-1);
-  return { ...last, sampleIndex: last.index };
-}
-function replayMetricMax(replayTrack, mode = state.replay.mode) {
-  if (!replayTrack) return 0;
-  if (mode === 'time' && replayTrack.modeAvailable.time) return replayTrack.totalDurationSec;
-  return replayTrack.totalDistanceKm;
-}
-function replayMetricLabel(replayTrack, cursor, mode = state.replay.mode) {
-  if (mode === 'time' && replayTrack?.modeAvailable.time) return fmtElapsedShort(cursor);
-  return `${fmtKm(cursor)} km`;
-}
-function replayCursorForMode(replayTrack, targetMode, referenceFrame) {
-  if (!replayTrack || !referenceFrame) return 0;
-  if (targetMode === 'time' && replayTrack.modeAvailable.time) return clamp(referenceFrame.elapsedSec ?? 0, 0, replayTrack.totalDurationSec);
-  return clamp(referenceFrame.cumulativeKm ?? 0, 0, replayTrack.totalDistanceKm);
-}
-function replayCandidateTrack() {
-  const highlighted = state.tracks.find((track) => track.id === state.highlightedTrackId) ?? null;
-  if (highlighted) return highlighted;
-  const favorite = state.tracks.find((track) => track.favorite) ?? null;
-  if (favorite) return favorite;
-  const selected = state.tracks.find((track) => state.selectedTrackIds.has(track.id)) ?? null;
-  if (selected) return selected;
-  if (state.replay.activeTrackId) return state.tracks.find((track) => track.id === state.replay.activeTrackId) ?? null;
-  return state.tracks[0] ?? null;
-}
-function replaySeekValueFromDistance(distanceKm) {
-  if (!state.replay.replayTrack) return 0;
-  if (state.replay.mode !== 'time' || !state.replay.replayTrack.modeAvailable.time) return distanceKm;
-  const sample = state.replay.replayTrack.samples.reduce((best, current) => {
-    const currentDistance = Math.abs(current.cumulativeKm - distanceKm);
-    const bestDistance = Math.abs(best.cumulativeKm - distanceKm);
-    if (currentDistance < bestDistance) return current;
-    return best;
-  }, state.replay.replayTrack.samples[0]);
-  return sample?.elapsedSec ?? 0;
-}
-function replayDistanceFromProfileEvent(event) {
-  const replayTrack = state.replay.replayTrack;
-  if (!replayTrack?.samples?.length || !el.replayProfileChart) return null;
-  const rect = el.replayProfileChart.getBoundingClientRect();
-  const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-  return ratio * (replayTrack.totalDistanceKm || 0);
-}
-function clearReplay2DScene() {
-  if (!state.replay.layers2d) return;
-  Object.values(state.replay.layers2d).forEach((layer) => {
-    if (!layer) return;
-    try {
-      layer.remove?.();
-    } catch {}
-  });
-  state.replay.layers2d = {};
-}
-function clearReplay3DScene() {
-  if (state.replayMap3dReady && state.replayMap3d) {
-    state.replayMap3d.getSource('replay-route')?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [] } });
-    state.replayMap3d.getSource('replay-played')?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [] } });
-    state.replayMap3d.getSource('replay-photos')?.setData({ type: 'FeatureCollection', features: [] });
-  }
-  state.replay.marker3d?.setLngLat([10.4, 51.2]);
-}
-function clearReplayScene() {
-  clearReplay2DScene();
-  clearReplay3DScene();
-}
-function ensureReplayMaps() {
-  if (!state.replayMap2d && el.replayMap2d) {
-    state.replayMap2d = L.map(el.replayMap2d, { zoomControl: true, attributionControl: true }).setView([51.2, 10.4], 6);
-    L.tileLayer(TILE_URL, { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(state.replayMap2d);
-  }
-  if (!state.replayMap3d && el.replayMap3d && window.maplibregl) {
-    state.replayMap3d = new window.maplibregl.Map({
-      container: el.replayMap3d,
-      center: [10.4, 51.2],
-      zoom: 6,
-      pitch: 62,
-      bearing: 0,
-      maxZoom: 18,
-      maxPitch: 85,
-      style: {
-        version: 8,
-        sources: {
-          osm: { type: 'raster', tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '&copy; OpenStreetMap Contributors', maxzoom: 19 },
-          terrainSource: { type: 'raster-dem', url: 'https://tiles.mapterhorn.com/tilejson.json', attribution: '<a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener noreferrer">&copy; Mapterhorn</a>' },
-          hillshadeSource: { type: 'raster-dem', url: 'https://tiles.mapterhorn.com/tilejson.json', attribution: '<a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener noreferrer">&copy; Mapterhorn</a>' }
-        },
-        layers: [
-          { id: 'osm', type: 'raster', source: 'osm' },
-          { id: 'hills', type: 'hillshade', source: 'hillshadeSource', layout: { visibility: 'visible' }, paint: { 'hillshade-shadow-color': '#473B24' } }
-        ],
-        terrain: { source: 'terrainSource', exaggeration: 1.55 },
-        sky: {}
-      }
-    });
-    state.replayMap3d.addControl(new window.maplibregl.NavigationControl({ visualizePitch: true, showZoom: true, showCompass: true }));
-    state.replayMap3d.on('load', () => {
-      state.replayMap3dReady = true;
-      ensureReplay3DSources();
-      updateReplayScene();
-    });
-  } else if (!window.maplibregl && el.replayMap3d && !el.replayMap3d.textContent.trim()) {
-    const template = document.querySelector('#replay-3d-placeholder-template');
-    const fragment = template.content.cloneNode(true);
-    fragment.querySelector('.replay-placeholder-note').textContent = t('replayUnavailable3d');
-    el.replayMap3d.append(fragment);
-  }
-}
-function ensureReplay3DSources() {
-  if (!state.replayMap3dReady || !state.replayMap3d) return;
-  const map = state.replayMap3d;
-  if (!map.getSource('replay-route')) {
-    map.addSource('replay-route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
-    map.addLayer({ id: 'replay-route', type: 'line', source: 'replay-route', paint: { 'line-color': '#9ed5b0', 'line-width': 4.5, 'line-opacity': 0.78 } });
-  }
-  if (!map.getSource('replay-played')) {
-    map.addSource('replay-played', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
-    map.addLayer({ id: 'replay-played', type: 'line', source: 'replay-played', paint: { 'line-color': '#ff2a1a', 'line-width': 6, 'line-opacity': 1 } });
-  }
-  if (!map.getSource('replay-photos')) {
-    map.addSource('replay-photos', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addLayer({ id: 'replay-photos', type: 'circle', source: 'replay-photos', paint: { 'circle-radius': 4, 'circle-color': '#f8fbfa', 'circle-stroke-width': 2, 'circle-stroke-color': '#14201d' } });
-  }
-  if (!state.replay.marker3d) {
-    const markerEl = document.createElement('div');
-    markerEl.className = 'replay-maplibre-marker';
-    state.replay.marker3d = new window.maplibregl.Marker({ element: markerEl }).setLngLat([10.4, 51.2]).addTo(map);
-  }
-}
-function fitReplayMaps(replayTrack) {
-  const bounds = trackBounds(replayTrack?.track);
-  if (bounds && state.replayMap2d) state.replayMap2d.fitBounds(bounds.pad(0.08));
-  if (replayTrack?.samples?.length && state.replayMap3dReady && state.replayMap3d) {
-    const coordinates = replayTrack.samples.map((sample) => [sample.lng, sample.lat]);
-    const lngLatBounds = coordinates.reduce((acc, coordinate) => acc.extend(coordinate), new window.maplibregl.LngLatBounds(coordinates[0], coordinates[0]));
-    state.replayMap3d.fitBounds(lngLatBounds, { padding: 56, pitch: 70, bearing: 12, duration: 0 });
-  }
-}
-function replayPlayedLatLngs(replayTrack, frame) {
-  if (!replayTrack || !frame) return [];
-  const points = replayTrack.track.points.filter((point) => (point.cumulativeKm ?? 0) <= frame.cumulativeKm).map((point) => [point.lat, point.lng]);
-  points.push([frame.lat, frame.lng]);
-  return points;
-}
-function replayRouteCoordinates(replayTrack) {
-  return replayTrack?.track?.points?.map((point) => [point.lng, point.lat]) ?? [];
-}
-function replay2DTarget(replayTrack, frame) {
-  if (!replayTrack || !frame) return null;
-  if (state.replay.cameraMode2d === 'overview') {
-    const bounds = trackBounds(replayTrack.track);
-    let center = L.latLng(frame.lat, frame.lng);
-    if (bounds) center = bounds.getCenter();
-    return { center, zoom: null, bounds };
-  }
-  if (state.replay.cameraMode2d === 'ahead') {
-    const frameIndex = Math.max(0, Math.round(frame.sampleIndex ?? frame.pointIndex ?? 0));
-    const lookAheadIndex = Math.min(replayTrack.samples.length - 1, frameIndex + 64);
-    const lookAheadSample = replayTrack.samples[lookAheadIndex] ?? frame;
-    return {
-      center: L.latLng(
-        frame.lat + ((lookAheadSample.lat ?? frame.lat) - frame.lat) * 0.9,
-        frame.lng + ((lookAheadSample.lng ?? frame.lng) - frame.lng) * 0.9
-      ),
-      zoom: 13.2,
-      bounds: null
-    };
-  }
-  return { center: L.latLng(frame.lat, frame.lng), zoom: 17.5, bounds: null };
-}
-function applyReplay2DCamera(replayTrack = state.replay.replayTrack, frame = replayFrameAtCursor(state.replay.replayTrack, state.replay.mode, state.replay.cursor), options = {}) {
-  const force = !!options.force;
-  const animate = !!options.animate;
-  if (!state.replayMap2d || !replayTrack || !frame) return;
-  if (state.settings.activeWorkspace !== 'replay' || state.replay.view !== '2d') return;
-  if (!force && !state.replay.followCamera) return;
-  const target = replay2DTarget(replayTrack, frame);
-  if (!target) return;
-  if (target.bounds) {
-    if (!force && state.replay.lastApplied2DMode === 'overview') return;
-    let duration = 0;
-    if (animate) duration = 0.45;
-    state.replayMap2d.fitBounds(target.bounds.pad(0.22), { animate, duration });
-    state.replay.lastApplied2DMode = 'overview';
-    return;
-  }
-  const map = state.replayMap2d;
-  const zoomTarget = target.zoom ?? state.replayMap2d.getZoom();
-  const currentZoom = map.getZoom();
-  state.replay.lastApplied2DMode = state.replay.cameraMode2d;
-  if (force || Math.abs(currentZoom - zoomTarget) > 0.12) {
-    let duration = 0;
-    if (animate) duration = 0.45;
-    map.setView(target.center, zoomTarget, { animate, duration });
-    return;
-  }
-  const size = map.getSize();
-  const markerPoint = map.latLngToContainerPoint([frame.lat, frame.lng]);
-  let desiredX = size.x * 0.5;
-  if (state.replay.cameraMode2d === 'ahead') desiredX = size.x * 0.34;
-  const desiredY = size.y * 0.56;
-  const deltaX = markerPoint.x - desiredX;
-  const deltaY = markerPoint.y - desiredY;
-  let deadZoneX = Math.max(40, size.x * 0.06);
-  if (state.replay.cameraMode2d === 'ahead') deadZoneX = Math.max(56, size.x * 0.09);
-  const deadZoneY = Math.max(28, size.y * 0.08);
-  if (!force && Math.abs(deltaX) <= deadZoneX && Math.abs(deltaY) <= deadZoneY) return;
-  map.panBy([deltaX, deltaY], { animate: false, duration: 0 });
-}
-function refreshReplay2DCamera(options = {}) {
-  const replayTrack = state.replay.replayTrack;
-  const frame = replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor);
-  if (!state.replayMap2d || !replayTrack || !frame || state.replay.view !== '2d') return;
-  state.replayMap2d.invalidateSize(false);
-  applyReplay2DCamera(replayTrack, frame, options);
-  window.requestAnimationFrame(() => {
-    if (!state.replayMap2d || state.replay.view !== '2d') return;
-    state.replayMap2d.invalidateSize(false);
-    applyReplay2DCamera(replayTrack, replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor), { ...options, animate: false, force: true });
-  });
-}
-function setReplayCameraMode2d(mode, options = {}) {
-  if (!mode) return;
-  state.replay.cameraMode2d = mode;
-  state.replay.lastApplied2DMode = null;
-  state.replay.last2DCameraAppliedAt = 0;
-  renderReplayControls();
-  refreshReplay2DCamera({ force: true, animate: options.animate !== false });
-}
-function syncReplay2DScene(replayTrack, frame) {
-  if (!state.replayMap2d || !replayTrack || !frame) return;
-  const map = state.replayMap2d;
-  const routeLatLngs = replayTrack.track.points.map((point) => [point.lat, point.lng]);
-  if (!state.replay.layers2d.route) {
-    state.replay.layers2d.route = L.polyline(routeLatLngs, { color: '#9ed5b0', weight: 5, opacity: 0.66, lineCap: 'round', lineJoin: 'round' }).addTo(map);
-    state.replay.layers2d.played = L.polyline(replayPlayedLatLngs(replayTrack, frame), { color: '#ff2a1a', weight: 6, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(map);
-      state.replay.layers2d.marker = L.marker([frame.lat, frame.lng], { icon: L.divIcon({ className: 'replay-marker-wrap', html: replayMarkerIconHtml(frame.bearing), iconSize: [22, 22], iconAnchor: [11, 11] }), zIndexOffset: 1000 }).addTo(map);
-      state.replay.layers2d.photos = L.layerGroup().addTo(map);
-    } else {
-      state.replay.layers2d.route.setLatLngs(routeLatLngs);
-      state.replay.layers2d.played.setLatLngs(replayPlayedLatLngs(replayTrack, frame));
-      state.replay.layers2d.marker.setLatLng([frame.lat, frame.lng]);
-      state.replay.layers2d.marker.setIcon(L.divIcon({ className: 'replay-marker-wrap', html: replayMarkerIconHtml(frame.bearing), iconSize: [22, 22], iconAnchor: [11, 11] }));
-    }
-  state.replay.layers2d.route?.bringToBack?.();
-  state.replay.layers2d.played?.bringToFront?.();
-  state.replay.layers2d.photos?.bringToFront?.();
-  state.replay.layers2d.marker?.setZIndexOffset?.(1000);
-  state.replay.layers2d.photos.clearLayers();
-  if (state.replay.showPhotos) {
-    (replayTrack.track.photos ?? []).forEach((photo) => {
-      const latLng = photoLatLng(photo);
-      if (!latLng) return;
-      L.circleMarker(latLng, { radius: 4, color: '#14201d', weight: 2, fillColor: '#f8fbfa', fillOpacity: 1 }).addTo(state.replay.layers2d.photos);
-    });
-  }
-  applyReplay2DCamera(replayTrack, frame, { animate: false });
-}
-function replay3DCamera(frame) {
-  if (!frame) return { pitch: 70, zoom: 13.8, bearing: 0 };
-  if (state.replay.cameraMode3d === 'top') return { pitch: 32, zoom: 13.45, bearing: 0 };
-  if (state.replay.cameraMode3d === 'orbit') {
-    let stableBearing = ((frame.bearing ?? 0) + 32) % 360;
-    if (Number.isFinite(state.replay.replayTrack?.orbitBearing)) stableBearing = state.replay.replayTrack.orbitBearing;
-    return { pitch: 72, zoom: 14.05, bearing: stableBearing };
-  }
-  return { pitch: 79, zoom: 14.85, bearing: frame.bearing ?? 0 };
-}
-function syncReplay3DScene(replayTrack, frame) {
-  if (!state.replayMap3dReady || !state.replayMap3d || !replayTrack || !frame) return;
-  ensureReplay3DSources();
-  const map = state.replayMap3d;
-  map.getSource('replay-route')?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: replayRouteCoordinates(replayTrack) } });
-  map.getSource('replay-played')?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: replayPlayedLatLngs(replayTrack, frame).map(([lat, lng]) => [lng, lat]) } });
-  let photoFeatures = [];
-  if (state.replay.showPhotos) {
-    photoFeatures = (replayTrack.track.photos ?? []).map((photo) => {
-      const latLng = photoLatLng(photo);
-      if (!latLng) return null;
-      return { type: 'Feature', geometry: { type: 'Point', coordinates: [latLng[1], latLng[0]] }, properties: {} };
-    }).filter(Boolean);
-  }
-  map.getSource('replay-photos')?.setData({ type: 'FeatureCollection', features: photoFeatures });
-  state.replay.marker3d?.setLngLat([frame.lng, frame.lat]);
-  if (state.settings.activeWorkspace === 'replay' && state.replay.view === '3d' && state.replay.followCamera) {
-    const camera = replay3DCamera(frame);
-    map.jumpTo({ center: [frame.lng, frame.lat], bearing: camera.bearing, pitch: camera.pitch, zoom: camera.zoom });
-  }
-}
-function renderReplayControls() {
-  const replayTrack = state.replay.replayTrack;
-  const hasTrack = !!replayTrack;
-  const canUseTime = !!replayTrack?.modeAvailable.time;
-  const is2d = state.replay.view === '2d';
-  const hasPhotos = !!replayTrack?.photoMarkers?.length;
-  const hasElevation = !!replayTrack?.samples?.some((sample) => Number.isFinite(sample?.ele));
-  el.replayViewButtons?.forEach((button) => {
-    const active = button.dataset.replayView === state.replay.view;
-    button.classList.toggle('is-active', active);
-    button.setAttribute('aria-pressed', String(active));
-  });
-  if (el.replaySpeedSelect) el.replaySpeedSelect.value = String(state.replay.speed);
-  el.replayModeButtons?.forEach((button) => {
-    const isTime = button.dataset.replayMode === 'time';
-    const active = button.dataset.replayMode === state.replay.mode;
-    button.classList.toggle('is-active', active);
-    button.setAttribute('aria-pressed', String(active));
-    button.disabled = !hasTrack || (isTime && !canUseTime);
-  });
-  if (el.replayCamera2dRow) el.replayCamera2dRow.hidden = !is2d;
-  if (el.replayCamera3dRow) el.replayCamera3dRow.hidden = is2d;
-  el.replayCamera2dButtons?.forEach((button) => {
-    const mode = button.getAttribute('data-replay-camera-2d') || 'center';
-    const active = mode === state.replay.cameraMode2d;
-    button.classList.toggle('is-active', active);
-    button.dataset.active = String(active);
-    button.setAttribute('aria-pressed', String(active));
-    button.style.background = '';
-    button.style.borderColor = '';
-    button.style.color = '';
-    button.style.boxShadow = '';
-    if (active) {
-      button.style.background = 'linear-gradient(135deg, rgba(185, 224, 196, 0.98), rgba(142, 198, 160, 0.82))';
-      button.style.borderColor = 'rgba(185, 224, 196, 0.9)';
-      button.style.color = '#18302a';
-      button.style.boxShadow = 'inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 10px 20px rgba(8, 16, 14, 0.22)';
-    }
-  });
-  el.replayCameraButtons?.forEach((button) => {
-    const active = button.dataset.replayCamera === state.replay.cameraMode3d;
-    button.classList.toggle('is-active', active);
-    button.setAttribute('aria-pressed', String(active));
-  });
-  [el.replayRestartButton, el.replayPlayButton, el.replayPauseButton, el.replayBackButton, el.replayForwardButton, ...el.replayViewButtons, ...el.replayCamera2dButtons, ...el.replayCameraButtons].forEach((button) => {
-    if (!button) return;
-    button.disabled = !hasTrack;
-  });
-  if (el.replayJumpStartButton) el.replayJumpStartButton.disabled = !hasTrack;
-  if (el.replayJumpEndButton) el.replayJumpEndButton.disabled = !hasTrack;
-  if (el.replayJumpHighButton) el.replayJumpHighButton.disabled = !hasTrack || !hasElevation;
-  if (el.replayJumpPhotoButton) el.replayJumpPhotoButton.disabled = !hasTrack || !hasPhotos;
-  el.replayPlayButton?.classList.toggle('is-active', !!state.replay.playing);
-  el.replayPauseButton?.classList.toggle('is-active', !state.replay.playing && !!hasTrack);
-  if (el.replaySpeedSelect) el.replaySpeedSelect.disabled = !hasTrack;
-  if (el.replayFollowCameraInput) el.replayFollowCameraInput.checked = !!state.replay.followCamera;
-  if (el.replayShowPhotosInput) el.replayShowPhotosInput.checked = !!state.replay.showPhotos;
-  if (el.replayShowProfileInput) el.replayShowProfileInput.checked = !!state.replay.showProfile;
-  if (el.replayFollowCameraInput) el.replayFollowCameraInput.disabled = !hasTrack;
-  if (el.replayShowPhotosInput) el.replayShowPhotosInput.disabled = !hasTrack;
-  if (el.replayShowProfileInput) el.replayShowProfileInput.disabled = !hasTrack;
-}
-function buildReplayProfileGeometry(replayTrack) {
-  const samples = replayTrack.samples;
-  const width = 1000;
-  const height = 260;
-  const padding = { top: 10, right: 18, bottom: 18, left: 18 };
-  const elevations = samples.map((sample) => sample.ele ?? replayTrack.track.elevationMinM ?? 0);
-  const min = Math.min(...elevations);
-  const max = Math.max(...elevations);
-  const span = Math.max(1, max - min);
-  let exaggeration = 1.12;
-  if (span < 180) exaggeration = 1.3;
-  if (span < 80) exaggeration = 1.55;
-  if (span < 35) exaggeration = 1.85;
-  const mid = (min + max) / 2;
-  const midY = padding.top + ((height - padding.top - padding.bottom) / 2);
-  const halfPlotHeight = (height - padding.top - padding.bottom) / 2;
-  const xFor = (km) => padding.left + (km / Math.max(0.001, replayTrack.totalDistanceKm || 0.001)) * (width - padding.left - padding.right);
-  const yFor = (ele) => {
-    const normalized = ((ele - mid) / Math.max(span / 2, 1)) * exaggeration;
-    const rawY = midY - (normalized * halfPlotHeight);
-    return clamp(rawY, padding.top, height - padding.bottom);
-  };
-  return {
-    key: `${replayTrack.track.id}:${replayTrack.samples.length}:${replayTrack.totalDistanceKm}:${replayTrack.track.color || ''}`,
-    width,
-    height,
-    padding,
-    min,
-    xFor,
-    yFor,
-    polyline: samples.map((sample) => `${xFor(sample.cumulativeKm)},${yFor(sample.ele ?? min)}`).join(' ')
-  };
-}
-function ensureReplayProfileGeometry(replayTrack) {
-  if (!replayTrack) return null;
-  const current = state.replay.profileRender;
-  const nextKey = `${replayTrack.track.id}:${replayTrack.samples.length}:${replayTrack.totalDistanceKm}:${replayTrack.track.color || ''}`;
-  if (current.key === nextKey && current.geometry) return current.geometry;
-  const geometry = buildReplayProfileGeometry(replayTrack);
-  state.replay.profileRender = { key: geometry.key, geometry };
-  return geometry;
-}
-/**
- * Renders the static elevation-profile SVG elements from the replay chart template.
- * @param {object} replayTrack Replay data containing the track color.
- * @param {object} geometry Precalculated dimensions and profile coordinates.
- * @returns {void}
- */
-function renderReplayProfileStaticChart(replayTrack, geometry) {
-  const startX = geometry.padding.left;
-  const startY = geometry.yFor(geometry.min);
-  const fragment = el.replayProfileChartTemplate.content.cloneNode(true);
-  const chartTemplate = fragment.querySelector('svg');
-  const gridLine = chartTemplate.querySelector('.profile-grid-line');
-  const profileLine = chartTemplate.querySelector('.profile-line');
-  const hoverLine = chartTemplate.querySelector('.profile-hover-line');
-  const hoverDot = chartTemplate.querySelector('.profile-hover-dot');
-  const chartBottom = geometry.height - geometry.padding.bottom;
-  const chartRight = geometry.width - geometry.padding.right;
-  let trackColor = '#9ed5b0';
-  if (replayTrack.track.color) trackColor = replayTrack.track.color;
-  gridLine.setAttribute('x1', `${geometry.padding.left}`);
-  gridLine.setAttribute('y1', `${chartBottom}`);
-  gridLine.setAttribute('x2', `${chartRight}`);
-  gridLine.setAttribute('y2', `${chartBottom}`);
-  profileLine.setAttribute('points', geometry.polyline);
-  profileLine.setAttribute('stroke', trackColor);
-  hoverLine.setAttribute('x1', `${startX}`);
-  hoverLine.setAttribute('y1', `${geometry.padding.top}`);
-  hoverLine.setAttribute('x2', `${startX}`);
-  hoverLine.setAttribute('y2', `${chartBottom}`);
-  hoverDot.setAttribute('cx', `${startX}`);
-  hoverDot.setAttribute('cy', `${startY}`);
-  el.replayProfileChart.replaceChildren(...chartTemplate.children);
-  el.replayProfileChart.dataset.geometryKey = geometry.key;
-}
-function updateReplayProfileCursor(geometry, frame) {
-  let cursorX = geometry.padding.left;
-  let cursorY = geometry.yFor(geometry.min);
-  if (frame) {
-    cursorX = geometry.xFor(frame.cumulativeKm);
-    cursorY = geometry.yFor(frame.ele ?? geometry.min);
-  }
-  const cursorLine = el.replayProfileChart.querySelector('.profile-hover-line');
-  const cursorDot = el.replayProfileChart.querySelector('.profile-hover-dot');
-  if (cursorLine) {
-    cursorLine.setAttribute('x1', `${cursorX}`);
-    cursorLine.setAttribute('x2', `${cursorX}`);
-  }
-  if (cursorDot) {
-    cursorDot.setAttribute('cx', `${cursorX}`);
-    cursorDot.setAttribute('cy', `${cursorY}`);
-  }
-}
-function renderReplayProfile() {
-  const replayTrack = state.replay.replayTrack;
-  const frame = replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor);
-  const visible = !!(replayTrack && replayTrack.track.hasElevation && state.replay.showProfile);
-  el.replayProfilePanel.hidden = !state.replay.showProfile;
-  el.replayWorkspace?.classList.toggle('is-profile-collapsed', !state.replay.showProfile);
-  if (el.replayProfileTrackName) el.replayProfileTrackName.textContent = replayTrack?.track?.name || '-';
-  el.replayAscentValue.textContent = '-';
-  el.replayDescentValue.textContent = '-';
-  if (replayTrack?.track?.hasElevation) {
-    el.replayAscentValue.textContent = fmtMeters(replayTrack.track.elevationGainM);
-    el.replayDescentValue.textContent = fmtMeters(replayTrack.track.elevationLossM);
-  }
-  el.replaySpeedValue.textContent = '-';
-  if (frame?.elapsedSec > 0 && frame?.cumulativeKm > 0) el.replaySpeedValue.textContent = fmtHours((frame.cumulativeKm / frame.elapsedSec) * 3600);
-  el.replayPointValue.textContent = '-';
-  if (replayTrack && frame) el.replayPointValue.textContent = `${fmtNum(Math.min(replayTrack.samples.length, Math.round(frame.pointIndex ?? 0) + 1))} / ${fmtNum(replayTrack.samples.length)}`;
-  el.replayProfileEmpty.hidden = visible;
-  el.replayProfileChartShell.hidden = !visible;
-  if (!visible) {
-    el.replayProfileEmpty.textContent = t('replayProfileHint');
-    if (replayTrack && !replayTrack.track.hasElevation) el.replayProfileEmpty.textContent = t('profileHintNoElevation');
-    el.replayProfileChart.replaceChildren();
-    state.replay.profileRender = { key: null, geometry: null };
-    return;
-  }
-  const geometry = ensureReplayProfileGeometry(replayTrack);
-  if (!geometry) return;
-  if (el.replayProfileChart.dataset.geometryKey !== geometry.key) renderReplayProfileStaticChart(replayTrack, geometry);
-  updateReplayProfileCursor(geometry, frame);
-}
-function renderReplayTimeline() {}
-function updateReplayReadouts(replayTrack, frame) {
-  el.replayDistanceValue.textContent = '0.0 km';
-  el.replayAltitudeValue.textContent = '-';
-  el.replayGradeValue.textContent = '-';
-  el.replayTimeValue.textContent = '--:--:--';
-  if (frame) {
-    el.replayDistanceValue.textContent = `${fmtKm(frame.cumulativeKm)} km`;
-    el.replayGradeValue.textContent = fmtGrade(frame.gradePercent);
-    el.replayTimeValue.textContent = fmtElapsedShort(frame.elapsedSec);
-    if (frame.ele != null) el.replayAltitudeValue.textContent = fmtMeters(frame.ele);
-  }
-  if (el.replayDirectionValue) el.replayDirectionValue.textContent = replayDirectionText(replayTrack, frame);
-}
-function renderReplayDirectionOverlay(replayTrack, frame) {
-  if (!el.replayDirectionOverlay || !el.replayDirectionOverlayIcon || !el.replayDirectionOverlayToggle) return;
-  const collapsed = !!state.settings.replayDirectionOverlayCollapsed;
-  el.replayDirectionOverlay.hidden = collapsed;
-  el.replayDirectionOverlayIcon.hidden = !collapsed;
-  let directionToggleLabel = t('replayDirectionHide');
-  el.replayDirectionOverlayToggle.textContent = '–';
-  if (collapsed) {
-    el.replayDirectionOverlayToggle.textContent = '+';
-    directionToggleLabel = t('replayDirectionShow');
-  }
-  el.replayDirectionOverlayToggle.setAttribute('aria-label', directionToggleLabel);
-  el.replayDirectionOverlayToggle.setAttribute('title', directionToggleLabel);
-  el.replayDirectionOverlayIcon.setAttribute('aria-label', t('replayDirectionShow'));
-  el.replayDirectionOverlayIcon.setAttribute('title', t('replayDirectionShow'));
-}
-function renderReplayWorkspace() {
-  const replayTrack = state.replay.replayTrack;
-  const frame = replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor);
-  el.replayMap2d.hidden = state.replay.view !== '2d';
-  el.replayMap3d.hidden = state.replay.view !== '3d';
-  renderReplayControls();
-  if (!replayTrack || !frame) {
-    state.replay.playing = false;
-    cancelReplayLoop();
-    el.replayTrackTitle.textContent = t('replayEmptyTitle');
-    el.replayTrackSubtitle.textContent = t('replayEmptySubtitle');
-    updateReplayReadouts(null, null);
-    renderReplayDirectionOverlay(null, null);
-    renderReplayTimeline();
-    renderReplayProfile();
-    clearReplayScene();
-    return;
-  }
-  el.replayTrackTitle.textContent = replayTrack?.track?.name || t('replayEmptyTitle');
-  if (replayTrack) {
-    const sourceLabel = replayTrackSourceLabel(replayTrack.track);
-    const accountLabel = replayTrack.track.accountLabel || '';
-    const subtitleParts = [sourceLabel, fmtDate(replayTrack.track.dateStart)];
-    if (accountLabel && accountLabel !== sourceLabel) subtitleParts.push(accountLabel);
-    el.replayTrackSubtitle.textContent = subtitleParts.filter(Boolean).join(' · ');
-  } else {
-    el.replayTrackSubtitle.textContent = t('replayEmptySubtitle');
-  }
-  updateReplayReadouts(replayTrack, frame);
-  renderReplayDirectionOverlay(replayTrack, frame);
-  renderReplayTimeline();
-  renderReplayProfile();
-  updateReplayScene();
-}
-function updateReplayScene() {
-  const replayTrack = state.replay.replayTrack;
-  const frame = replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor);
-  if (!replayTrack || !frame) {
-    clearReplayScene();
-    return;
-  }
-  if (state.replay.view === '2d') syncReplay2DScene(replayTrack, frame);
-  if (state.replay.view === '3d') syncReplay3DScene(replayTrack, frame);
-}
-function cancelReplayLoop() {
-  if (state.replay.rafId) cancelAnimationFrame(state.replay.rafId);
-  state.replay.rafId = null;
-  state.replay.lastFrameAt = 0;
-}
-function replayTick(timestamp) {
-  if (!state.replay.playing || !state.replay.replayTrack) return;
-  if (!state.replay.lastFrameAt) state.replay.lastFrameAt = timestamp;
-  const deltaSec = (timestamp - state.replay.lastFrameAt) / 1000;
-  state.replay.lastFrameAt = timestamp;
-  const metricMax = replayMetricMax(state.replay.replayTrack, state.replay.mode);
-  const distanceScale = Math.max(0.05, (state.replay.replayTrack.totalDistanceKm || 1) / REPLAY_DISTANCE_SECONDS);
-  let increment = deltaSec * state.replay.speed * distanceScale;
-  if (state.replay.mode === 'time') increment = deltaSec * state.replay.speed * REPLAY_TIME_SCALE;
-  state.replay.cursor = clamp(state.replay.cursor + increment, 0, metricMax);
-  if (state.replay.cursor >= metricMax) {
-    state.replay.playing = false;
-    renderReplayWorkspace();
-    cancelReplayLoop();
-    return;
-  }
-  const frame = replayFrameAtCursor(state.replay.replayTrack, state.replay.mode, state.replay.cursor);
-  updateReplayReadouts(state.replay.replayTrack, frame);
-  renderReplayProfile();
-  updateReplayScene();
-  state.replay.rafId = requestAnimationFrame(replayTick);
-}
-function setReplayPlaying(playing) {
-  if (playing && !state.replay.replayTrack) return;
-  state.replay.playing = playing;
-  if (!playing) {
-    cancelReplayLoop();
-    renderReplayControls();
-    return;
-  }
-  cancelReplayLoop();
-  renderReplayControls();
-  state.replay.rafId = requestAnimationFrame(replayTick);
-}
-function setReplayCursor(value) {
-  state.replay.cursor = clamp(value, 0, replayMetricMax(state.replay.replayTrack, state.replay.mode));
-  renderReplayWorkspace();
-}
-function jumpReplayTo(kind) {
-  const replayTrack = state.replay.replayTrack;
-  if (!replayTrack?.samples?.length) return;
-  let targetFrame = replayTrack.samples[0];
-  if (kind === 'end') {
-    targetFrame = replayTrack.samples.at(-1);
-  } else if (kind === 'highest') {
-    targetFrame = replayTrack.samples.reduce((best, sample) => {
-      const bestElevation = best.ele ?? Number.NEGATIVE_INFINITY;
-      const sampleElevation = sample.ele ?? Number.NEGATIVE_INFINITY;
-      if (sampleElevation > bestElevation) return sample;
-      return best;
-    }, replayTrack.samples[0]);
-  } else if (kind === 'photo') {
-    const currentFrame = replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor);
-    const currentDistance = currentFrame?.cumulativeKm ?? 0;
-    const marker = replayTrack.photoMarkers.find((item) => item.distanceKm >= currentDistance) ?? replayTrack.photoMarkers[0];
-    if (marker) targetFrame = replayTrack.samples[marker.sampleIndex] ?? targetFrame;
-  }
-  setReplayPlaying(false);
-  setReplayCursor(replayCursorForMode(replayTrack, state.replay.mode, targetFrame));
-}
-function resetReplayToStart() {
-  setReplayPlaying(false);
-  setReplayCursor(0);
-}
-function setReplayMode(mode) {
-  const replayTrack = state.replay.replayTrack;
-  const referenceFrame = replayFrameAtCursor(replayTrack, state.replay.mode, state.replay.cursor);
-  state.replay.mode = 'distance';
-  if (mode === 'time' && replayTrack?.modeAvailable.time) state.replay.mode = 'time';
-  applyReplayModeDefaults(state.replay.mode, state.replay.view);
-  state.replay.cursor = replayCursorForMode(replayTrack, state.replay.mode, referenceFrame);
-  renderReplayWorkspace();
-}
-function setReplayView(view) {
-  state.replay.view = '2d';
-  if (view === '3d') state.replay.view = '3d';
-  state.replay.mode = 'distance';
-  applyReplayModeDefaults(state.replay.mode, state.replay.view);
-  if (state.replay.view === '3d') {
-    state.replay.cameraMode3d = 'follow';
-  }
-  el.replayMap2d.hidden = state.replay.view !== '2d';
-  el.replayMap3d.hidden = state.replay.view !== '3d';
-  ensureReplayMaps();
-  scheduleMapLayoutRefresh();
-  renderReplayWorkspace();
-}
-async function openReplayTrack(trackId) {
-  const track = state.tracks.find((item) => item.id === trackId) ?? replayCandidateTrack();
-  if (!track) return;
-  ensureReplayMaps();
-  state.replay.activeTrackId = trackId;
-  state.replay.replayTrack = buildReplayTrack(track);
-  if (!state.replay.replayTrack) return;
-  state.replay.replayTrack.orbitBearing = (((state.replay.replayTrack.samples ?? []).find((sample) => Number.isFinite(sample?.bearing))?.bearing ?? 0) + 32) % 360;
-  state.replay.activeTrackId = track.id;
-  state.replay.mode = 'distance';
-  state.replay.speed = replayDefaultSpeed(state.replay.view, state.replay.mode);
-  state.replay.cameraMode3d = 'follow';
-  state.replay.cursor = 0;
-  state.replay.playing = false;
-  cancelReplayLoop();
-  state.settings.activeWorkspace = 'replay';
-  await saveSettings();
+function renderAll() {
+  renderI18n();
   renderWorkspace();
-  scheduleMapLayoutRefresh();
-  fitReplayMaps(state.replay.replayTrack);
+  renderAccounts();
+  renderLibrary();
+  renderSelection();
+  renderRecent();
+  // Legacy Komoot workspace stays dormant until its proxy UI is deliberately reactivated.
+  // renderKomoot();
+  // renderProxy();
+  // renderKomootProgress();
+  renderProfile();
   renderReplayWorkspace();
 }
-function renderAll() { renderI18n(); renderWorkspace(); renderAccounts(); renderLibrary(); renderSelection(); renderRecent(); renderKomoot(); renderProxy(); renderKomootProgress(); renderProfile(); renderReplayWorkspace(); }
 function layerStyleForTrack(track, casing = false) {
   const highlighted = state.highlightedTrackId === track.id;
   const baseWeight = Math.max(4, Number(state.settings.trackLineWeight) || 6);
@@ -4485,6 +4072,11 @@ function scaledSegmentIndices(track, segments, segment) {
   if (to <= from) return null;
   return { from, to };
 }
+/**
+ * Builds colored map layers from a track's surface and way-type segment ranges.
+ * @param {object} track Track containing points and derived segment ranges.
+ * @returns {object} Leaflet layer group containing the visible segment lines.
+ */
 function buildTrackSegmentLayers(track) {
   const layers = [];
   const baseWeight = Math.max(4, Number(state.settings.trackLineWeight) || 6);
@@ -4514,11 +4106,10 @@ function buildTrackSegmentLayers(track) {
       if (latLngs.length < 2) return;
       layers.push(L.polyline(latLngs, {
         interactive: false,
-        color: 'rgba(248, 251, 250, 0.92)',
-        weight: Math.max(2, Math.round(baseWeight / 2)),
+        color: profileSegmentDistributionColor(segment.value, 'waytype'),
+        weight: Math.max(4, baseWeight + 1),
         opacity: 0.95,
-        dashArray: wayTypeSegmentDash(segment.value),
-        lineCap: 'butt',
+        lineCap: 'round',
         lineJoin: 'round'
       }));
     });
@@ -4547,12 +4138,11 @@ function renderMapSegmentLegendItems(container, values, type) {
     const fragment = template.content.cloneNode(true);
     const line = fragment.querySelector('.map-segment-legend-line');
     const label = fragment.querySelector('.map-segment-legend-label');
-    line.setAttribute('stroke', 'rgba(248, 251, 250, 0.92)');
+    line.setAttribute('stroke', profileSegmentDistributionColor(value, type));
     line.setAttribute('stroke-width', '3');
     line.setAttribute('stroke-linecap', 'round');
-    line.setAttribute('stroke-dasharray', wayTypeSegmentDash(value));
+    if (type === 'waytype') line.removeAttribute('stroke-dasharray');
     if (type === 'surface') {
-      line.setAttribute('stroke', surfaceSegmentColor(value));
       line.setAttribute('stroke-width', '4');
       line.removeAttribute('stroke-dasharray');
     }
@@ -5254,6 +4844,7 @@ async function mergeSelectedTracks(orderedTracks = selectedTracksForMerge()) {
   state.tracks = state.tracks.filter((track) => track.id !== hydratedTrack.id).concat(hydratedTrack).sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? ''));
   state.selectedTrackIds = new Set([hydratedTrack.id]);
   state.highlightedTrackId = hydratedTrack.id;
+  await saveSettings();
   renderAll();
   syncMapForSelectionChange();
   setStatus(t('mergeSelectedTracksDone'));
@@ -5285,6 +4876,34 @@ async function exportSelectedTracksGpx() {
   downloadBlob(t('exportSelectedGpxFileName'), blob);
   setStatus(t('exportSelectedGpxDone', { count: tracks.length }));
 }
+
+/**
+ * Exports selected route tracks as individual FIT activities in one ZIP archive.
+ * @returns {Promise<void>} Resolves after creating the download or showing feedback.
+ */
+async function exportSelectedTracksFit() {
+  const tracks = state.tracks.filter((track) => state.selectedTrackIds.has(track.id) && track.points?.length > 1);
+  if (!tracks.length) {
+    setStatus(t('exportSelectedFitEmpty'), true);
+    return;
+  }
+  const { exportFitActivity } = await loadFitIoModule();
+  const usedNames = new Set();
+  const files = tracks.map((track, index) => {
+    const base = sanitizeFileName(track.name || `${t('unnamedTrack')} ${index + 1}`) || `track-${index + 1}`;
+    let fileName = `${base}.fit`;
+    let suffix = 2;
+    while (usedNames.has(fileName.toLowerCase())) {
+      fileName = `${base}-${suffix}.fit`;
+      suffix += 1;
+    }
+    usedNames.add(fileName.toLowerCase());
+    return { name: fileName, bytes: exportFitActivity(track), modifiedAt: trackLastChanged(track) || track.importedAt || isoNow() };
+  });
+  downloadBlob(t('exportSelectedFitFileName'), await createZipBlob(files));
+  el.exportSelectedGpxMenu?.removeAttribute('open');
+  setStatus(t('exportSelectedFitDone', { count: tracks.length }));
+}
 function exportSelectedTracksMultiGpx() {
   const tracks = state.tracks.filter((track) => state.selectedTrackIds.has(track.id) && track.points?.length);
   if (!tracks.length) {
@@ -5296,7 +4915,17 @@ function exportSelectedTracksMultiGpx() {
   el.exportSelectedGpxMenu?.removeAttribute('open');
   setStatus(t('exportSelectedMultiTrackGpxDone', { count: tracks.length }));
 }
-function setHighlightedTrack(trackId) { state.highlightedTrackId = trackId; syncMap(); renderProfile(); }
+/**
+ * Sets the focused track, persists that focus and refreshes its map and profile display.
+ * @param {string|null} trackId ID of the focused track, or null to clear focus.
+ * @returns {void}
+ */
+function setHighlightedTrack(trackId) {
+  state.highlightedTrackId = trackId;
+  void saveSettings();
+  syncMap();
+  renderProfile();
+}
 function syncMapForSelectionChange() {
   syncMap();
   const selectedTracks = visibleSelectedTracks();
@@ -5309,6 +4938,7 @@ function syncMapForSelectionChange() {
     const bounds = trackBounds(onlyTrack);
     if (bounds) state.map.fitBounds(bounds.pad(0.08));
   }
+  void saveSettings();
   renderProfile();
 }
 function initMap() {
@@ -5331,6 +4961,7 @@ function syncMap() {
     state.heatmapStats = null;
     const active = new Set(visibleSelectedTracks().map((track) => track.id));
     const photoOnlyMode = !!state.settings.photoOverlayOnly;
+    const photosHidden = !!state.settings.hideMapPhotos;
     const heatmapMode = !!state.settings.heatmapMode;
     if (heatmapMode) {
       const tracks = heatmapTrackSet();
@@ -5370,14 +5001,21 @@ function syncMap() {
     const timelineLayer = buildTrackTimelineLayer(track);
     let segmentLayer = L.layerGroup();
     if (state.settings.segmentOverlayMode && state.highlightedTrackId === track.id) segmentLayer = buildTrackSegmentLayers(track);
+    const replacesHighlightedLine = state.highlightedTrackId === track.id && segmentLayer.getLayers().length > 0;
     if (!photoOnlyMode) {
-      casing = L.polyline(latLngs, layerStyleForTrack(track, true));
-      line = L.polyline(latLngs, layerStyleForTrack(track, false)).bindPopup(`<strong>${track.name}</strong><br>${fmtKm(track.distanceKm)} km`);
-      line.on('click', (event) => { L.DomEvent.stopPropagation(event); setHighlightedTrack(track.id); });
-      casing.on('click', (event) => { L.DomEvent.stopPropagation(event); setHighlightedTrack(track.id); });
-      layers.push(casing, line, segmentLayer, kmLayer, arrowLayer);
-      if (state.highlightedTrackId === track.id) layers.push(photoLayer, timelineLayer);
-    } else if (photoLayer.getLayers().length) {
+      if (!replacesHighlightedLine) {
+        casing = L.polyline(latLngs, layerStyleForTrack(track, true));
+        line = L.polyline(latLngs, layerStyleForTrack(track, false)).bindPopup(`<strong>${track.name}</strong><br>${fmtKm(track.distanceKm)} km`);
+        line.on('click', (event) => { L.DomEvent.stopPropagation(event); setHighlightedTrack(track.id); });
+        casing.on('click', (event) => { L.DomEvent.stopPropagation(event); setHighlightedTrack(track.id); });
+        layers.push(casing, line);
+      }
+      layers.push(segmentLayer, kmLayer, arrowLayer);
+      if (state.highlightedTrackId === track.id) {
+        if (!photosHidden) layers.push(photoLayer);
+        layers.push(timelineLayer);
+      }
+    } else if (!photosHidden && photoLayer.getLayers().length) {
       layers.push(photoLayer);
     }
     const group = L.layerGroup(layers).addTo(state.map);
@@ -5438,51 +5076,188 @@ function focusTrack(trackId) {
   }
   renderProfile();
 }
-async function deleteTracks(trackIds) { for (const trackId of trackIds) { const track = state.tracks.find((item) => item.id === trackId); if (track) await deleteTrackPhotoBlobs(track); await del(STORES.tracks, trackId); state.selectedTrackIds.delete(trackId); } state.tracks = state.tracks.filter((track) => !trackIds.includes(track.id)); if (trackIds.includes(state.replay.activeTrackId)) { state.replay.activeTrackId = null; state.replay.replayTrack = null; setReplayPlaying(false); } renderAll(); syncMapForSelectionChange(); setStatus(t('statusDeleted')); }
+/**
+ * Removes tracks, their attached photo blobs and their persisted selection references.
+ * @param {string[]} trackIds IDs of the tracks to delete.
+ * @returns {Promise<void>} Resolves when tracks and settings are stored without the deleted IDs.
+ */
+async function deleteTracks(trackIds) {
+  for (const trackId of trackIds) {
+    const track = state.tracks.find((item) => item.id === trackId);
 
-async function importTrackRecords(records, replaceExisting = false) {
-  const existing = new Map(state.tracks.map((track) => [track.signature, track])); const existingRemote = new Map(state.tracks.map((track) => [remoteTrackKey(track), track]).filter(([key]) => !!key)); const incoming = []; let duplicates = 0;
+    if (track) {
+      await deleteTrackPhotoBlobs(track);
+    }
+
+    await del(STORES.tracks, trackId);
+    state.selectedTrackIds.delete(trackId);
+  }
+
+  state.tracks = state.tracks.filter((track) => !trackIds.includes(track.id));
+
+  if (trackIds.includes(state.replay.activeTrackId)) {
+    state.replay.activeTrackId = null;
+    state.replay.replayTrack = null;
+    setReplayPlaying(false);
+  }
+
+  await saveSettings();
+  renderAll();
+  syncMapForSelectionChange();
+  setStatus(t('statusDeleted'));
+}
+
+/**
+ * Stores imported tracks, replacing matching records when requested and selecting the imported tracks.
+ * @param {object[]} records Imported track records.
+ * @param {boolean} replaceExisting Whether matching tracks should be overwritten.
+ * @returns {Promise<{imported: number, duplicates: number}>} Import result counts.
+ */
+/**
+ * Collects import records and reconciles records that already exist locally.
+ * @param {object[]} records Parsed track records to import.
+ * @param {boolean} replaceExisting Whether matching records should retain their local ID and presentation data.
+ * @returns {{incoming: object[], duplicates: number}} Accepted records and skipped duplicate count.
+ */
+function collectTrackRecordsForImport(records, replaceExisting) {
+  const existingBySignature = new Map(state.tracks.map((track) => [track.signature, track]));
+  const existingByRemoteKey = new Map(
+    state.tracks
+      .map((track) => [remoteTrackKey(track), track])
+      .filter(([key]) => !!key),
+  );
+  const incoming = [];
+  let duplicates = 0;
+
   records.forEach((record) => {
     const remoteKey = remoteTrackKey(record);
-    let remoteExisting = null;
-    if (remoteKey) remoteExisting = existingRemote.get(remoteKey);
-    const dupe = remoteExisting ?? existing.get(record.signature);
-    if (dupe && !replaceExisting) { duplicates += 1; return; }
-    if (dupe && replaceExisting) {
-      record.id = dupe.id;
-      record.favorite = !!dupe.favorite;
-      record.tags = normalizeTagList(dupe.tags);
-      record.color = dupe.color || record.color;
+    let existingTrack = null;
+
+    if (remoteKey) {
+      existingTrack = existingByRemoteKey.get(remoteKey);
+    }
+
+    if (!existingTrack) {
+      existingTrack = existingBySignature.get(record.signature);
+    }
+
+    if (existingTrack && !replaceExisting) {
+      duplicates += 1;
+      return;
+    }
+
+    if (existingTrack && replaceExisting) {
+      record.id = existingTrack.id;
+      record.favorite = !!existingTrack.favorite;
+      record.tags = normalizeTagList(existingTrack.tags);
+      record.color = existingTrack.color || record.color;
       record.lastChanged = isoNow();
       record.signature = signature(record);
     }
+
     incoming.push(record);
   });
-  if (!incoming.length && duplicates) { setStatus(t('duplicateTracksSkipped', { count: duplicates })); return { imported: 0, duplicates }; }
-  for (const track of incoming) {
+
+  return { incoming, duplicates };
+}
+
+/**
+ * Deletes persisted photo blobs before their parent tracks are overwritten.
+ * @param {object[]} tracks Incoming tracks which may replace local records.
+ * @param {boolean} replaceExisting Whether incoming records replace local records.
+ * @returns {Promise<void>} Resolves after obsolete photo blobs are removed.
+ */
+async function deleteReplacedTrackPhotos(tracks, replaceExisting) {
+  if (!replaceExisting) {
+    return;
+  }
+
+  for (const track of tracks) {
     const existingTrack = state.tracks.find((item) => item.id === track.id);
-    if (replaceExisting && existingTrack) await deleteTrackPhotoBlobs(existingTrack);
+
+    if (existingTrack) {
+      await deleteTrackPhotoBlobs(existingTrack);
+    }
   }
-  const prepared = await Promise.all(incoming.map((track) => prepareTrackPhotosForStorage(track)));
-  await putMany(STORES.tracks, prepared);
-  const hydrated = await hydrateTracksPhotos(prepared);
-  const map = new Map(hydrated.map((track) => [track.id, track]));
-  revokeAllTrackPhotoUrls(state.tracks.filter((track) => map.has(track.id)));
-  state.tracks = state.tracks.filter((track) => !map.has(track.id)).concat(hydrated).sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? ''));
-  hydrated.forEach((track) => state.selectedTrackIds.add(track.id));
-  hydrated.forEach((track) => { const entry = state.layers.get(track.id); if (!entry) return; entry.group.remove(); state.layers.delete(track.id); });
-  if (state.replay.activeTrackId) {
-    const updatedReplayTrack = state.tracks.find((track) => track.id === state.replay.activeTrackId) || hydrated.find((track) => track.id === state.replay.activeTrackId) || null;
-    state.replay.replayTrack = null;
-    if (updatedReplayTrack) state.replay.replayTrack = buildReplayTrack(updatedReplayTrack);
+}
+
+/**
+ * Prepares imported photos, stores their tracks, and restores displayable photo URLs.
+ * @param {object[]} tracks Incoming track records.
+ * @returns {Promise<object[]>} Hydrated tracks ready for application state.
+ */
+async function storeImportedTracks(tracks) {
+  const preparedTracks = await Promise.all(tracks.map((track) => prepareTrackPhotosForStorage(track)));
+  await putMany(STORES.tracks, preparedTracks);
+  return hydrateTracksPhotos(preparedTracks);
+}
+
+/**
+ * Replaces matching local tracks with imported tracks and preserves the user's selection.
+ * @param {object[]} importedTracks Hydrated tracks to insert into application state.
+ * @returns {Promise<void>} Resolves after state and persisted selection have been updated.
+ */
+async function applyImportedTracks(importedTracks) {
+  const importedById = new Map(importedTracks.map((track) => [track.id, track]));
+  const replacedTracks = state.tracks.filter((track) => importedById.has(track.id));
+  revokeAllTrackPhotoUrls(replacedTracks);
+  state.tracks = state.tracks
+    .filter((track) => !importedById.has(track.id))
+    .concat(importedTracks)
+    .sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? ''));
+  importedTracks.forEach((track) => state.selectedTrackIds.add(track.id));
+  await saveSettings();
+
+  importedTracks.forEach((track) => {
+    const entry = state.layers.get(track.id);
+
+    if (entry) {
+      entry.group.remove();
+      state.layers.delete(track.id);
+    }
+  });
+}
+
+/**
+ * Refreshes the replay data when its active track was updated by an import.
+ * @returns {void} Does not return a value.
+ */
+function refreshReplayTrackAfterImport() {
+  if (!state.replay.activeTrackId) {
+    return;
   }
+
+  const updatedReplayTrack = state.tracks.find((track) => track.id === state.replay.activeTrackId);
+  state.replay.replayTrack = null;
+
+  if (updatedReplayTrack) {
+    state.replay.replayTrack = buildReplayTrack(updatedReplayTrack);
+  }
+}
+
+async function importTrackRecords(records, replaceExisting = false) {
+  const importRecords = collectTrackRecordsForImport(records, replaceExisting);
+
+  if (!importRecords.incoming.length && importRecords.duplicates) {
+    setStatus(t('duplicateTracksSkipped', { count: importRecords.duplicates }));
+    return { imported: 0, duplicates: importRecords.duplicates };
+  }
+
+  await deleteReplacedTrackPhotos(importRecords.incoming, replaceExisting);
+  const hydratedTracks = await storeImportedTracks(importRecords.incoming);
+  await applyImportedTracks(hydratedTracks);
+  refreshReplayTrackAfterImport();
   renderAll();
   syncMap();
   fitSelection();
+
   let importStatus = t('statusImported');
-  if (duplicates) importStatus = `${t('statusImported')} · ${t('duplicateTracksSkipped', { count: duplicates })}`;
+  if (importRecords.duplicates) {
+    importStatus = `${t('statusImported')} · ${t('duplicateTracksSkipped', { count: importRecords.duplicates })}`;
+  }
+
   setStatus(importStatus);
-  return { imported: hydrated.length, duplicates };
+  return { imported: hydratedTracks.length, duplicates: importRecords.duplicates };
 }
 function normalizeBackupTrack(track) {
   const surfaceSegments = normalizeRangeSegments(track.surfaceSegments);
@@ -5513,6 +5288,11 @@ function normalizeBackupTrack(track) {
   };
   return enrichTrackMetrics(normalized);
 }
+/**
+ * Imports portable tour-backup records and selects every track accepted from the backup.
+ * @param {object[]} records Track records from a Trailthread tour backup.
+ * @returns {Promise<{imported: number, duplicates: number, skippedConflicts: number}>} Import result counts.
+ */
 async function importTourBackupRecords(records) {
   const existingById = new Map(state.tracks.map((track) => [track.id, track]));
   const existingBySignature = new Map(state.tracks.map((track) => [track.signature, track]));
@@ -5560,6 +5340,7 @@ async function importTourBackupRecords(records) {
   revokeAllTrackPhotoUrls(state.tracks.filter((track) => map.has(track.id)));
   state.tracks = state.tracks.filter((track) => !map.has(track.id)).concat(hydrated).sort((a, b) => (b.importedAt ?? '').localeCompare(a.importedAt ?? ''));
   hydrated.forEach((track) => state.selectedTrackIds.add(track.id));
+  await saveSettings();
   hydrated.forEach((track) => {
     const entry = state.layers.get(track.id);
     if (!entry) return;
@@ -5788,12 +5569,13 @@ async function importKmlFiles(files) {
 }
 
 /**
- * Imports selected GPX, KML, KMZ and Trailthread backup files.
+ * Imports selected FIT, GPX, KML, KMZ and Trailthread backup files.
  * @param {FileList|File[]} files Files selected through the local import control.
  * @returns {Promise<void>} Resolves after all valid GPX files have been stored.
  */
 async function importLocalFiles(files) {
   const selectedFiles = [...files];
+  const fitFiles = selectedFiles.filter((file) => file.name.toLocaleLowerCase().endsWith('.fit'));
   const gpxFiles = selectedFiles.filter((file) => file.name.toLocaleLowerCase().endsWith('.gpx'));
   const kmlFiles = selectedFiles.filter((file) => {
     const name = file.name.toLocaleLowerCase();
@@ -5801,7 +5583,7 @@ async function importLocalFiles(files) {
   });
   const packageFiles = selectedFiles.filter((file) => {
     const name = file.name.toLocaleLowerCase();
-    return !name.endsWith('.gpx') && !name.endsWith('.kml') && !name.endsWith('.kmz');
+    return !name.endsWith('.fit') && !name.endsWith('.gpx') && !name.endsWith('.kml') && !name.endsWith('.kmz');
   });
   let companionManifest = null;
   const tourBackupRecords = [];
@@ -5832,12 +5614,27 @@ async function importLocalFiles(files) {
     if (kmlImport.backupRecords.length) await importTourBackupRecords(kmlImport.backupRecords);
     if (kmlImport.genericRecords.length) await importTrackRecords(kmlImport.genericRecords);
   }
-  if (!gpxFiles.length) {
+  const records = [];
+  if (fitFiles.length) {
+    const { importFitActivity } = await loadFitIoModule();
+    for (const file of fitFiles) {
+      const imported = await importFitActivity(file);
+      const record = buildTrackRecord({ gpxText: imported.gpxText, fileName: `${imported.name}.gpx`, source: 'fit', type: 'recorded', meta: { dateStart: imported.dateStart, sport: imported.sport } });
+      record.points.forEach((point, index) => {
+        const fitPoint = imported.points[index];
+        if (!fitPoint) return;
+        if (fitPoint.heartRateBpm != null) point.heartRateBpm = fitPoint.heartRateBpm;
+        if (fitPoint.cadenceRpm != null) point.cadenceRpm = fitPoint.cadenceRpm;
+        if (fitPoint.temperatureC != null) point.temperatureC = fitPoint.temperatureC;
+      });
+      records.push(record);
+    }
+  }
+  if (!gpxFiles.length && !fitFiles.length) {
     if (companionManifest) setStatus('Bitte wähle das Komoot-Importpaket zusammen mit mindestens einer GPX-Datei aus.', true);
     else if (invalidPackageFound) setStatus('Die ausgewählte Datei ist weder eine GPX-Datei noch eine Trailthread-Sicherung.', true);
     return;
   }
-  const records = [];
   let enrichedCount = 0;
   for (const file of gpxFiles) {
     let tour = null;
@@ -5877,32 +5674,24 @@ async function importLocalFiles(files) {
   if (companionManifest && !enrichedCount) setStatus(`${result.imported} GPX importiert. Keine Dateinamen passten zum Komoot-Importpaket.`, true);
 }
 
+/**
+ * Delegates a legacy proxy request to the dormant Komoot workspace module.
+ * @param {string} path Endpoint path below the local proxy base URL.
+ * @param {object} [options={}] HTTP request options and optional JSON body.
+ * @returns {Promise<object>} Valid proxy response payload.
+ */
 async function proxyRequest(path, options = {}) {
-  const url = `${proxyBaseUrl()}${path}`;
-  let response;
-  try {
-    const headers = {};
-    let body;
-    let targetAddressSpace;
-    if (options.body) {
-      headers['Content-Type'] = 'application/json';
-      body = JSON.stringify(options.body);
-    }
-    if (shouldRequestLoopbackAccess()) targetAddressSpace = 'loopback';
-    response = await fetch(url, {
-      method: options.method ?? 'GET',
-      headers,
-      body,
-      targetAddressSpace
-    });
-  } catch (error) {
-    throw new Error(normalizeProxyError(error));
-  }
-  const payload = await response.json().catch(() => null);
-  if (!response.ok || !payload?.ok) throw new Error(payload?.error || `HTTP ${response.status}`);
-  return payload;
+  return komootWorkspaceController.proxyRequest(path, options);
 }
-async function ensureProxyAccountLogin(account) { if (!account) throw new Error(t('accountRequired')); await proxyRequest('/login', { method: 'POST', body: { email: account.email, password: account.password } }); }
+
+/**
+ * Delegates legacy account authentication to the dormant Komoot workspace module.
+ * @param {object} account Stored Komoot account with email and password.
+ * @returns {Promise<void>} Resolves after the proxy accepted the account.
+ */
+async function ensureProxyAccountLogin(account) {
+  await komootWorkspaceController.ensureAccountLogin(account);
+}
 
 /**
  * Shows a validation result in the account dialog.
@@ -5927,19 +5716,7 @@ function accountLoginFailureMessage(error) {
 }
 
 async function checkProxy() {
-  try {
-    const payload = await proxyRequest('/health');
-    state.proxy = { ...state.proxy, online: true, mode: payload.mode ?? null, lastCheckAt: payload.serverTime || new Date().toISOString(), lastError: null };
-    renderProxy();
-    setKomootStatus(t('proxyOnline'));
-    return true;
-  } catch (error) {
-    const message = normalizeProxyError(error);
-    state.proxy = { ...state.proxy, online: false, lastCheckAt: new Date().toISOString(), lastError: message };
-    renderProxy();
-    setKomootStatus(message, true);
-    return false;
-  }
+  return komootWorkspaceController.checkProxy();
 }
 /**
  * Verifies Komoot credentials through the local proxy and persists a confirmed account.
@@ -6019,7 +5796,6 @@ async function loadKomootTours() {
     setKomootStatus(error.message, true);
   }
 }
-async function importKomootSelection() { if (!state.komootTours.length) { setKomootStatus(t('loadToursFirst'), true); return; } const ids = [...state.selectedKomootTourIds]; if (!ids.length) { setKomootStatus(t('selectToursFirst'), true); return; } const account = activeAccount(); if (!account) { setKomootStatus(t('accountRequired'), true); return; } if (!await checkProxy()) return; try { setKomootProgress(komootProgressText().importing, 15, false); await ensureProxyAccountLogin(account); setKomootProgress(komootProgressText().importing, 35, false); const payload = await proxyRequest('/import', { method: 'POST', body: { language: lang(), tourIds: ids } }); setKomootProgress(komootProgressText().importing, 80, false); const toursById = new Map(state.komootTours.map((tour) => [tour.id, tour])); const records = payload.items.map((item) => { const summary = toursById.get(item.id); return buildTrackRecord({ gpxText: item.gpx, fileName: item.fileName, source: 'komoot', type: summary?.type || 'unknown', account: { ...account, sourceTrackId: item.id }, description: item.description || null, photos: item.photos || null, meta: { dateStart: item.dateStart || summary?.dateStart || summary?.date || null, durationHours: item.durationHours ?? null, sport: item.sport || summary?.sport || null, surfaces: item.surfaces || null, wayTypes: item.wayTypes || null, surfaceSegments: item.surfaceSegments || null, wayTypeSegments: item.wayTypeSegments || null, directions: item.directions || null } }); }); const result = await importTrackRecords(records, true); setKomootProgress(komootProgressText().done, 100, false); setKomootStatus(t('komootImported', { count: result.imported })); window.setTimeout(clearKomootProgress, 500); } catch (error) { clearKomootProgress(); state.proxy.lastError = error.message; renderProxy(); setKomootStatus(error.message, true); } }
 
 function downloadBlob(name, blob) { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); URL.revokeObjectURL(url); }
 function downloadJson(name, payload) { const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); downloadBlob(name, blob); }
@@ -6183,10 +5959,48 @@ async function loadState() {
   state.tracks = await hydrateTracksPhotos(storedTracks);
   const settings = await all(STORES.settings);
   state.settings = { ...state.settings, ...(settings[0] ?? {}) };
+  if (state.settings.layoutMigrationVersion < 3) {
+    state.settings.libraryCompact = false;
+    state.settings.layoutMigrationVersion = 3;
+  }
+  restoreTrackSelection();
   await deactivateLegacyProxyConnector();
   if (!['library', 'replay'].includes(state.settings.activeWorkspace)) state.settings.activeWorkspace = 'library';
   applyPaneWidths();
   await saveSettings();
+}
+
+/**
+ * Restores persisted selection IDs when they still refer to tracks in the local library.
+ * @returns {void}
+ */
+function restoreTrackSelection() {
+  const knownTrackIds = new Set(state.tracks.map((track) => track.id));
+  let storedTrackIds = [];
+  if (Array.isArray(state.settings.selectedTrackIds)) storedTrackIds = state.settings.selectedTrackIds;
+  state.selectedTrackIds = new Set(storedTrackIds.filter((trackId) => knownTrackIds.has(trackId)));
+  state.highlightedTrackId = null;
+  if (knownTrackIds.has(state.settings.highlightedTrackId) && state.selectedTrackIds.has(state.settings.highlightedTrackId)) state.highlightedTrackId = state.settings.highlightedTrackId;
+  if (!state.highlightedTrackId && state.selectedTrackIds.size === 1) state.highlightedTrackId = [...state.selectedTrackIds][0];
+}
+
+/**
+ * Moves the library search and filter controls into the mobile dialog and opens it.
+ * @returns {void}
+ */
+function openMobileLibraryFilterDialog() {
+  if (!el.libraryControls || !el.mobileLibraryFilterControls || !el.mobileLibraryFilterDialog) return;
+  el.mobileLibraryFilterControls.append(el.libraryControls);
+  if (!el.mobileLibraryFilterDialog.open) el.mobileLibraryFilterDialog.showModal();
+}
+
+/**
+ * Returns the shared library search and filter controls to their desktop position.
+ * @returns {void}
+ */
+function restoreMobileLibraryFilterControls() {
+  if (!el.libraryControls || !el.libraryToolbar) return;
+  el.libraryToolbar.before(el.libraryControls);
 }
 
 function bindEvents() {
@@ -6204,9 +6018,11 @@ function bindEvents() {
     if (state.settings.activeWorkspace === 'replay') renderReplayWorkspace();
   }));
   el.settingsButton.addEventListener('click', () => el.settingsDialog.showModal());
+  el.openLibraryFiltersButton?.addEventListener('click', openMobileLibraryFilterDialog);
+  el.mobileLibraryFilterDialog?.addEventListener('close', restoreMobileLibraryFilterControls);
   el.helpButton?.addEventListener('click', () => {
     el.helpDialog.showModal();
-    void loadReadmeContent();
+    void loadHelpContent();
   });
   el.replayJumpStartButton?.addEventListener('click', () => jumpReplayTo('start'));
   el.replayJumpHighButton?.addEventListener('click', () => jumpReplayTo('highest'));
@@ -6228,6 +6044,9 @@ function bindEvents() {
     await saveSettings();
     scheduleMapLayoutRefresh();
   });
+  el.showMobileSidebarButton?.addEventListener('click', () => {
+    void showMobileSidebar();
+  });
   el.toggleLibraryCompactButton?.addEventListener('click', async () => {
     state.settings.libraryCompact = !state.settings.libraryCompact;
     applyPaneWidths();
@@ -6240,16 +6059,22 @@ function bindEvents() {
     setAccountStatus('');
     el.accountDialog.showModal();
   });
-  el.saveAccountButton.addEventListener('click', saveAccount);
+  // Legacy Komoot workspace is dormant; account login remains available in komoot-workspace.js.
+  // el.saveAccountButton.addEventListener('click', saveAccount);
   el.trackDetailEditButton?.addEventListener('click', () => {
     state.trackDetailUi.editing = true;
+    trackDetailRemovedPhotoIndexes = new Set();
     renderTrackDetailDialog();
     el.trackDetailNameInput?.focus();
     el.trackDetailNameInput?.select();
   });
   el.trackDetailCancelButton?.addEventListener('click', () => {
     state.trackDetailUi.editing = false;
+    trackDetailRemovedPhotoIndexes = new Set();
     renderTrackDetailDialog();
+  });
+  el.trackDetailCloseButton?.addEventListener('click', () => {
+    void requestTrackDetailClose();
   });
   el.trackDetailSaveButton?.addEventListener('click', async () => {
     const track = state.tracks.find((item) => item.id === state.trackDetailUi.trackId);
@@ -6258,20 +6083,48 @@ function bindEvents() {
     const nextDescription = cleanText(el.trackDetailDescriptionInput?.value);
     const nextFavorite = !!el.trackDetailFavoriteInput?.checked;
     const nextTags = parseTagInput(el.trackDetailTagsInput?.value);
-    const updatedTrack = touchTrack(track, { name: nextName, description: nextDescription || '', favorite: nextFavorite, tags: nextTags });
+    let currentPhotos = [];
+    if (Array.isArray(track.photos)) currentPhotos = track.photos;
+    const removedPhotos = [];
+    const nextPhotos = currentPhotos.filter((photo, index) => {
+      if (!trackDetailRemovedPhotoIndexes.has(index)) return true;
+      removedPhotos.push(photo);
+      return false;
+    });
+    const updatedTrack = touchTrack(track, { name: nextName, description: nextDescription || '', favorite: nextFavorite, tags: nextTags, photos: nextPhotos });
     await put(STORES.tracks, updatedTrack);
     state.tracks = state.tracks.map((item) => {
       if (item.id === updatedTrack.id) return updatedTrack;
       return item;
     });
+    for (const photo of removedPhotos) {
+      try {
+        await deleteTrackPhotoBlob(photo);
+      } catch (error) {
+        console.warn('The removed photo could not be deleted from local storage.', error);
+      }
+    }
     state.trackDetailUi.editing = false;
+    trackDetailRemovedPhotoIndexes = new Set();
     renderAll();
     renderTrackDetailDialog();
+    syncMapForSelectionChange();
     setStatus(t('trackSaved'));
   });
   el.trackDetailDialog?.addEventListener('close', () => {
     state.trackDetailUi.trackId = null;
     state.trackDetailUi.editing = false;
+    trackDetailRemovedPhotoIndexes = new Set();
+    if (el.trackDetailStatus) {
+      el.trackDetailStatus.hidden = true;
+      el.trackDetailStatus.textContent = '';
+      el.trackDetailStatus.classList.remove('is-error');
+    }
+  });
+  el.trackDetailDialog?.addEventListener('cancel', (event) => {
+    if (!trackDetailHasUnsavedChanges()) return;
+    event.preventDefault();
+    void requestTrackDetailClose();
   });
   el.fileInput.addEventListener('change', async (event) => {
     const files = [...event.target.files];
@@ -6287,6 +6140,9 @@ function bindEvents() {
   el.librarySortSelect.addEventListener('change', refreshLibraryFilterView);
   el.exportSelectedGpxButton.addEventListener('click', exportSelectedTracksGpx);
   el.exportSelectedMultiTrackGpxButton?.addEventListener('click', exportSelectedTracksMultiGpx);
+  el.exportSelectedFitButton?.addEventListener('click', () => {
+    void exportSelectedTracksFit();
+  });
   el.exportSelectedKmzButton?.addEventListener('click', () => {
     void exportSelectedTracksKmz('compatibility');
   });
@@ -6309,9 +6165,19 @@ function bindEvents() {
   el.fitAllButton.addEventListener('click', fitSelection);
   el.mapPhotoModeButton?.addEventListener('click', async () => {
     if (state.settings.heatmapMode) return;
+    if (!state.settings.photoOverlayOnly) state.settings.hideMapPhotos = false;
     state.settings.photoOverlayOnly = !state.settings.photoOverlayOnly;
     await saveSettings();
     renderMapPhotoModeButton();
+    renderMapPhotoVisibilityButton();
+    syncMap();
+  });
+  el.mapPhotoVisibilityButton?.addEventListener('click', async () => {
+    state.settings.hideMapPhotos = !state.settings.hideMapPhotos;
+    if (state.settings.hideMapPhotos) state.settings.photoOverlayOnly = false;
+    await saveSettings();
+    renderMapPhotoModeButton();
+    renderMapPhotoVisibilityButton();
     syncMap();
   });
   el.mapHeatmapButton?.addEventListener('click', async () => {
@@ -6323,6 +6189,7 @@ function bindEvents() {
       if (state.settings.heatmapMode) state.settings.photoOverlayOnly = false;
       await saveSettings();
       renderMapPhotoModeButton();
+      renderMapPhotoVisibilityButton();
       renderMapHeatmapButton();
       syncMap();
       if (state.settings.heatmapMode) {
@@ -6370,26 +6237,16 @@ function bindEvents() {
     } else {
       filteredTracks().forEach((track) => state.selectedTrackIds.add(track.id));
     }
+    void saveSettings();
     renderAll();
     syncMapForSelectionChange();
   });
-  el.komootAccountSelect.addEventListener('change', async (event) => {
-    state.settings.activeAccountId = event.target.value || null;
-    await saveSettings();
-    renderAccounts();
-  });
-  el.komootLoadButton.addEventListener('click', loadKomootTours);
-  el.komootAccountSelect?.addEventListener('change', async () => {
-    const account = state.accounts.find((item) => item.id === el.komootAccountSelect.value) ?? null;
-    if (!account) return;
-    state.settings.activeAccountId = account.id;
-    await saveSettings();
-    restoreKomootCache(account, { announce: true });
-    renderKomootLoadButton();
-  });
-  el.komootImportButton.addEventListener('click', importKomootSelection);
-  el.recordedSelectAllButton.addEventListener('click', () => selectAllKomootTours('recorded'));
-  el.plannedSelectAllButton.addEventListener('click', () => selectAllKomootTours('planned'));
+  // Legacy Komoot workspace event bindings are intentionally disabled.
+  // el.komootAccountSelect.addEventListener('change', handleLegacyKomootAccountChange);
+  // el.komootLoadButton.addEventListener('click', loadKomootTours);
+  // el.komootImportButton.addEventListener('click', importKomootSelection);
+  // el.recordedSelectAllButton.addEventListener('click', selectAllRecordedKomootTours);
+  // el.plannedSelectAllButton.addEventListener('click', selectAllPlannedKomootTours);
   el.replayViewButtons.forEach((button) => button.addEventListener('click', () => setReplayView(button.dataset.replayView)));
   el.replaySpeedSelect?.addEventListener('change', () => {
     state.replay.speed = Number(el.replaySpeedSelect.value) || 1;
@@ -6404,8 +6261,7 @@ function bindEvents() {
   }));
   el.replayCameraButtons.forEach((button) => button.addEventListener('click', () => { state.replay.cameraMode3d = button.dataset.replayCamera || 'orbit'; renderReplayControls(); updateReplayScene(); }));
   el.replayRestartButton?.addEventListener('click', resetReplayToStart);
-  el.replayPlayButton?.addEventListener('click', () => setReplayPlaying(true));
-  el.replayPauseButton?.addEventListener('click', () => setReplayPlaying(false));
+  el.replayPlayButton?.addEventListener('click', () => setReplayPlaying(!state.replay.playing));
   el.replayBackButton?.addEventListener('click', () => setReplayCursor(state.replay.cursor - Math.max(0.5, replayMetricMax(state.replay.replayTrack, state.replay.mode) / 40)));
   el.replayForwardButton?.addEventListener('click', () => setReplayCursor(state.replay.cursor + Math.max(0.5, replayMetricMax(state.replay.replayTrack, state.replay.mode) / 40)));
   el.replayFollowCameraInput?.addEventListener('change', () => {
@@ -6555,6 +6411,78 @@ async function registerServiceWorker() {
     setUpdateStatus(t('statusSwRegisterFailed', { message: error.message }), false, true);
   }
 }
-async function init() { await loadState(); applyPaneWidths(); renderI18n(); applyKomootExtensionConfiguration(); initMap(); bindEvents(); renderAll(); syncMap(); fitSelection(); scheduleMapLayoutRefresh(); setStatus(t('statusReady')); await registerServiceWorker(); }
+/**
+ * Initializes persisted state, rendering, map behavior and offline update support.
+ * @returns {Promise<void>} Resolves after the application is ready for interaction.
+ */
+async function init() {
+  await loadState();
+  applyPaneWidths();
+  renderI18n();
+  applyKomootExtensionConfiguration();
+  initMap();
+  bindEvents();
+  renderAll();
+  syncMap();
+  fitSelection();
+  scheduleMapLayoutRefresh();
+  await registerServiceWorker();
+}
+
+// The controller is created only after all injected helpers have been initialized.
+const replayWorkspaceController = createReplayWorkspaceController({
+  state,
+  el,
+  tileUrl: TILE_URL,
+  replayTimeScale: REPLAY_TIME_SCALE,
+  replayDistanceSeconds: REPLAY_DISTANCE_SECONDS,
+  trackSourceLabel,
+  parsePointTime,
+  haversine,
+  bearingDegrees,
+  profileGradeAtPoint,
+  clamp,
+  photoLatLng,
+  normalizeDirections,
+  fmtNum,
+  fmtElapsedShort,
+  fmtKm,
+  fmtMeters,
+  fmtHours,
+  fmtGrade,
+  fmtDate,
+  translate: t,
+  trackBounds,
+  replayMarkerIconHtml,
+  applyReplayModeDefaults,
+  replayDefaultSpeed,
+  scheduleMapLayoutRefresh,
+  saveSettings,
+  renderWorkspace,
+});
+
+const {
+  buildReplayTrack,
+  cancelReplayLoop,
+  ensureReplayMaps,
+  jumpReplayTo,
+  openReplayTrack,
+  refreshReplay2DCamera,
+  renderReplayControls,
+  renderReplayWorkspace,
+  replayDistanceFromProfileEvent,
+  replayFrameAtCursor,
+  replayMetricMax,
+  replayCandidateTrack,
+  replaySeekValueFromDistance,
+  resetReplayToStart,
+  setReplayCameraMode2d,
+  setReplayCursor,
+  setReplayMode,
+  setReplayPlaying,
+  setReplayView,
+  updateReplayScene,
+} = replayWorkspaceController;
+
 init().catch((error) => { console.error(error); setStatus(error.message || t('statusError'), true); });
 

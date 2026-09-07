@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 const SUPPORTED_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".md", ".php", ".ps1", ".svg", ".txt", ".webmanifest", ".yaml", ".yml"]);
-const SKIPPED_DIRECTORIES = new Set([".git", "artifacts", "downloads", "node_modules", "snapshots"]);
+const SKIPPED_DIRECTORIES = new Set([".git", "downloads", "node_modules", "snapshots"]);
 
 /**
  * Returns whether a file is a supported text source.

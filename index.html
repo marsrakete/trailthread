@@ -85,29 +85,27 @@
         <div id="accounts-list" class="account-list" aria-live="polite"></div>
       </section>
 
-      <section class="panel support-panel">
-        <p class="eyebrow" data-i18n="supportEyebrow"></p>
-        <p class="support-note" data-i18n="supportNote"></p>
-        <div class="support-actions">
-          <a href="https://ko-fi.com/U7U01OC260" target="_blank" rel="noreferrer noopener">
-            <img src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Support on Ko-fi">
-          </a>
-        </div>
-      </section>
     </aside>
 
     <div class="pane-resizer" data-resize-handle="left" aria-hidden="true"></div>
 
     <aside class="library-column">
+      <div class="mobile-sidebar-reveal">
+        <img src="icons/icon.svg" alt="Trailthread Icon">
+        <button id="show-mobile-sidebar-button" class="icon-button" type="button" aria-label="Linke Spalte anzeigen" title="Linke Spalte anzeigen">⟫</button>
+      </div>
       <section id="library-sidebar-panel" class="panel library-panel">
         <div class="panel-heading pane-header-row">
           <div>
             <h2 data-i18n="libraryTitle"></h2>
             <p id="library-summary" data-i18n="libraryEmpty"></p>
           </div>
-          <button id="toggle-library-compact-button" class="icon-button pane-toggle-button" type="button" aria-label="Bibliothek schmal schalten" title="Bibliothek schmal schalten">◨</button>
+          <div class="library-header-actions">
+            <button id="open-library-filters-button" class="button button-subtle library-filter-dialog-button" type="button" data-i18n="libraryFiltersButton"></button>
+            <button id="toggle-library-compact-button" class="icon-button pane-toggle-button" type="button" aria-label="Bibliothek schmal schalten" title="Bibliothek schmal schalten">◨</button>
+          </div>
         </div>
-        <div class="library-controls">
+        <div id="library-controls" class="library-controls">
           <input id="library-search-input" class="library-search-input" type="search" placeholder="Search">
           <div class="control-row">
             <select id="library-type-filter">
@@ -141,9 +139,9 @@
             </select>
           </div>
         </div>
-        <div class="button-row compact-row library-toolbar library-toolbar-grid">
+        <div id="library-toolbar" class="button-row compact-row library-toolbar library-toolbar-grid">
           <label class="button button-primary" for="file-input" data-i18n="addFiles"></label>
-          <input id="file-input" type="file" accept=".gpx,.kml,.kmz,.json,.gz,application/gpx+xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/json,application/gzip" multiple hidden>
+          <input id="file-input" type="file" accept=".fit,.gpx,.kml,.kmz,.json,.gz,application/vnd.ant.fit,application/gpx+xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/json,application/gzip" multiple hidden>
           <div class="library-export-split">
             <button id="export-selected-gpx-button" class="button button-subtle" type="button" data-i18n="exportSelectedGpx"></button>
             <details id="export-selected-gpx-menu" class="library-export-menu">
@@ -152,6 +150,7 @@
               </summary>
               <div class="library-export-popover">
                 <button id="export-selected-multitrack-gpx-button" class="button button-ghost" type="button" data-i18n="exportSelectedMultiTrackGpx"></button>
+                <button id="export-selected-fit-button" class="button button-ghost" type="button" data-i18n="exportSelectedFit"></button>
                 <button id="export-selected-kmz-button" class="button button-ghost" type="button" data-i18n="exportSelectedKmz"></button>
                 <button id="export-selected-kmz-pro-button" class="button button-ghost" type="button" data-i18n="exportSelectedKmzPro"></button>
               </div>
@@ -176,6 +175,7 @@
           <button id="fit-all-button" class="button button-ghost" type="button" data-i18n="fitSelection"></button>
           <button id="next-track-button" class="button button-subtle toolbar-nav-button" type="button" data-i18n="nextTrack" aria-label="Nächster Track">→</button>
             <button id="map-photo-mode-button" class="button button-subtle" type="button"></button>
+            <button id="map-photo-visibility-button" class="button button-subtle" type="button"></button>
             <div class="heatmap-tools">
               <button id="map-heatmap-button" class="button button-subtle" type="button" data-i18n="mapHeatmap"></button>
               <div class="heatmap-help">
@@ -242,16 +242,7 @@
               <p class="status-kicker" data-i18n="profileTitle"></p>
               <strong id="profile-track-name">-</strong>
             </div>
-            <div id="profile-segment-summary" class="profile-segment-summary profile-segment-summary-inline" hidden>
-              <div class="profile-segment-row">
-                <span class="profile-segment-label" data-i18n="analysisSurfaceTitle"></span>
-                <div id="profile-surface-breakdown" class="profile-segment-items"></div>
-              </div>
-              <div class="profile-segment-row">
-                <span class="profile-segment-label" data-i18n="analysisWayTypeTitle"></span>
-                <div id="profile-waytype-breakdown" class="profile-segment-items"></div>
-              </div>
-            </div>
+            <div id="profile-segment-summary" class="profile-segment-summary profile-segment-summary-inline" hidden></div>
             <div class="profile-stats">
               <div class="profile-stat">
                 <span data-i18n="labelAvgSpeed"></span>
@@ -390,22 +381,19 @@
                   </span>
                   <span class="sr-only" data-i18n="replayBack"></span>
                 </button>
-                <button id="replay-play-button" class="icon-button replay-transport-button replay-transport-button-primary" type="button">
+                <button id="replay-play-button" class="icon-button replay-transport-button" type="button" aria-pressed="false">
                   <span class="replay-transport-icon replay-transport-icon-play" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="currentColor">
                       <path d="M8 6.5v11l9-5.5z"></path>
                     </svg>
                   </span>
-                  <span class="sr-only" data-i18n="replayPlay"></span>
-                </button>
-                <button id="replay-pause-button" class="icon-button replay-transport-button" type="button">
-                  <span class="replay-transport-icon" aria-hidden="true">
+                  <span class="replay-transport-icon replay-transport-icon-pause" aria-hidden="true" hidden>
                     <svg viewBox="0 0 24 24" fill="currentColor">
                       <path d="M7 6h4v12H7z"></path>
                       <path d="M13 6h4v12h-4z"></path>
                     </svg>
                   </span>
-                  <span class="sr-only">Pause</span>
+                  <span class="sr-only replay-playback-toggle-label"></span>
                 </button>
                 <button id="replay-forward-button" class="icon-button replay-transport-button" type="button">
                   <span class="replay-transport-icon" aria-hidden="true">
@@ -649,6 +637,16 @@
         </div>
       </section>
 
+      <section class="settings-block settings-support-block">
+        <h3 data-i18n="supportEyebrow"></h3>
+        <p class="support-note" data-i18n="supportNote"></p>
+        <div class="support-actions">
+          <a href="https://ko-fi.com/U7U01OC260" target="_blank" rel="noreferrer noopener">
+            <img src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Support on Ko-fi">
+          </a>
+        </div>
+      </section>
+
       <div class="button-row">
         <button class="button button-ghost" type="button" data-close-dialog="settings-dialog" data-i18n="closeButton"></button>
       </div>
@@ -667,6 +665,32 @@
       </div>
     </form>
   </dialog>
+
+  <dialog id="profile-segment-dialog" class="modal-dialog">
+    <form method="dialog" class="modal-sheet profile-segment-dialog-sheet">
+      <div class="panel-heading">
+        <h2 id="profile-segment-dialog-title"></h2>
+      </div>
+      <ul id="profile-segment-detail-list" class="profile-segment-detail-list"></ul>
+      <div class="button-row">
+        <button class="button button-ghost" type="button" data-close-dialog="profile-segment-dialog" data-i18n="closeButton"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="mobile-library-filter-dialog-template">
+    <dialog id="mobile-library-filter-dialog" class="modal-dialog">
+      <form method="dialog" class="modal-sheet mobile-library-filter-sheet">
+        <div class="panel-heading">
+          <h2 data-i18n="libraryFiltersTitle"></h2>
+        </div>
+        <div id="mobile-library-filter-controls"></div>
+        <div class="button-row">
+          <button class="button button-primary" type="button" data-close-dialog="mobile-library-filter-dialog" data-i18n="closeButton"></button>
+        </div>
+      </form>
+    </dialog>
+  </template>
 
   <dialog id="confirm-dialog" class="modal-dialog">
     <form method="dialog" class="modal-sheet modal-sheet-confirm">
@@ -736,7 +760,6 @@
             <button class="track-description-toggle" type="button" hidden></button>
           </div>
           <div class="track-facts"></div>
-          <button class="button button-subtle track-osm-waytype-button" type="button" hidden></button>
           <span class="track-submeta"></span>
           <div class="track-photo-strip" hidden></div>
         </div>
@@ -792,6 +815,19 @@
 
   <template id="track-photo-thumb-template">
     <img class="track-photo-thumb" loading="lazy" decoding="async">
+  </template>
+
+  <template id="track-detail-photo-template">
+    <article class="track-detail-photo">
+      <img class="track-detail-photo-image" loading="lazy" decoding="async">
+      <button class="icon-button track-detail-photo-delete" type="button" hidden></button>
+    </article>
+  </template>
+
+  <template id="track-analysis-action-template">
+    <div class="track-analysis-action">
+      <button class="button button-subtle track-osm-waytype-button" type="button"></button>
+    </div>
   </template>
 
   <template id="track-fact-template">
@@ -860,14 +896,24 @@
     </svg>
   </template>
 
-  <template id="profile-segment-chip-template">
-    <span class="profile-segment-chip">
+  <template id="profile-segment-distribution-template">
+    <button class="profile-distribution-button" type="button">
+      <svg class="profile-distribution-donut" viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="profile-distribution-donut-track" cx="50" cy="50" r="40"></circle>
+        <g class="profile-distribution-donut-segments"></g>
+      </svg>
+      <span class="profile-distribution-label"></span>
+    </button>
+  </template>
+
+  <template id="profile-segment-detail-template">
+    <li class="profile-segment-detail-item">
       <svg class="map-segment-swatch-svg" viewBox="0 0 32 8" aria-hidden="true">
         <line class="profile-segment-swatch-line" x1="1" y1="4" x2="31" y2="4"></line>
       </svg>
-      <span class="profile-segment-chip-label"></span>
-      <strong class="profile-segment-chip-percent"></strong>
-    </span>
+      <span class="profile-segment-detail-label"></span>
+      <strong class="profile-segment-detail-percent"></strong>
+    </li>
   </template>
 
   <template id="map-segment-legend-item-template">
@@ -910,12 +956,13 @@
       <div id="track-detail-facts" class="track-detail-facts"></div>
       <p id="track-detail-description" class="track-detail-description"></p>
       <section id="track-detail-analysis" class="track-detail-analysis"></section>
+      <div id="track-detail-status" class="track-detail-status" role="status" aria-live="polite" hidden></div>
       <div id="track-detail-photos" class="track-detail-photos"></div>
       <div class="button-row">
         <button id="track-detail-edit-button" class="button button-subtle" type="button" data-i18n="editTrackButton"></button>
         <button id="track-detail-save-button" class="button button-primary" type="button" data-i18n="saveTrackButton" hidden></button>
         <button id="track-detail-cancel-button" class="button button-ghost" type="button" data-i18n="cancelEditButton" hidden></button>
-        <button class="button button-ghost" type="button" data-close-dialog="track-detail-dialog" data-i18n="closeButton"></button>
+        <button id="track-detail-close-button" class="button button-ghost" type="button" data-i18n="closeButton"></button>
       </div>
     </form>
   </dialog>

@@ -7,10 +7,25 @@ const APP_SHELL = [
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./modules/komoot-import.js",
+  "./modules/osm-analysis.js",
+  "./modules/track-detail.js",
+  "./modules/replay-workspace.js",
+  "./modules/fit-io.js",
+  "./modules/vendor/fit-file-parser/fit-parser.js",
+  "./modules/vendor/fit-file-parser/binary.js",
+  "./modules/vendor/fit-file-parser/helper.js",
+  "./modules/vendor/fit-file-parser/fit.js",
+  "./modules/vendor/fit-file-parser/messages.js",
+  "./modules/vendor/fit-file-parser/fit-encoder.js",
+  "./modules/vendor/fit-file-parser/garmin_profile.generated.js",
+  "./modules/komoot-workspace.js",
   "./config.js",
   "./version.js",
   "./manifest.json",
-  "./README.md",
+  "./HELP.de.md",
+  "./HELP.en.md",
+  "./HELP.fr.md",
   "./icons/icon.svg",
   "./icons/maskable.svg",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
@@ -71,7 +86,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (sameOrigin && requestUrl.pathname.endsWith("/README.md")) {
+  if (sameOrigin && /\/HELP\.(de|en|fr)\.md$/u.test(requestUrl.pathname)) {
     event.respondWith(
       fetch(request)
         .then((networkResponse) => {
@@ -79,7 +94,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           return networkResponse;
         })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("./README.md")))
+        .catch(() => caches.match(request).then((cached) => cached || caches.match("./HELP.en.md")))
     );
     return;
   }
