@@ -82,6 +82,45 @@ function routePointsFromFitRecords(records) {
 }
 
 /**
+ * Extracts timestamped sensor readings from decoded FIT records.
+ * @param {object[]} records Decoded FIT record messages.
+ * @returns {object[]} Sensor samples with at least one supported value.
+ */
+function sensorSamplesFromFitRecords(records) {
+  const samples = [];
+  records.forEach((record) => {
+    const time = fitTimestampToIso(record.timestamp);
+    if (!time) return;
+    const sample = { time };
+    const lat = degreesFromFitCoordinate(record.position_lat, 90);
+    const lng = degreesFromFitCoordinate(record.position_long, 180);
+    const heartRate = finiteValue(record.heart_rate);
+    const cadence = finiteValue(record.cadence);
+    const temperature = finiteValue(record.temperature);
+    if (heartRate != null) sample.heartRateBpm = heartRate;
+    if (cadence != null) sample.cadenceRpm = cadence;
+    if (temperature != null) sample.temperatureC = temperature;
+    if (lat != null && lng != null) {
+      sample.lat = lat;
+      sample.lng = lng;
+    }
+    if (heartRate == null && cadence == null && temperature == null) return;
+    samples.push(sample);
+  });
+  return samples;
+}
+
+/**
+ * Decodes a FIT file with the bundled offline parser.
+ * @param {File} file FIT file selected by the user.
+ * @returns {Promise<object>} Parsed FIT message collection.
+ */
+async function decodeFitFile(file) {
+  const parser = new FitParser({ force: false, mode: 'list', temperatureUnit: 'celsius', lengthUnit: 'km' });
+  return parser.parseAsync(await file.arrayBuffer());
+}
+
+/**
  * Creates lean GPX XML so FIT imports use Trailthread's established track parser.
  * @param {string} name Track name.
  * @param {object[]} points Geographic track points.
@@ -105,8 +144,7 @@ function gpxFromPoints(name, points) {
  * @returns {Promise<{name: string, gpxText: string, points: object[], dateStart: string|null, sport: string|null}>} Decoded track payload.
  */
 export async function importFitActivity(file) {
-  const parser = new FitParser({ force: false, mode: 'list', temperatureUnit: 'celsius', lengthUnit: 'km' });
-  const data = await parser.parseAsync(await file.arrayBuffer());
+  const data = await decodeFitFile(file);
   const points = routePointsFromFitRecords(data.records || []);
   if (points.length < 2) throw new Error('Die FIT-Datei enthält keine GPS-Route mit mindestens zwei Punkten.');
   const session = data.sessions?.[0] || {};
@@ -114,6 +152,18 @@ export async function importFitActivity(file) {
   if (session.name) name = String(session.name);
   const dateStart = points.find((point) => point.time)?.time || fitTimestampToIso(session.start_time);
   return { name, gpxText: gpxFromPoints(name, points), points, dateStart, sport: session.sport || null };
+}
+
+/**
+ * Decodes sensor samples from a FIT file without requiring a GPS route.
+ * @param {File} file FIT file selected as a sensor-data source.
+ * @returns {Promise<{fileName: string, samples: object[]}>} Timestamped supported sensor readings.
+ */
+export async function importFitSensorSamples(file) {
+  const data = await decodeFitFile(file);
+  const samples = sensorSamplesFromFitRecords(data.records || []);
+  if (!samples.length) throw new Error('Die FIT-Datei enthält keine zeitgestempelten Werte für Puls, Kadenz oder Temperatur.');
+  return { fileName: file.name, samples };
 }
 
 /**

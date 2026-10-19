@@ -243,6 +243,10 @@
               <strong id="profile-track-name">-</strong>
             </div>
             <div id="profile-segment-summary" class="profile-segment-summary profile-segment-summary-inline" hidden></div>
+            <details id="profile-sensor-overlays" class="profile-sensor-overlays" hidden>
+              <summary data-i18n="profileSensorCurves"></summary>
+              <div id="profile-sensor-overlay-options" class="profile-sensor-overlay-options"></div>
+            </details>
             <div class="profile-stats">
               <div class="profile-stat">
                 <span data-i18n="labelAvgSpeed"></span>
@@ -273,6 +277,7 @@
               <div class="profile-cursor-row"><span data-i18n="labelAfter"></span><strong id="profile-cursor-after">-</strong></div>
               <div class="profile-cursor-row"><span data-i18n="labelAltitudeCurrent"></span><strong id="profile-cursor-altitude">-</strong></div>
               <div class="profile-cursor-row"><span data-i18n="labelGrade"></span><strong id="profile-cursor-grade">-</strong></div>
+              <div id="profile-cursor-sensors"></div>
             </div>
           </div>
         </section>
@@ -896,6 +901,20 @@
     </svg>
   </template>
 
+  <template id="profile-sensor-overlay-option-template">
+    <label class="profile-sensor-overlay-option">
+      <input type="checkbox" data-profile-sensor-overlay>
+      <span class="profile-sensor-overlay-label"></span>
+    </label>
+  </template>
+
+  <template id="profile-cursor-sensor-template">
+    <div class="profile-cursor-row profile-cursor-sensor-row">
+      <span class="profile-cursor-sensor-label"></span>
+      <strong class="profile-cursor-sensor-value"></strong>
+    </div>
+  </template>
+
   <template id="profile-segment-distribution-template">
     <button class="profile-distribution-button" type="button">
       <svg class="profile-distribution-donut" viewBox="0 0 100 100" aria-hidden="true">
@@ -929,6 +948,16 @@
     <div class="replay-placeholder-note"></div>
   </template>
 
+  <template id="fit-sensor-import-field-template">
+    <label class="fit-sensor-import-field">
+      <input class="fit-sensor-import-checkbox" type="checkbox">
+      <span class="fit-sensor-import-field-copy">
+        <strong class="fit-sensor-import-field-label"></strong>
+        <small class="fit-sensor-import-field-meta"></small>
+      </span>
+    </label>
+  </template>
+
   <dialog id="track-detail-dialog" class="modal-dialog">
     <form method="dialog" class="modal-sheet modal-sheet-wide track-detail-dialog">
       <div class="panel-heading">
@@ -959,10 +988,27 @@
       <div id="track-detail-status" class="track-detail-status" role="status" aria-live="polite" hidden></div>
       <div id="track-detail-photos" class="track-detail-photos"></div>
       <div class="button-row">
+        <label class="button button-subtle" for="track-detail-fit-sensor-input" data-i18n="fitSensorImportButton"></label>
+        <input id="track-detail-fit-sensor-input" type="file" accept=".fit,application/vnd.ant.fit" hidden>
         <button id="track-detail-edit-button" class="button button-subtle" type="button" data-i18n="editTrackButton"></button>
         <button id="track-detail-save-button" class="button button-primary" type="button" data-i18n="saveTrackButton" hidden></button>
         <button id="track-detail-cancel-button" class="button button-ghost" type="button" data-i18n="cancelEditButton" hidden></button>
         <button id="track-detail-close-button" class="button button-ghost" type="button" data-i18n="closeButton"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="fit-sensor-import-dialog" class="modal-dialog">
+    <form method="dialog" class="modal-sheet fit-sensor-import-dialog">
+      <div class="panel-heading">
+        <h2 data-i18n="fitSensorImportTitle"></h2>
+        <p id="fit-sensor-import-description"></p>
+      </div>
+      <p id="fit-sensor-import-summary" class="fit-sensor-import-summary" role="status" aria-live="polite"></p>
+      <div id="fit-sensor-import-fields" class="fit-sensor-import-fields"></div>
+      <div class="button-row">
+        <button id="fit-sensor-import-apply-button" class="button button-primary" type="button" data-i18n="fitSensorImportApply"></button>
+        <button class="button button-ghost" type="submit" data-i18n="cancelButton"></button>
       </div>
     </form>
   </dialog>

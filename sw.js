@@ -12,6 +12,7 @@ const APP_SHELL = [
   "./modules/track-detail.js",
   "./modules/replay-workspace.js",
   "./modules/fit-io.js",
+  "./modules/fit-sensor-merge.js",
   "./modules/vendor/fit-file-parser/fit-parser.js",
   "./modules/vendor/fit-file-parser/binary.js",
   "./modules/vendor/fit-file-parser/helper.js",

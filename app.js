@@ -3,6 +3,7 @@ import { importKomootSelection } from "./modules/komoot-import.js";
 import { createTrackDetailController } from "./modules/track-detail.js";
 import { createReplayWorkspaceController } from "./modules/replay-workspace.js";
 import { createKomootWorkspaceController } from "./modules/komoot-workspace.js";
+import { FIT_SENSOR_FIELDS, applyFitSensorMergePlan, createFitSensorMergePlan } from "./modules/fit-sensor-merge.js";
 
 const DB_NAME = "gpx-bibliothek";
 const DB_VERSION = 4;
@@ -30,7 +31,7 @@ const LIBRARY_DESCRIPTION_MAX_LENGTH = 5000;
 const REPLAY_DISTANCE_SECONDS = 1200;
 const APP_SHARE_URL = "https://marsrakete.github.io/trailthread/";
 
-const state = { db: null, map: null, replayMap2d: null, replayMap3d: null, replayMap3dReady: false, layers: new Map(), heatmapLayer: null, heatmapStats: null, tracks: [], accounts: [], settings: { id: "app", language: "auto", activeWorkspace: "library", activeAccountId: null, leftPaneWidth: 180, middlePaneWidth: 400, sidebarCompact: false, libraryCompact: false, layoutMigrationVersion: 0, photoOverlayOnly: false, hideMapPhotos: false, heatmapMode: false, segmentOverlayMode: false, replayDirectionOverlayCollapsed: false, trackLineWeight: 6, komootCaches: {} }, selectedTrackIds: new Set(), highlightedTrackId: null, libraryUi: { focusTrackId: null, scrollTop: 0 }, mergeUi: { orderedTrackIds: [] }, profileUi: { trackId: null, samples: [], plot: null, hoverMarker: null }, photoDialogUi: { trackId: null, photos: [], index: 0, swipeStartX: null }, trackDetailUi: { trackId: null, editing: false }, resizeUi: { handle: null, startX: 0, leftPaneWidth: 180, middlePaneWidth: 400, rafId: null }, komootTours: [], selectedKomootTourIds: new Set(), komootUi: { focusTourId: null, focusList: null, scrollTopByList: { recorded: 0, planned: 0 }, focusOffsetByList: { recorded: null, planned: null }, progress: { active: false, label: '', value: 0, indeterminate: false } }, replay: { activeTrackId: null, replayTrack: null, view: '2d', mode: 'distance', playing: false, speed: 4, cursor: 0, followCamera: true, showPhotos: true, showProfile: true, cameraMode2d: 'center', cameraMode3d: 'orbit', rafId: null, lastFrameAt: 0, layers2d: { route: null, played: null, marker: null, photos: null }, sources3dReady: false, marker3d: null, lastApplied2DMode: null, last2DCameraAppliedAt: 0, profileRender: { key: null, geometry: null } }, proxy: { online: false, mode: null, lastCheckAt: null, lastError: null } };
+const state = { db: null, map: null, replayMap2d: null, replayMap3d: null, replayMap3dReady: false, layers: new Map(), heatmapLayer: null, heatmapStats: null, tracks: [], accounts: [], settings: { id: "app", language: "auto", activeWorkspace: "library", activeAccountId: null, leftPaneWidth: 180, middlePaneWidth: 400, sidebarCompact: false, libraryCompact: false, layoutMigrationVersion: 0, photoOverlayOnly: false, hideMapPhotos: false, heatmapMode: false, segmentOverlayMode: false, replayDirectionOverlayCollapsed: false, trackLineWeight: 6, komootCaches: {} }, selectedTrackIds: new Set(), highlightedTrackId: null, libraryUi: { focusTrackId: null, scrollTop: 0 }, mergeUi: { orderedTrackIds: [] }, profileUi: { trackId: null, samples: [], plot: null, hoverMarker: null, sensorOverlayFields: new Set() }, photoDialogUi: { trackId: null, photos: [], index: 0, swipeStartX: null }, trackDetailUi: { trackId: null, editing: false }, resizeUi: { handle: null, startX: 0, leftPaneWidth: 180, middlePaneWidth: 400, rafId: null }, komootTours: [], selectedKomootTourIds: new Set(), komootUi: { focusTourId: null, focusList: null, scrollTopByList: { recorded: 0, planned: 0 }, focusOffsetByList: { recorded: null, planned: null }, progress: { active: false, label: '', value: 0, indeterminate: false } }, replay: { activeTrackId: null, replayTrack: null, view: '2d', mode: 'distance', playing: false, speed: 4, cursor: 0, followCamera: true, showPhotos: true, showProfile: true, cameraMode2d: 'center', cameraMode3d: 'orbit', rafId: null, lastFrameAt: 0, layers2d: { route: null, played: null, marker: null, photos: null }, sources3dReady: false, marker3d: null, lastApplied2DMode: null, last2DCameraAppliedAt: 0, profileRender: { key: null, geometry: null } }, proxy: { online: false, mode: null, lastCheckAt: null, lastError: null } };
 
 const libraryDerivedCache = {
   tracksRef: null,
@@ -92,7 +93,19 @@ Object.assign(el, {
   openLibraryFiltersButton: document.querySelector('#open-library-filters-button'),
   showMobileSidebarButton: document.querySelector('#show-mobile-sidebar-button'),
   mobileLibraryFilterDialog: document.querySelector('#mobile-library-filter-dialog'),
-  mobileLibraryFilterControls: document.querySelector('#mobile-library-filter-controls')
+  mobileLibraryFilterControls: document.querySelector('#mobile-library-filter-controls'),
+  trackDetailFitSensorInput: document.querySelector('#track-detail-fit-sensor-input'),
+  fitSensorImportDialog: document.querySelector('#fit-sensor-import-dialog'),
+  fitSensorImportDescription: document.querySelector('#fit-sensor-import-description'),
+  fitSensorImportSummary: document.querySelector('#fit-sensor-import-summary'),
+  fitSensorImportFields: document.querySelector('#fit-sensor-import-fields'),
+  fitSensorImportApplyButton: document.querySelector('#fit-sensor-import-apply-button'),
+  fitSensorImportFieldTemplate: document.querySelector('#fit-sensor-import-field-template'),
+  profileSensorOverlays: document.querySelector('#profile-sensor-overlays'),
+  profileSensorOverlayOptions: document.querySelector('#profile-sensor-overlay-options'),
+  profileSensorOverlayOptionTemplate: document.querySelector('#profile-sensor-overlay-option-template'),
+  profileCursorSensors: document.querySelector('#profile-cursor-sensors'),
+  profileCursorSensorTemplate: document.querySelector('#profile-cursor-sensor-template')
 });
 
 Object.assign(el, {
@@ -113,6 +126,7 @@ let osmAnalysisTrackId = null;
 let osmAnalysisModulePromise = null;
 let fitIoModulePromise = null;
 let trackDetailRemovedPhotoIndexes = new Set();
+let fitSensorImportPreview = null;
 
 const trackDetailController = createTrackDetailController({
   state,
@@ -1961,6 +1975,155 @@ function loadFitIoModule() {
 }
 
 /**
+ * Returns the localized label for one supported FIT sensor field.
+ * @param {string} field Stored Trailthread sensor field name.
+ * @returns {string} Localized field label.
+ */
+function fitSensorFieldLabel(field) {
+  if (field === 'heartRateBpm') return t('fitSensorHeartRate');
+  if (field === 'cadenceRpm') return t('fitSensorCadence');
+  if (field === 'temperatureC') return t('fitSensorTemperature');
+  return field;
+}
+
+/**
+ * Formats a detected FIT timestamp offset for the sensor import preview.
+ * @param {number} offsetMs Offset applied to FIT timestamps in milliseconds.
+ * @returns {string} Signed whole-hour offset label.
+ */
+function fitSensorTimeOffsetLabel(offsetMs) {
+  const hours = Math.round(Math.abs(offsetMs) / (60 * 60 * 1000));
+  if (offsetMs < 0) return `-${hours} h`;
+  return `+${hours} h`;
+}
+
+/**
+ * Renders the non-destructive FIT sensor import preview dialog.
+ * @returns {void} Does not return a value.
+ */
+function renderFitSensorImportPreview() {
+  if (!fitSensorImportPreview || !el.fitSensorImportFields || !el.fitSensorImportFieldTemplate) return;
+  const { fileName, plan } = fitSensorImportPreview;
+  el.fitSensorImportDescription.textContent = t('fitSensorImportDescription', { fileName });
+  if (plan.matchMode === 'position') {
+    el.fitSensorImportSummary.textContent = t('fitSensorImportPositionSummary', { points: plan.targetPointCount });
+  } else {
+    el.fitSensorImportSummary.textContent = t('fitSensorImportSummary', { points: plan.targetPointCount, seconds: Math.round(plan.toleranceMs / 1000) });
+  }
+  if (plan.matchMode === 'time' && plan.timeOffsetMs) {
+    let offsetKey = 'fitSensorImportOffsetDetected';
+    if (plan.timeOffsetSource === 'position') offsetKey = 'fitSensorImportPositionOffsetDetected';
+    el.fitSensorImportSummary.textContent += ` ${t(offsetKey, { offset: fitSensorTimeOffsetLabel(plan.timeOffsetMs) })}`;
+  }
+  el.fitSensorImportFields.hidden = false;
+  el.fitSensorImportApplyButton.hidden = false;
+  el.fitSensorImportFields.replaceChildren();
+  let transferableFields = 0;
+  FIT_SENSOR_FIELDS.forEach((field) => {
+    const summary = plan.fields[field];
+    const fragment = el.fitSensorImportFieldTemplate.content.cloneNode(true);
+    const checkbox = fragment.querySelector('.fit-sensor-import-checkbox');
+    const label = fragment.querySelector('.fit-sensor-import-field-label');
+    const meta = fragment.querySelector('.fit-sensor-import-field-meta');
+    const transferable = summary.transferableCount;
+    checkbox.value = field;
+    checkbox.checked = transferable > 0;
+    checkbox.disabled = transferable === 0;
+    label.textContent = fitSensorFieldLabel(field);
+    meta.textContent = t('fitSensorImportFieldSummary', { source: summary.sourceCount, target: plan.targetPointCount, transferable, existing: summary.skippedExistingCount });
+    if (transferable > 0) transferableFields += 1;
+    el.fitSensorImportFields.append(fragment);
+  });
+  el.fitSensorImportApplyButton.disabled = transferableFields === 0;
+}
+
+/**
+ * Opens the FIT import dialog early and displays its current local processing step.
+ * @param {string} fileName Name of the FIT source file.
+ * @param {string} message Localized progress message.
+ * @returns {void} Does not return a value.
+ */
+function renderFitSensorImportProgress(fileName, message) {
+  el.fitSensorImportDescription.textContent = t('fitSensorImportDescription', { fileName });
+  el.fitSensorImportSummary.textContent = message;
+  el.fitSensorImportSummary.classList.remove('is-error');
+  el.fitSensorImportFields.replaceChildren();
+  el.fitSensorImportFields.hidden = true;
+  el.fitSensorImportApplyButton.hidden = true;
+  if (!el.fitSensorImportDialog.open) el.fitSensorImportDialog.showModal();
+}
+
+/**
+ * Displays a FIT import error in the already open import dialog.
+ * @param {string} fileName Name of the FIT source file.
+ * @param {string} message Error description.
+ * @returns {void} Does not return a value.
+ */
+function renderFitSensorImportError(fileName, message) {
+  renderFitSensorImportProgress(fileName, message);
+  el.fitSensorImportSummary.classList.add('is-error');
+}
+
+/**
+ * Decodes a selected FIT file and opens its sensor merge preview for the current detail track.
+ * @param {File} file FIT file chosen by the user.
+ * @returns {Promise<void>} Resolves after the preview dialog is rendered.
+ */
+async function previewFitSensorImport(file) {
+  const track = state.tracks.find((item) => item.id === state.trackDetailUi.trackId);
+  if (!track) return;
+  fitSensorImportPreview = null;
+  renderFitSensorImportProgress(file.name, t('fitSensorImportReading', { fileName: file.name }));
+  await waitForBrowserPaint();
+  const { importFitSensorSamples } = await loadFitIoModule();
+  const imported = await importFitSensorSamples(file);
+  renderFitSensorImportProgress(file.name, t('fitSensorImportSamplesRead', { count: imported.samples.length }));
+  await waitForBrowserPaint();
+  const plan = await createFitSensorMergePlan(track.points, imported.samples, 30000, (progress) => {
+    if (progress.phase === 'gps') renderFitSensorImportProgress(file.name, t('fitSensorImportGpsProgress', progress));
+  });
+  fitSensorImportPreview = { trackId: track.id, fileName: imported.fileName, plan };
+  el.fitSensorImportSummary.classList.remove('is-error');
+  renderFitSensorImportPreview();
+}
+
+/**
+ * Waits for a browser paint so a persistent detail status becomes visible before local work starts.
+ * @returns {Promise<void>} Resolves on the next animation frame.
+ */
+function waitForBrowserPaint() {
+  return new Promise((resolve) => window.requestAnimationFrame(resolve));
+}
+
+/**
+ * Saves the checked FIT sensor fields from the current preview into the selected track.
+ * @returns {Promise<void>} Resolves after the updated track has been persisted locally.
+ */
+async function applyFitSensorImportPreview() {
+  if (!fitSensorImportPreview) return;
+  const track = state.tracks.find((item) => item.id === fitSensorImportPreview.trackId);
+  if (!track) return;
+  const selectedFields = [...el.fitSensorImportFields.querySelectorAll('.fit-sensor-import-checkbox:checked')].map((input) => input.value);
+  if (!selectedFields.length) return;
+  const merged = applyFitSensorMergePlan(track, fitSensorImportPreview.plan, selectedFields, { fileName: fitSensorImportPreview.fileName, importedAt: isoNow() });
+  const updatedTrack = touchTrack(track, { points: merged.points, sensorImports: merged.sensorImports });
+  await put(STORES.tracks, updatedTrack);
+  state.tracks = state.tracks.map((item) => {
+    if (item.id === updatedTrack.id) return updatedTrack;
+    return item;
+  });
+  let updatedPoints = 0;
+  selectedFields.forEach((field) => {
+    updatedPoints += merged.sensorMergeApplied[field] || 0;
+  });
+  fitSensorImportPreview = null;
+  el.fitSensorImportDialog.close();
+  renderAll();
+  renderTrackDetailDialog();
+  setTrackDetailStatus(t('fitSensorImportDone', { points: updatedPoints }), false, true);
+}
+
+/**
  * Starts the on-demand OSM way-type analysis for one local track.
  * @param {string} trackId Identifier of the track selected in the library.
  * @returns {Promise<void>} Resolves after the analysis module has completed its work.
@@ -2126,6 +2289,92 @@ function renderProfileSegmentSummary(track) {
   el.profileSegmentSummary.replaceChildren();
   renderProfileSegmentDistribution(el.profileSegmentSummary, track.surfaceSegments, 'surface');
   renderProfileSegmentDistribution(el.profileSegmentSummary, track.wayTypeSegments, 'waytype');
+}
+
+/**
+ * Returns sensor fields that have enough samples to form a visible profile curve.
+ * @param {Array<TrackPoint>} samples Elevation-profile samples for the active track.
+ * @returns {string[]} FIT sensor field names with at least two numeric values.
+ */
+function profileSensorFields(samples) {
+  return FIT_SENSOR_FIELDS.filter((field) => {
+    const sensorSamples = samples.filter((sample) => Number.isFinite(sample?.[field]));
+    return sensorSamples.length >= 2;
+  });
+}
+
+/**
+ * Renders the optional sensor-curve controls for the active elevation profile.
+ * @param {Array<TrackPoint>} samples Elevation-profile samples for the active track.
+ * @returns {void}
+ */
+function renderProfileSensorOverlayControls(samples) {
+  if (!el.profileSensorOverlays || !el.profileSensorOverlayOptions || !el.profileSensorOverlayOptionTemplate) return;
+  const fields = profileSensorFields(samples);
+  state.profileUi.sensorOverlayFields.forEach((field) => {
+    if (!fields.includes(field)) state.profileUi.sensorOverlayFields.delete(field);
+  });
+  el.profileSensorOverlayOptions.replaceChildren();
+  if (!fields.length) {
+    el.profileSensorOverlays.hidden = true;
+    el.profileSensorOverlays.open = false;
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  fields.forEach((field) => {
+    const option = el.profileSensorOverlayOptionTemplate.content.cloneNode(true);
+    const label = option.querySelector('.profile-sensor-overlay-option');
+    const input = option.querySelector('[data-profile-sensor-overlay]');
+    const text = option.querySelector('.profile-sensor-overlay-label');
+    label.dataset.sensorField = field;
+    input.value = field;
+    input.checked = state.profileUi.sensorOverlayFields.has(field);
+    text.textContent = fitSensorFieldLabel(field);
+    fragment.append(option);
+  });
+  el.profileSensorOverlayOptions.append(fragment);
+  el.profileSensorOverlays.hidden = false;
+}
+
+/**
+ * Updates the current optional sensor-curve selection and redraws the profile.
+ * @param {string} field FIT sensor field selected in the profile controls.
+ * @param {boolean} selected Whether the curve should be visible.
+ * @returns {void}
+ */
+function setProfileSensorOverlayField(field, selected) {
+  if (selected) state.profileUi.sensorOverlayFields.add(field);
+  else state.profileUi.sensorOverlayFields.delete(field);
+  renderProfile();
+}
+
+/**
+ * Creates a sensor line that is scaled independently within the elevation plot.
+ * @param {Array<TrackPoint>} samples Elevation-profile samples with optional sensor values.
+ * @param {string} field FIT sensor field that should be drawn.
+ * @param {(distance: number) => number} x Maps cumulative kilometers to SVG coordinates.
+ * @param {number} top Top edge of the plot in SVG coordinates.
+ * @param {number} height Available SVG height for the plot.
+ * @returns {SVGPathElement|null} Sensor line, or null when there are too few values.
+ */
+function createProfileSensorLine(samples, field, x, top, height) {
+  const sensorSamples = samples.filter((sample) => Number.isFinite(sample?.[field]));
+  if (sensorSamples.length < 2) return null;
+  const values = sensorSamples.map((sample) => sample[field]);
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const span = Math.max(maximum - minimum, 1);
+  const y = (value) => top + ((maximum - value) / span) * height;
+  const pathData = sensorSamples.map((sample, index) => {
+    let command = 'L';
+    if (index === 0) command = 'M';
+    return `${command} ${x(sample.cumulativeKm).toFixed(2)} ${y(sample[field]).toFixed(2)}`;
+  }).join(' ');
+  const path = createProfileSvgElement('path', { class: `profile-sensor-line profile-sensor-line-${field}`, d: pathData });
+  const title = createProfileSvgElement('title', {});
+  title.textContent = `${fitSensorFieldLabel(field)}: ${formatFitSensorAverage(field, minimum)} - ${formatFitSensorAverage(field, maximum)}`;
+  path.append(title);
+  return path;
 }
 function normalizeDirections(value) {
   if (!Array.isArray(value)) return [];
@@ -2657,12 +2906,45 @@ function renderTrackFacts(container, track) {
   if (track.elevationGainM != null) appendTrackFact(container, '↗', t('labelAscent'), fmtMeters(track.elevationGainM));
   if (track.elevationLossM != null) appendTrackFact(container, '↘', t('labelDescent'), fmtMeters(track.elevationLossM));
   if (track.sport) appendTrackFact(container, iconForSport(track.sport), t('labelSport'), sportLabel(track.sport));
+  const sensorSummary = fitSensorAvailabilitySummary(track);
+  if (sensorSummary) appendTrackFact(container, '⌁', t('fitSensorDataLabel'), sensorSummary);
   normalizeTagList(track.tags).slice(0, 3).forEach((item) => {
     const tag = document.createElement('span');
     tag.className = 'track-tag-chip';
     tag.textContent = `#${item}`;
     container.append(tag);
   });
+}
+
+/**
+ * Formats an average FIT sensor value without repeating its unit in the value itself.
+ * @param {string} field FIT point property name.
+ * @param {number} value Numeric average for the field.
+ * @returns {string} Localized rounded average.
+ */
+function formatFitSensorAverage(field, value) {
+  let maximumFractionDigits = 0;
+  if (field === 'temperatureC') maximumFractionDigits = 1;
+  return new Intl.NumberFormat(lang(), { maximumFractionDigits }).format(value);
+}
+
+/**
+ * Summarizes stored FIT sensors through their averages for a compact track card.
+ * @param {object} track Track record with optional point-level sensor data.
+ * @returns {string} Localized sensor average summary, or an empty string without values.
+ */
+function fitSensorAvailabilitySummary(track) {
+  let points = [];
+  if (Array.isArray(track.points)) points = track.points;
+  const labels = [];
+  FIT_SENSOR_FIELDS.forEach((field) => {
+    const values = points.map((point) => point?.[field]).filter(Number.isFinite);
+    if (!values.length) return;
+    const total = values.reduce((sum, value) => sum + value, 0);
+    const average = total / values.length;
+    labels.push(t('fitSensorAvailabilityItem', { sensor: fitSensorFieldLabel(field), value: formatFitSensorAverage(field, average) }));
+  });
+  return labels.join(' · ');
 }
 /**
  * Builds one analysis pill from the shared template.
@@ -3808,6 +4090,7 @@ function ensureProfileHoverMarker() {
 function clearProfileHover() {
   if (state.profileUi.hoverMarker) state.profileUi.hoverMarker.remove();
   state.profileUi.hoverMarker = null;
+  if (el.profileCursorSensors) el.profileCursorSensors.replaceChildren();
   if (!el.profileChart) return;
   const hover = el.profileChart.querySelector('.profile-hover');
   if (hover) hover.replaceChildren();
@@ -3869,6 +4152,27 @@ function profileChartDimensions() {
 }
 
 /**
+ * Renders values for the sensor curves currently enabled in the profile.
+ * @param {TrackPoint} sample Track point selected by the profile pointer.
+ * @returns {void}
+ */
+function renderProfileCursorSensors(sample) {
+  if (!el.profileCursorSensors || !el.profileCursorSensorTemplate) return;
+  const fragment = document.createDocumentFragment();
+  state.profileUi.sensorOverlayFields.forEach((field) => {
+    const value = sample?.[field];
+    if (!Number.isFinite(value)) return;
+    const row = el.profileCursorSensorTemplate.content.cloneNode(true);
+    const label = row.querySelector('.profile-cursor-sensor-label');
+    const displayValue = row.querySelector('.profile-cursor-sensor-value');
+    label.textContent = fitSensorFieldLabel(field);
+    displayValue.textContent = formatFitSensorAverage(field, value);
+    fragment.append(row);
+  });
+  el.profileCursorSensors.replaceChildren(fragment);
+}
+
+/**
  * Updates the map marker, profile crosshair and the hover information for one elevation sample.
  * @param {TrackPoint} sample Track point selected from the elevation profile.
  * @returns {void}
@@ -3890,6 +4194,7 @@ function updateProfileHover(sample) {
   el.profileCursorAfter.textContent = `${fmtKm(sample.cumulativeKm)} km (${fmtElapsedShort(sample.cumulativeTimeSec)}, ${gradeArrow(ascentDirection)} ${fmtNum(ascent)} m)`;
   el.profileCursorAltitude.textContent = fmtMeters(sample.ele);
   el.profileCursorGrade.textContent = fmtGrade(grade);
+  renderProfileCursorSensors(sample);
   el.profileCursorInfo.classList.toggle('is-right', x < 280);
   el.profileCursorInfo.hidden = false;
 }
@@ -3923,6 +4228,7 @@ function renderProfile() {
   clearProfileHover();
   if (el.profileSegmentSummary) el.profileSegmentSummary.hidden = true;
   el.profileSegmentSummary?.replaceChildren();
+  if (el.profileSensorOverlays) el.profileSensorOverlays.hidden = true;
   if (!track) {
     el.profileEmpty.hidden = false;
     el.profileEmpty.textContent = t('profileHintNoTrack');
@@ -3938,6 +4244,7 @@ function renderProfile() {
     el.profileChart.replaceChildren();
     return;
   }
+  renderProfileSensorOverlayControls(samples);
   el.profileChartShell.hidden = false;
   const hasSegmentSummary = state.settings.segmentOverlayMode && (normalizeRangeSegments(track.surfaceSegments).length || normalizeRangeSegments(track.wayTypeSegments).length);
   if (el.profileSegmentSummary) el.profileSegmentSummary.hidden = !hasSegmentSummary;
@@ -3973,6 +4280,10 @@ function renderProfile() {
   });
   el.profileChart.append(createProfileSvgElement('path', { class: 'profile-area', d: areaPath, fill: track.color }));
   el.profileChart.append(createProfileSvgElement('path', { class: 'profile-line', d: linePath, stroke: track.color }));
+  state.profileUi.sensorOverlayFields.forEach((field) => {
+    const sensorLine = createProfileSensorLine(samples, field, x, padY, plotHeight);
+    if (sensorLine) el.profileChart.append(sensorLine);
+  });
   const photoGroup = createProfileSvgElement('g', { class: 'profile-photos' });
   let profilePhotos = [];
   if (Array.isArray(track.photos)) profilePhotos = track.photos;
@@ -6076,6 +6387,22 @@ function bindEvents() {
   el.trackDetailCloseButton?.addEventListener('click', () => {
     void requestTrackDetailClose();
   });
+  el.trackDetailFitSensorInput?.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      await previewFitSensorImport(file);
+    } catch (error) {
+      renderFitSensorImportError(file.name, error.message);
+    }
+  });
+  el.fitSensorImportApplyButton?.addEventListener('click', () => {
+    void applyFitSensorImportPreview();
+  });
+  el.fitSensorImportDialog?.addEventListener('close', () => {
+    fitSensorImportPreview = null;
+  });
   el.trackDetailSaveButton?.addEventListener('click', async () => {
     const track = state.tracks.find((item) => item.id === state.trackDetailUi.trackId);
     if (!track) return;
@@ -6322,6 +6649,11 @@ function bindEvents() {
     renderTrackWidthControl();
     syncMap();
     await saveSettings();
+  });
+  el.profileSensorOverlayOptions?.addEventListener('change', (event) => {
+    if (!(event.target instanceof HTMLInputElement)) return;
+    if (!event.target.matches('[data-profile-sensor-overlay]')) return;
+    setProfileSensorOverlayField(event.target.value, event.target.checked);
   });
   el.profileChart?.addEventListener('pointermove', (event) => {
     const sample = profileSampleFromEvent(event);

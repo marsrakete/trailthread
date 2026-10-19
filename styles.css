@@ -2124,6 +2124,58 @@ body.is-library-compact .library-panel .pane-header-row {
   flex: 0 0 auto;
 }
 
+.profile-sensor-overlays {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 8.2rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.profile-sensor-overlays summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.profile-sensor-overlay-options {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+
+.profile-sensor-overlay-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.profile-sensor-overlay-option::before {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--sensor-color);
+  content: '';
+}
+
+.profile-sensor-overlay-option[data-sensor-field="heartRateBpm"] {
+  --sensor-color: #f46b8e;
+}
+
+.profile-sensor-overlay-option[data-sensor-field="cadenceRpm"] {
+  --sensor-color: #ffd166;
+}
+
+.profile-sensor-overlay-option[data-sensor-field="temperatureC"] {
+  --sensor-color: #63d5ff;
+}
+
 .profile-distribution-button {
   display: grid;
   justify-items: center;
@@ -2262,6 +2314,26 @@ body.is-library-compact .library-panel .pane-header-row {
   stroke-linecap: round;
 }
 
+.profile-sensor-line {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.94;
+}
+
+.profile-sensor-line-heartRateBpm {
+  stroke: #f46b8e;
+}
+
+.profile-sensor-line-cadenceRpm {
+  stroke: #ffd166;
+}
+
+.profile-sensor-line-temperatureC {
+  stroke: #63d5ff;
+}
+
 .profile-area {
   opacity: 0.18;
 }
@@ -2341,6 +2413,18 @@ body.is-library-compact .library-panel .pane-header-row {
 .profile-cursor-row strong {
   color: #2a3431;
   text-align: right;
+}
+
+.profile-cursor-sensors:not(:empty) {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(31, 41, 39, 0.14);
+}
+
+.profile-cursor-sensor-row {
+  color: #2a3431;
 }
 
 .workspace-panel {
@@ -2646,6 +2730,55 @@ body.is-library-compact .library-panel .pane-header-row {
   border-color: rgba(255, 111, 111, 0.42);
   background: rgba(124, 48, 48, 0.28);
   color: #ffd7d7;
+}
+
+.fit-sensor-import-dialog {
+  width: min(34rem, calc(100vw - 3rem));
+}
+
+.fit-sensor-import-summary {
+  margin: 0 0 0.9rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.fit-sensor-import-summary.is-error {
+  color: #ffd7d7;
+}
+
+.fit-sensor-import-fields {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.fit-sensor-import-field {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(185, 224, 196, 0.2);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.fit-sensor-import-field:has(input:disabled) {
+  opacity: 0.58;
+}
+
+.fit-sensor-import-field input {
+  margin-top: 0.2rem;
+  accent-color: var(--accent-strong);
+}
+
+.fit-sensor-import-field-copy {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.fit-sensor-import-field-meta {
+  color: var(--muted);
+  line-height: 1.35;
 }
 
 .track-analysis-grid {

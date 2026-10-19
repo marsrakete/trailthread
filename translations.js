@@ -494,6 +494,75 @@ Object.assign(translations.fr, {
 });
 
 Object.assign(translations.de, {
+  fitSensorImportButton: "FIT-Sensordaten ergänzen",
+  fitSensorImportTitle: "FIT-Sensordaten ergänzen",
+  fitSensorImportDescription: "Quelle: {fileName}. Es werden nur fehlende Werte in diesem Track ergänzt.",
+  fitSensorImportSummary: "{points} Trackpunkte mit Zeitstempel. Werte werden nur bei höchstens {seconds} Sekunden Zeitabstand zugeordnet.",
+  fitSensorImportPositionSummary: "Sensorwerte wurden anhand passender GPS-Positionen mit {points} Trackpunkten abgeglichen.",
+  fitSensorImportOffsetDetected: "FIT-Zeit wurde um {offset} verschoben, um eine wahrscheinliche Zeitzonendifferenz auszugleichen.",
+  fitSensorImportPositionOffsetDetected: "FIT-Zeit wurde um {offset} anhand übereinstimmender GPS-Positionen ausgerichtet.",
+  fitSensorHeartRate: "Herzfrequenz (BPM)",
+  fitSensorCadence: "Kadenz (U/min)",
+  fitSensorTemperature: "Temperatur (°C)",
+  fitSensorImportFieldSummary: "{transferable} von {target} Trackpunkten erhalten einen Wert. {source} FIT-Proben werden auf die vorhandene Track-Geometrie verdichtet; {existing} vorhandene Werte bleiben unverändert.",
+  fitSensorImportApply: "Ausgewählte Werte übernehmen",
+  fitSensorImportDone: "FIT-Sensordaten an {points} Trackpunkten ergänzt.",
+  fitSensorImportReading: "FIT-Datei wird gelesen: {fileName}",
+  fitSensorImportSamplesRead: "{count} Sensorproben gelesen. GPS-Positionen werden verglichen...",
+  fitSensorImportGpsProgress: "GPS-Positionen werden verglichen: {current}/{total}",
+  fitSensorImportPreviewReady: "FIT-Sensordaten geprüft. Auswahl ist bereit.",
+  fitSensorDataLabel: "FIT-Sensoren",
+  fitSensorAvailabilityItem: "{sensor}: Ø {value}",
+  profileSensorCurves: "Sensor-Kurven"
+});
+
+Object.assign(translations.en, {
+  fitSensorImportButton: "Add FIT sensor data",
+  fitSensorImportTitle: "Add FIT sensor data",
+  fitSensorImportDescription: "Source: {fileName}. Only missing values in this track will be added.",
+  fitSensorImportSummary: "{points} track points have timestamps. Values are assigned only up to {seconds} seconds apart.",
+  fitSensorImportPositionSummary: "Sensor values were matched to {points} track points using corresponding GPS positions.",
+  fitSensorImportOffsetDetected: "FIT timestamps were shifted by {offset} to compensate for a likely timezone difference.",
+  fitSensorImportPositionOffsetDetected: "FIT timestamps were shifted by {offset} using matching GPS positions.",
+  fitSensorHeartRate: "Heart rate (BPM)",
+  fitSensorCadence: "Cadence (rpm)",
+  fitSensorTemperature: "Temperature (°C)",
+  fitSensorImportFieldSummary: "{transferable} of {target} track points receive a value. {source} FIT samples are condensed onto the existing track geometry; {existing} existing values remain unchanged.",
+  fitSensorImportApply: "Add selected values",
+  fitSensorImportDone: "FIT sensor data added to {points} track points.",
+  fitSensorImportReading: "Reading FIT file: {fileName}",
+  fitSensorImportSamplesRead: "Read {count} sensor samples. Comparing GPS positions...",
+  fitSensorImportGpsProgress: "Comparing GPS positions: {current}/{total}",
+  fitSensorImportPreviewReady: "FIT sensor data checked. Selection is ready.",
+  fitSensorDataLabel: "FIT sensors",
+  fitSensorAvailabilityItem: "{sensor}: avg. {value}",
+  profileSensorCurves: "Sensor curves"
+});
+
+Object.assign(translations.fr, {
+  fitSensorImportButton: "Ajouter les donnees capteur FIT",
+  fitSensorImportTitle: "Ajouter les donnees capteur FIT",
+  fitSensorImportDescription: "Source : {fileName}. Seules les valeurs manquantes de cette trace sont ajoutees.",
+  fitSensorImportSummary: "{points} points de trace ont un horodatage. Les valeurs sont associees avec un ecart maximal de {seconds} secondes.",
+  fitSensorImportPositionSummary: "Les valeurs capteur ont ete associees a {points} points de trace a partir de positions GPS correspondantes.",
+  fitSensorImportOffsetDetected: "Les heures FIT ont ete decalees de {offset} pour compenser un probable decalage de fuseau horaire.",
+  fitSensorImportPositionOffsetDetected: "Les heures FIT ont ete decalees de {offset} a partir de positions GPS correspondantes.",
+  fitSensorHeartRate: "Frequence cardiaque (BPM)",
+  fitSensorCadence: "Cadence (tr/min)",
+  fitSensorTemperature: "Temperature (°C)",
+  fitSensorImportFieldSummary: "{transferable} des {target} points de trace recoivent une valeur. Les {source} echantillons FIT sont condenses sur la geometrie existante ; {existing} valeurs existantes restent inchangees.",
+  fitSensorImportApply: "Ajouter les valeurs selectionnees",
+  fitSensorImportDone: "Donnees capteur FIT ajoutees a {points} points de trace.",
+  fitSensorImportReading: "Lecture du fichier FIT : {fileName}",
+  fitSensorImportSamplesRead: "{count} echantillons capteur lus. Comparaison des positions GPS...",
+  fitSensorImportGpsProgress: "Comparaison des positions GPS : {current}/{total}",
+  fitSensorImportPreviewReady: "Donnees capteur FIT verifiees. La selection est prete.",
+  fitSensorDataLabel: "Capteurs FIT",
+  fitSensorAvailabilityItem: "{sensor} : moy. {value}",
+  profileSensorCurves: "Courbes des capteurs"
+});
+
+Object.assign(translations.de, {
   discardTrackChangesTitle: "Änderungen verwerfen?",
   confirmDiscardTrackChanges: "Ungespeicherte Änderungen gehen beim Schließen verloren.",
   discardTrackChangesConfirm: "Änderungen verwerfen",

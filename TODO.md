@@ -33,6 +33,14 @@ Die Browser-Erweiterung ist der aktuelle Komoot-Weg. Die ältere Proxy-Anbindung
 - `offen`: Die besonders langen, kompakten Bereiche in [app.js](/C:/Projekte/trailthread/app.js:42) und den Render-/Event-Handlern in kleine, klar abgegrenzte Funktionen aufteilen. Dabei verschachtelte Ternaries und Einzeiler schrittweise durch lesbare `if`/`else`-Blöcke ersetzen.
 - `offen`: Verbleibende UI-HTML-Zusammenbauten prüfen und wiederkehrende Oberflächen auf vorhandene `<template>`-Elemente oder strukturierte DOM-Erzeugung umstellen. XML-Serialisierung für KML/KMZ sowie kontrolliertes Markdown/Mermaid-Rendering bleiben davon ausgenommen.
 
+### AGENTS-Review: Modularisierung Und Tests `offen`
+
+- `offen`: [app.js](/C:/Projekte/trailthread/app.js:1) ist mit rund 6.500 Zeilen weiterhin Einstiegspunkt, IndexedDB-Zugriff, Track-Normalisierung, Import/Export, Bibliothek, Karte und Event-Wiring zugleich. Die Bereiche schrittweise entlang stabiler Domänen in `track-storage`, `track-io`, `library-workspace` und `map-workspace` auslagern; die Einstiegdatei behält globalen Zustand und DOM-Wiring.
+- `offen`: [content-komoot.js](/C:/Projekte/trailthread/browser-extension/content-komoot.js:1) trennt Toolbar-Erzeugung, Komoot-API-/Paging-Zugriff, Tour-Metadaten und Sicherungs-Export noch nicht. Diese Verantwortungen in Extension-Module aufteilen, sodass das Content-Script nur noch Seitenintegration und Nachrichtenbindung steuert.
+- `offen`: Eine Testbasis für die vorhandenen Domain-Module einführen. Jede öffentliche API aus `modules/` erhält Contract-Tests für Normalfall, Grenzfall und ungültige Eingaben; insbesondere FIT-Import/-Export, OSM-Analyse, Replay-Controller, Track-Details und Komoot-Import absichern.
+- `offen`: Einen automatisierten Browser-Smoke-Test für die PWA ergänzen, der beim Start `pageerror` erfasst und Bibliothek, Detailansicht, Replay sowie mobilen Filterdialog lädt. Regressionsfälle wie die jüngsten Replay-Initialisierungsfehler werden damit vor einem Release erkannt; Karten- und responsive Oberflächen zusätzlich mit Geometrie-Assertions oder Screenshots prüfen.
+- `offen`: Den gebündelten FIT-Vendor bereinigen: Die unreferenzierte `modules/vendor/fit-file-parser/cjs/`-Dopplung und nur für TypeScript gedachte Deklarationen nach einer Import-/Cache-Prüfung entfernen oder nachvollziehbar als Entwicklungsquelle dokumentieren. Lizenzdatei und produktiv benötigte ESM-Dateien bleiben erhalten.
+
 ## Nächste Ideen
 
 ### ~~1. Heatmap~~
