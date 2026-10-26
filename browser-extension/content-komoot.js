@@ -1,6 +1,10 @@
 const TOUR_URL_PATTERN = /\/tour\/(\d+)/i;
 const SELECTED_TOURS = new Map();
 let toolbar = null;
+const TOOLBAR_TOGGLE_LABELS = Object.freeze({
+  expand: 'Trailthread aufklappen',
+  collapse: 'Trailthread einklappen',
+});
 let runActive = false;
 let tourListLoading = false;
 let tourListLoadStatus = '';
@@ -88,18 +92,25 @@ function createToolbarTemplates() {
   host.innerHTML = `
     <template id="trailthread-komoot-toolbar-template">
       <aside class="trailthread-komoot-toolbar" aria-live="polite">
-        <strong class="trailthread-komoot-title">Trailthread</strong>
-        <span class="trailthread-komoot-summary">Keine Tour ausgewählt</span>
-        <div class="trailthread-komoot-selection-actions" hidden>
-          <button class="trailthread-komoot-load-all" data-tour-type="all" type="button">Alle Touren markieren</button>
-          <button class="trailthread-komoot-load-all" data-tour-type="recorded" type="button">Alle gemachten Touren markieren</button>
-          <button class="trailthread-komoot-load-all" data-tour-type="planned" type="button">Alle geplanten Touren markieren</button>
+        <button class="trailthread-komoot-toggle" type="button" aria-expanded="false" aria-controls="trailthread-komoot-toolbar-body">
+          <strong class="trailthread-komoot-title">Trailthread</strong>
+          <svg class="trailthread-komoot-toggle-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <path d="m6 15 6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+        <div class="trailthread-komoot-body" id="trailthread-komoot-toolbar-body" hidden>
+          <span class="trailthread-komoot-summary">Keine Tour ausgewählt</span>
+          <div class="trailthread-komoot-selection-actions" hidden>
+            <button class="trailthread-komoot-load-all" data-tour-type="all" type="button">Alle Touren markieren</button>
+            <button class="trailthread-komoot-load-all" data-tour-type="recorded" type="button">Alle gemachten Touren markieren</button>
+            <button class="trailthread-komoot-load-all" data-tour-type="planned" type="button">Alle geplanten Touren markieren</button>
+          </div>
+          <button class="trailthread-komoot-clear-selection" type="button" hidden>Auswahl aufheben</button>
+          <button class="trailthread-komoot-download-gpx" type="button" disabled>Ausgewählte GPX-Dateien herunterladen</button>
+          <button class="trailthread-komoot-download-backup" type="button" disabled>Als Trailthread-Datei mit Bildern exportieren</button>
+          <button class="trailthread-komoot-cancel" type="button" hidden>Export abbrechen</button>
+          <p class="trailthread-komoot-status">Wähle eigene Touren aus.</p>
         </div>
-        <button class="trailthread-komoot-clear-selection" type="button" hidden>Auswahl aufheben</button>
-        <button class="trailthread-komoot-download-gpx" type="button" disabled>Ausgewählte GPX-Dateien herunterladen</button>
-        <button class="trailthread-komoot-download-backup" type="button" disabled>Als Trailthread-Datei mit Bildern exportieren</button>
-        <button class="trailthread-komoot-cancel" type="button" hidden>Export abbrechen</button>
-        <p class="trailthread-komoot-status">Wähle eigene Touren aus.</p>
       </aside>
     </template>
     <template id="trailthread-komoot-selection-template">
@@ -130,6 +141,28 @@ function describeCurrentKomootTour() {
   let name = `Komoot Tour ${match[1]}`;
   if (heading && heading.textContent.trim()) name = heading.textContent.trim();
   return { tourId: match[1], tourUrl: canonicalTourUrl(location.href, match[1]), name };
+}
+
+/**
+ * Collapses or expands the toolbar without changing selection or export state.
+ * @param {boolean} collapsed Whether only the Trailthread header should remain visible.
+ * @returns {void} Does nothing until the toolbar has been mounted.
+ */
+function setToolbarCollapsed(collapsed) {
+  if (!toolbar) return;
+  const toggle = toolbar.querySelector('.trailthread-komoot-toggle');
+  toolbar.classList.toggle('is-collapsed', collapsed);
+  toolbar.querySelector('.trailthread-komoot-body').hidden = collapsed;
+  toggle.setAttribute('aria-expanded', String(!collapsed));
+  let label = TOOLBAR_TOGGLE_LABELS.collapse;
+  let iconPath = 'm6 9 6 6 6-6';
+  if (collapsed) {
+    label = TOOLBAR_TOGGLE_LABELS.expand;
+    iconPath = 'm6 15 6-6 6 6';
+  }
+  toggle.querySelector('path').setAttribute('d', iconPath);
+  toggle.setAttribute('aria-label', label);
+  toggle.title = label;
 }
 
 /**
@@ -1243,6 +1276,10 @@ function ensureTourListEnhancement() {
   }
   const toolbarFragment = toolbarTemplate.content.cloneNode(true);
   toolbar = toolbarFragment.querySelector('.trailthread-komoot-toolbar');
+  toolbar.querySelector('.trailthread-komoot-toggle').addEventListener('click', () => {
+    setToolbarCollapsed(!toolbar.classList.contains('is-collapsed'));
+  });
+  setToolbarCollapsed(true);
   toolbar.querySelector('.trailthread-komoot-download-gpx').addEventListener('click', () => startKomootExport('gpx'));
   toolbar.querySelector('.trailthread-komoot-download-backup').addEventListener('click', () => startKomootExport('backup'));
   for (const button of toolbar.querySelectorAll('[data-tour-type]')) {

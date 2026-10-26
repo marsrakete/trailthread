@@ -1,4 +1,5 @@
 .trailthread-komoot-toolbar {
+  box-sizing: border-box;
   position: fixed;
   right: 20px;
   bottom: 20px;
@@ -48,3 +49,30 @@
   background: #71e3b5;
   font: 12px/1.2 system-ui, sans-serif;
 }
+
+.trailthread-komoot-toolbar.is-collapsed {
+  width: max-content;
+  max-width: calc(100vw - 40px);
+  padding: 8px 12px;
+  gap: 0;
+}
+.trailthread-komoot-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.trailthread-komoot-toggle:focus-visible { outline: 2px solid #71e3b5; outline-offset: 4px; }
+.trailthread-komoot-toggle-icon { flex-shrink: 0; }
+.trailthread-komoot-toolbar.is-collapsed .trailthread-komoot-toggle-icon { transform: none; }
+.trailthread-komoot-body { display: grid; gap: 8px; min-width: 0; }
+.trailthread-komoot-body[hidden] { display: none; }
