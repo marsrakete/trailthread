@@ -2,68 +2,128 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
-const source = await readFile(new URL('../browser-extension/content-komoot.js', import.meta.url), 'utf8');
+const root = new URL('../browser-extension/', import.meta.url);
 const context = vm.createContext({
-  URL,
-  console,
+  URL, console, Error,
   location: new URL('https://www.komoot.com/de-de/user/123/activities?type=recorded'),
   document: { querySelectorAll: () => [] },
   chrome: { runtime: { onMessage: { addListener() {} } } },
 });
-// Keep the real selection workflow while suppressing page observers and worker startup.
+vm.runInContext(await readFile(new URL('tour-selection.js', root), 'utf8'), context);
+const source = await readFile(new URL('content-komoot.js', root), 'utf8');
 vm.runInContext(source.replace(/^observeKomootPage\(\);$/m, '').replace(/^void sendRuntimeMessage\(\{ type: 'trailthread:detail-ready' \}\);$/m, ''), context);
+const api = context.TrailthreadTourSelection;
+assert.equal(api.normalizeTourType('tour_recorded'), 'recorded');
+assert.equal(api.normalizeTourType(' PLANNED '), 'planned');
+assert.equal(api.normalizeTourType(null), 'unknown');
+assert.equal(api.normalizeTourType(123), 'unknown');
+assert.equal(api.listType(context.location.href), 'recorded');
+assert.equal(api.listType('https://www.komoot.com/user/123/routes'), 'planned');
+assert.equal(api.listType('https://www.komoot.com/user/123'), 'all');
+assert.throws(() => api.listType('invalid'));
 
-assert.equal(vm.runInContext('currentKomootListType()', context), 'recorded');
-context.location = new URL('https://www.komoot.com/de-de/user/123/routes?type=planned');
-assert.equal(vm.runInContext('currentKomootListType()', context), 'planned');
-context.location = new URL('https://www.komoot.com/de-de/user/123/activities');
-assert.equal(vm.runInContext('currentKomootListType()', context), 'recorded');
-context.location = new URL('https://www.komoot.com/de-de/user/123/routes');
-assert.equal(vm.runInContext('currentKomootListType()', context), 'planned');
-context.location = new URL('https://www.komoot.com/de-de/user/123');
-assert.equal(vm.runInContext('currentKomootListType()', context), 'all');
-context.location = new URL('https://www.komoot.com/de-de/user/123/activities?type=recorded');
-
-const pages = [
-  { _embedded: { tours: [{ id: 1, type: 'tour_recorded' }, { id: 2, type: 'planned' }, { id: 3, type: 'unexpected' }] }, _links: { next: { href: '?page=1' } } },
-  { _embedded: { tours: [{ id: 1, type: 'recorded' }, { id: 4, type: 'tour_planned' }, { id: 5, type: 'recorded' }, { id: 'invalid', type: 'recorded' }] } },
-];
+const overview = 'https://www.komoot.com/de-de/user/123/activities?type=recorded&search=Erft+%26+Seen';
+const filtered = api.buildRequest(overview, '123', 'filtered');
+assert.equal(new URL(filtered.href).searchParams.get('name'), 'Erft & Seen');
+assert.equal(new URL(filtered.href).searchParams.get('type'), 'tour_recorded');
+assert.equal(new URL(filtered.href).searchParams.has('search'), false);
+assert.equal(new URL(api.buildRequest(overview, '123', 'all').href).searchParams.has('name'), false);
+assert.equal(new URL(api.buildRequest(overview, '123', 'planned').href).searchParams.get('type'), 'tour_planned');
+assert.equal(new URL(api.buildRequest(overview.replace('Erft+%26+Seen', ''), '123', 'filtered').href).searchParams.has('name'), false);
+assert.throws(() => api.buildRequest(`${overview}&sport=hike`, '123', 'filtered'), /unsupported-filters/);
+assert.throws(() => api.buildRequest(overview.replace('recorded', 'unknown'), '123', 'filtered'), /unsupported-filters/);
+assert.throws(() => api.buildRequest(overview, '', 'all'), /missing-user/);
+assert.throws(() => api.buildRequest(overview, '123', 'invalid'), /invalid-scope/);
 
 /**
- * Runs the real paginated selector against mixed tour fixtures.
- * @param {string} type Requested selection scope.
- * @param {boolean} failSecondPage Whether to simulate a subsequent network failure.
- * @returns {Promise<string[]>} Selected identifiers after the operation settles.
+ * Returns the current package's identifiers for assertions across VM realms.
+ * @returns {string[]} Selected tour identifiers.
  */
-async function select(type, failSecondPage = false) {
-  let requests = 0;
-  context.loadKomootApiPage = async () => {
-    if (failSecondPage && requests === 1) throw new Error('offline');
-    return pages[requests++];
-  };
-  context.requestedType = type;
-  await vm.runInContext('loadAllKomootTours(requestedType)', context);
+function selectedIds() {
   return Array.from(vm.runInContext('[...SELECTED_TOURS.keys()]', context));
 }
 
-assert.deepEqual(await select('all'), ['1', '2', '3', '4', '5']);
+/**
+ * Runs the production content-script action against deterministic API pages.
+ * @param {string} scope Selection scope to add.
+ * @param {object[]} pages API responses, or Error values for partial failures.
+ * @returns {Promise<string[]>} Actual API request URLs in order.
+ */
+async function add(scope, pages) {
+  const requests = [];
+  context.loadKomootApiPage = async (href) => {
+    requests.push(href);
+    const payload = pages[requests.length - 1];
+    if (payload instanceof Error) throw payload;
+    return payload;
+  };
+  context.scope = scope;
+  await vm.runInContext('loadAllKomootTours(scope)', context);
+  return requests;
+}
+
+const mixedPages = [
+  { _embedded: { tours: [{ id: 1, type: 'tour_recorded' }, { id: 2, type: 'planned' }, { id: 3, type: 'unexpected' }] }, _links: { next: { href: '?page=1' } } },
+  { _embedded: { tours: [{ id: 1, type: 'recorded' }, { id: 4, type: 'tour_planned' }, { id: 5, type: 'recorded' }, { id: 'invalid' }] } },
+];
+await add('recorded', mixedPages);
+assert.deepEqual(selectedIds(), ['1', '5']);
+await add('planned', mixedPages);
+assert.deepEqual(selectedIds(), ['1', '5', '2', '4']);
+await add('all', mixedPages);
+assert.deepEqual(selectedIds(), ['1', '5', '2', '4', '3']);
+await add('all', mixedPages);
+assert.match(vm.runInContext('tourListLoadStatus', context), /^0 Touren hinzugefügt, 5 insgesamt/);
+await add('all', [{ _embedded: { tours: [] } }]);
+assert.equal(selectedIds().length, 5);
 vm.runInContext('clearTourSelection()', context);
-assert.equal(vm.runInContext('SELECTED_TOURS.size', context), 0);
-assert.equal(vm.runInContext('tourListLoadStatus', context), '');
-vm.runInContext('clearTourSelection()', context);
-assert.equal(vm.runInContext('SELECTED_TOURS.size', context), 0);
-assert.deepEqual(await select('recorded'), ['1', '5']);
-assert.equal(vm.runInContext('tourListLoadStatus', context), '2 gemachte Touren wurden markiert.');
-assert.deepEqual(await select('planned'), ['2', '4']);
-vm.runInContext('runActive = true; clearTourSelection(); runActive = false;', context);
-assert.equal(vm.runInContext('SELECTED_TOURS.size', context), 2);
-vm.runInContext('tourListLoading = true; clearTourSelection(); tourListLoading = false;', context);
-assert.equal(vm.runInContext('SELECTED_TOURS.size', context), 2);
-assert.deepEqual(await select('invalid'), ['2', '4']);
-assert.deepEqual(await select('recorded', true), ['1']);
-assert.match(vm.runInContext('tourListLoadStatus', context), /nicht vollständig markiert/);
+assert.equal(selectedIds().length, 0);
+
+context.location = new URL(overview);
+const manyPages = [0, 1, 2].map((page) => {
+  const tours = Array.from({ length: Math.min(24, 50 - page * 24) }, (_, index) => ({ id: page * 24 + index + 10, type: 'tour_recorded' }));
+  const result = { _embedded: { tours } };
+  if (page < 2) result._links = { next: { href: `https://api.komoot.de/v007/users/123/tours/?page=${page + 1}` } };
+  return result;
+});
+const requests = await add('filtered', manyPages);
+assert.equal(selectedIds().length, 50);
+for (const href of requests) {
+  const url = new URL(href);
+  assert.equal(url.searchParams.get('name'), 'Erft & Seen');
+  assert.equal(url.searchParams.get('type'), 'tour_recorded');
+}
+context.location = new URL(overview.replace('Erft+%26+Seen', 'Emscher'));
+await add('filtered', [{ _embedded: { tours: [{ id: 10, type: 'tour_recorded' }, { id: 100, type: 'tour_recorded' }] } }]);
+assert.equal(selectedIds().length, 51);
+assert.match(vm.runInContext('tourListLoadStatus', context), /^1 Tour hinzugefügt, 51 insgesamt/);
+const partialPage = { _embedded: { tours: [{ id: 999, type: 'tour_recorded' }] }, _links: { next: { href: '?page=1' } } };
+await add('filtered', [partialPage, new Error('offline')]);
+assert.equal(selectedIds().length, 52);
+assert.match(vm.runInContext('tourListLoadStatus', context), /nicht vollständig hinzugefügt/);
 assert.equal(vm.runInContext('tourListLoading', context), false);
-context.loadKomootApiPage = async () => ({ _embedded: { tours: [] } });
-await vm.runInContext("loadAllKomootTours('planned')", context);
-assert.equal(vm.runInContext('SELECTED_TOURS.size', context), 0);
-console.log('Komoot selection checks passed: URL context, pagination, type filters, replacement, duplicates, empty results and partial failures.');
+
+context.location = new URL(`${overview}&sport=hike`);
+assert.deepEqual(await add('filtered', manyPages), []);
+assert.equal(selectedIds().length, 52);
+assert.match(vm.runInContext('tourListLoadStatus', context), /noch nicht unterstützt/);
+context.location = new URL(overview);
+await add('filtered', [{}]);
+assert.match(vm.runInContext('tourListLoadStatus', context), /keine lesbare Tourenliste/);
+assert.equal(selectedIds().length, 52);
+vm.runInContext('runActive = true; clearTourSelection(); runActive = false;', context);
+assert.equal(selectedIds().length, 52);
+
+await assert.rejects(api.addTours(filtered, {
+  selection: new Map(), describeTour: () => null, onProgress() {},
+  loadPage: async () => ({ _embedded: { tours: [] }, _links: { next: { href: 'https://example.com/leak' } } }),
+}), /invalid-next-page/);
+await assert.rejects(api.addTours(filtered, {
+  selection: new Map(), describeTour: () => null, onProgress() {},
+  loadPage: async () => ({ _embedded: { tours: [] }, _links: { next: { href: filtered.href } } }),
+}), /repeated-page/);
+vm.runInContext('clearTourSelection()', context);
+assert.equal(selectedIds().length, 0);
+const manifest = JSON.parse(await readFile(new URL('manifest.json', root), 'utf8'));
+assert.deepEqual(manifest.content_scripts[0].js, ['tour-selection.js', 'content-komoot.js']);
+console.log('Komoot selection checks passed: additive scopes, URL mapping, 50 filtered results, pagination, deduplication, empty results, unsupported filters and partial failures.');

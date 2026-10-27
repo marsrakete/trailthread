@@ -5,6 +5,19 @@ const TOOLBAR_TOGGLE_LABELS = Object.freeze({
   expand: 'Trailthread aufklappen',
   collapse: 'Trailthread einklappen',
 });
+const TOUR_SELECTION_MESSAGES = Object.freeze({
+  loading: 'Touren werden geladen und hinzugefügt …',
+  progress: 'Touren werden hinzugefügt: Seite {page}, {added} neu, {total} insgesamt markiert.',
+  done: '{added} Touren hinzugefügt, {total} insgesamt markiert.',
+  doneOne: '1 Tour hinzugefügt, {total} insgesamt markiert.',
+  failed: 'Touren konnten nicht vollständig hinzugefügt werden. {added} neu, {total} insgesamt markiert. {details}',
+  'missing-user': 'Die Komoot-Nutzer-ID konnte auf dieser Liste nicht ermittelt werden.',
+  'unsupported-filters': 'Dieser Filter wird noch nicht unterstützt. Unterstützt werden Suchtext und Tourtyp. Bitte weitere Filter in Komoot entfernen.',
+  'invalid-tour-response': 'Komoot hat keine lesbare Tourenliste geliefert.',
+  'invalid-next-page': 'Die nächste Ergebnisseite konnte nicht sicher zugeordnet werden.',
+  'repeated-page': 'Komoot hat dieselbe Ergebnisseite erneut geliefert.',
+  unknown: 'Unbekannter Fehler',
+});
 let runActive = false;
 let tourListLoading = false;
 let tourListLoadStatus = '';
@@ -100,10 +113,11 @@ function createToolbarTemplates() {
         </button>
         <div class="trailthread-komoot-body" id="trailthread-komoot-toolbar-body" hidden>
           <span class="trailthread-komoot-summary">Keine Tour ausgewählt</span>
+          <button class="trailthread-komoot-filter-selection" data-tour-type="filtered" type="button" hidden>Touren des aktuellen Filters hinzufügen</button>
           <div class="trailthread-komoot-selection-actions" hidden>
-            <button class="trailthread-komoot-load-all" data-tour-type="all" type="button">Alle Touren markieren</button>
-            <button class="trailthread-komoot-load-all" data-tour-type="recorded" type="button">Alle gemachten Touren markieren</button>
-            <button class="trailthread-komoot-load-all" data-tour-type="planned" type="button">Alle geplanten Touren markieren</button>
+            <button class="trailthread-komoot-load-all" data-tour-type="all" type="button">Alle Touren hinzufügen</button>
+            <button class="trailthread-komoot-load-all" data-tour-type="recorded" type="button">Alle gemachten Touren hinzufügen</button>
+            <button class="trailthread-komoot-load-all" data-tour-type="planned" type="button">Alle geplanten Touren hinzufügen</button>
           </div>
           <button class="trailthread-komoot-clear-selection" type="button" hidden>Auswahl aufheben</button>
           <button class="trailthread-komoot-download-gpx" type="button" disabled>Ausgewählte GPX-Dateien herunterladen</button>
@@ -178,13 +192,14 @@ function renderToolbar() {
   const selectionActions = toolbar.querySelector('.trailthread-komoot-selection-actions');
   const loadAllButtons = selectionActions.querySelectorAll('[data-tour-type]');
   const clearSelectionButton = toolbar.querySelector('.trailthread-komoot-clear-selection');
+  const filterSelectionButton = toolbar.querySelector('.trailthread-komoot-filter-selection');
   const cancelButton = toolbar.querySelector('.trailthread-komoot-cancel');
   const status = toolbar.querySelector('.trailthread-komoot-status');
   if (isKomootTourDetailPage()) summary.textContent = 'Aktuelle Tour';
   else if (count === 1) summary.textContent = '1 Tour ausgewählt';
   else summary.textContent = `${count} Touren ausgewählt`;
-  gpxDownloadButton.disabled = !count || runActive;
-  backupDownloadButton.disabled = !count || runActive;
+  gpxDownloadButton.disabled = !count || runActive || tourListLoading;
+  backupDownloadButton.disabled = !count || runActive || tourListLoading;
   selectionActions.hidden = isKomootTourDetailPage();
   const preferredType = currentKomootListType();
   for (const button of loadAllButtons) {
@@ -193,6 +208,8 @@ function renderToolbar() {
   }
   clearSelectionButton.hidden = isKomootTourDetailPage();
   clearSelectionButton.disabled = !count || runActive || tourListLoading;
+  filterSelectionButton.hidden = isKomootTourDetailPage();
+  filterSelectionButton.disabled = runActive || tourListLoading;
   cancelButton.hidden = !runActive;
   if (runActive && activeExportMode === 'gpx') status.textContent = 'Komoot lädt die ausgewählten GPX-Dateien nacheinander herunter.';
   else if (runActive) status.textContent = 'Komoot bereitet die ausgewählten Touren mit Bildern vor.';
@@ -216,6 +233,7 @@ function addTourSelection(link, selectionTemplate) {
   const control = fragment.querySelector('.trailthread-komoot-selection');
   const input = fragment.querySelector('.trailthread-komoot-selection-input');
   input.checked = SELECTED_TOURS.has(tour.tourId);
+  input.disabled = runActive || tourListLoading;
   input.addEventListener('change', () => {
     if (input.checked) SELECTED_TOURS.set(tour.tourId, { tourId: tour.tourId, tourUrl: tour.tourUrl, name: tour.name });
     else SELECTED_TOURS.delete(tour.tourId);
@@ -330,65 +348,54 @@ function createKomootApiTourDescriptor(tour) {
  * @returns {'recorded'|'planned'|'all'} Preferred selection type for the current page.
  */
 function currentKomootListType() {
-  const url = new URL(location.href);
-  const type = normalizeKomootTourType(url.searchParams.get('type'));
-  if (type !== 'unknown') return type;
-  if (/\/activities\/?$/i.test(url.pathname)) return 'recorded';
-  if (/\/routes\/?$/i.test(url.pathname)) return 'planned';
-  return 'all';
+  return TrailthreadTourSelection.listType(location.href);
 }
 
 /**
- * Loads own tours through every API page and replaces the selection with the requested type.
- * @param {'all'|'recorded'|'planned'} [tourType='all'] Tour type to mark; unknown types are excluded from typed selections.
+ * Formats a localized selection status from the central extension copy.
+ * @param {string} key Message identifier.
+ * @param {object} [values={}] Named message placeholders.
+ * @returns {string} Completed status text.
+ */
+function tourSelectionMessage(key, values = {}) {
+  if (key === 'done' && values.added === 1) key = 'doneOne';
+  let message = TOUR_SELECTION_MESSAGES[key] || TOUR_SELECTION_MESSAGES.unknown;
+  for (const [name, value] of Object.entries(values)) message = message.replaceAll(`{${name}}`, String(value));
+  return message;
+}
+
+/**
+ * Loads own tours through every API page and adds them to the current package.
+ * @param {'all'|'recorded'|'planned'|'filtered'} [tourType='all'] Type or overview filter to add.
  * @returns {Promise<void>} Resolves after all available pages were processed or a failure was shown.
  */
 async function loadAllKomootTours(tourType = 'all') {
   if (tourListLoading || runActive || isKomootTourDetailPage()) return;
-  if (!['all', 'recorded', 'planned'].includes(tourType)) return;
+  if (!['all', 'recorded', 'planned', 'filtered'].includes(tourType)) return;
+  const overviewHref = location.href;
+  const originalSize = SELECTED_TOURS.size;
   tourListLoading = true;
-  tourListLoadStatus = 'Touren werden geladen und markiert …';
+  tourListLoadStatus = tourSelectionMessage('loading');
+  syncTourSelectionControls();
   renderToolbar();
   try {
     const userId = await loadKomootUserId();
-    if (!userId) throw new Error('Die Komoot-Nutzer-ID konnte auf dieser Liste nicht ermittelt werden.');
-    let pageUrl = `${location.origin}/api/v007/users/${encodeURIComponent(userId)}/tours/`;
-    let workerPageUrl = pageUrl;
-    const loadedPages = new Set();
-    const matchingTours = new Map();
-    // Replace earlier selections so another tour type cannot remain marked.
-    SELECTED_TOURS.clear();
-    syncTourSelectionControls();
-    while (pageUrl && !loadedPages.has(pageUrl)) {
-      loadedPages.add(pageUrl);
-      tourListLoadStatus = `Touren werden geladen und markiert: Seite ${loadedPages.size}, bisher ${matchingTours.size} markiert.`;
-      renderToolbar();
-      const payload = await loadKomootApiPage(pageUrl, workerPageUrl);
-      const tours = payload?._embedded?.tours;
-      if (Array.isArray(tours)) {
-        for (const tour of tours) {
-          const descriptor = createKomootApiTourDescriptor(tour);
-          if (!descriptor) continue;
-          if (tourType !== 'all' && descriptor.type !== tourType) continue;
-          matchingTours.set(descriptor.tourId, descriptor);
-          SELECTED_TOURS.set(descriptor.tourId, descriptor);
-        }
-      }
-      const nextHref = payload?._links?.next?.href;
-      if (typeof nextHref === 'string' && nextHref) {
-        workerPageUrl = new URL(nextHref, pageUrl).href;
-        pageUrl = sameOriginKomootApiPageUrl(workerPageUrl);
-      } else {
-        pageUrl = null;
-      }
-    }
-    tourListLoadStatus = `${matchingTours.size} Touren wurden markiert.`;
-    if (tourType === 'recorded') tourListLoadStatus = `${matchingTours.size} gemachte Touren wurden markiert.`;
-    else if (tourType === 'planned') tourListLoadStatus = `${matchingTours.size} geplante Touren wurden markiert.`;
+    const request = TrailthreadTourSelection.buildRequest(overviewHref, userId, tourType);
+    const result = await TrailthreadTourSelection.addTours(request, {
+      selection: SELECTED_TOURS,
+      loadPage: (url) => loadKomootApiPage(sameOriginKomootApiPageUrl(url), url),
+      describeTour: createKomootApiTourDescriptor,
+      onProgress: (progress) => {
+        tourListLoadStatus = tourSelectionMessage('progress', progress);
+        syncTourSelectionControls();
+        renderToolbar();
+      },
+    });
+    tourListLoadStatus = tourSelectionMessage('done', result);
   } catch (error) {
-    let details = 'Unbekannter Fehler';
-    if (error instanceof Error) details = error.message;
-    tourListLoadStatus = `Touren konnten nicht vollständig markiert werden. ${SELECTED_TOURS.size} Touren bleiben markiert: ${details}`;
+    let details = tourSelectionMessage('unknown');
+    if (error instanceof Error) details = TOUR_SELECTION_MESSAGES[error.message] || error.message;
+    tourListLoadStatus = tourSelectionMessage('failed', { added: SELECTED_TOURS.size - originalSize, total: SELECTED_TOURS.size, details });
   } finally {
     tourListLoading = false;
     syncTourSelectionControls();
@@ -407,6 +414,7 @@ function syncTourSelectionControls() {
     const link = card?.querySelector('a[href*="/tour/"]') || null;
     const tour = link instanceof HTMLAnchorElement ? describeTourLink(link) : null;
     input.checked = !!tour && SELECTED_TOURS.has(tour.tourId);
+    input.disabled = runActive || tourListLoading;
   }
 }
 
@@ -450,12 +458,7 @@ function komootPhotoText(value) {
  * @returns {'recorded'|'planned'|'unknown'} Track type stored in a Trailthread export.
  */
 function normalizeKomootTourType(value) {
-  const type = komootPhotoText(value);
-  if (!type) return 'unknown';
-  const normalizedType = type.toLocaleLowerCase();
-  if (normalizedType === 'tour_planned' || normalizedType === 'planned') return 'planned';
-  if (normalizedType === 'tour_recorded' || normalizedType === 'recorded') return 'recorded';
-  return 'unknown';
+  return TrailthreadTourSelection.normalizeTourType(value);
 }
 
 /**

@@ -22,7 +22,7 @@
 .trailthread-komoot-selection-actions .is-preferred { order: -1; }
 .trailthread-komoot-summary, .trailthread-komoot-status { color: #bbd8cd; }
 .trailthread-komoot-status { height: 6.75em; margin: 0; overflow-y: auto; }
-.trailthread-komoot-download-gpx, .trailthread-komoot-download-backup, .trailthread-komoot-load-all, .trailthread-komoot-clear-selection, .trailthread-komoot-cancel {
+.trailthread-komoot-download-gpx, .trailthread-komoot-download-backup, .trailthread-komoot-load-all, .trailthread-komoot-filter-selection, .trailthread-komoot-clear-selection, .trailthread-komoot-cancel {
   min-height: 38px;
   border: 0;
   border-radius: 8px;
@@ -34,7 +34,9 @@
   font-weight: 700;
 }
 
-.trailthread-komoot-load-all, .trailthread-komoot-clear-selection, .trailthread-komoot-cancel { color: #ecfff6; background: #30554a; }
+.trailthread-komoot-load-all, .trailthread-komoot-filter-selection, .trailthread-komoot-clear-selection, .trailthread-komoot-cancel { color: #ecfff6; background: #30554a; }
+.trailthread-komoot-filter-selection[hidden] { display: none; }
+.trailthread-komoot-filter-selection:disabled { cursor: not-allowed; opacity: .45; }
 .trailthread-komoot-download-gpx:disabled, .trailthread-komoot-download-backup:disabled, .trailthread-komoot-load-all:disabled, .trailthread-komoot-clear-selection:disabled { cursor: not-allowed; opacity: .45; }
 .trailthread-komoot-selection {
   position: relative;
