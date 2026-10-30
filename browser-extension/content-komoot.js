@@ -1,6 +1,7 @@
 const TOUR_URL_PATTERN = /\/tour\/(\d+)/i;
 const SELECTED_TOURS = new Map();
 let toolbar = null;
+let filterPreviewController = null;
 const TOOLBAR_TOGGLE_LABELS = Object.freeze({
   expand: 'Trailthread aufklappen',
   collapse: 'Trailthread einklappen',
@@ -12,7 +13,9 @@ const TOUR_SELECTION_MESSAGES = Object.freeze({
   doneOne: '1 Tour hinzugefügt, {total} insgesamt markiert.',
   failed: 'Touren konnten nicht vollständig hinzugefügt werden. {added} neu, {total} insgesamt markiert. {details}',
   'missing-user': 'Die Komoot-Nutzer-ID konnte auf dieser Liste nicht ermittelt werden.',
-  'unsupported-filters': 'Dieser Filter wird noch nicht unterstützt. Unterstützt werden Suchtext und Tourtyp. Bitte weitere Filter in Komoot entfernen.',
+  'unsupported-filters': 'Dieser Filter wird noch nicht unterstützt. Unterstützt werden Suchtext, Tourtyp, Sportarten, Datum, Umkreis, Sichtbarkeit, Höhenmeter sowie Länge oder Dauer. Bitte weitere Filter in Komoot entfernen.',
+  'unsupported-ebike-sport': 'Die E-Bike-Erweiterung ist bisher nur für Mountainbike und Rennrad bestätigt. Bitte die Sportauswahl prüfen.',
+  'invalid-filters': 'Die Filterwerte konnten nicht gelesen werden. Bitte Datum, Umkreis und Wertebereiche in Komoot prüfen und den Filter erneut setzen.',
   'invalid-tour-response': 'Komoot hat keine lesbare Tourenliste geliefert.',
   'invalid-next-page': 'Die nächste Ergebnisseite konnte nicht sicher zugeordnet werden.',
   'repeated-page': 'Komoot hat dieselbe Ergebnisseite erneut geliefert.',
@@ -113,6 +116,11 @@ function createToolbarTemplates() {
         </button>
         <div class="trailthread-komoot-body" id="trailthread-komoot-toolbar-body" hidden>
           <span class="trailthread-komoot-summary">Keine Tour ausgewählt</span>
+          <section class="trailthread-komoot-filter-preview" aria-label="Übernommene Filter">
+            <strong class="trailthread-komoot-filter-title">Übernommene Filter</strong>
+            <dl class="trailthread-komoot-filter-rows"></dl>
+            <p class="trailthread-komoot-filter-warning" role="status" hidden></p>
+          </section>
           <button class="trailthread-komoot-filter-selection" data-tour-type="filtered" type="button" hidden>Touren des aktuellen Filters hinzufügen</button>
           <div class="trailthread-komoot-selection-actions" hidden>
             <button class="trailthread-komoot-load-all" data-tour-type="all" type="button">Alle Touren hinzufügen</button>
@@ -132,6 +140,9 @@ function createToolbarTemplates() {
         <input class="trailthread-komoot-selection-input" type="checkbox">
         <span>Trailthread</span>
       </label>
+    </template>
+    <template id="trailthread-komoot-filter-row-template">
+      <div class="trailthread-komoot-filter-row"><dt></dt><dd></dd></div>
     </template>`;
   return host.content;
 }
@@ -195,6 +206,9 @@ function renderToolbar() {
   const filterSelectionButton = toolbar.querySelector('.trailthread-komoot-filter-selection');
   const cancelButton = toolbar.querySelector('.trailthread-komoot-cancel');
   const status = toolbar.querySelector('.trailthread-komoot-status');
+  const previewContainer = toolbar.querySelector('.trailthread-komoot-filter-preview');
+  previewContainer.hidden = isKomootTourDetailPage();
+  const preview = filterPreviewController.update(location.href);
   if (isKomootTourDetailPage()) summary.textContent = 'Aktuelle Tour';
   else if (count === 1) summary.textContent = '1 Tour ausgewählt';
   else summary.textContent = `${count} Touren ausgewählt`;
@@ -209,7 +223,7 @@ function renderToolbar() {
   clearSelectionButton.hidden = isKomootTourDetailPage();
   clearSelectionButton.disabled = !count || runActive || tourListLoading;
   filterSelectionButton.hidden = isKomootTourDetailPage();
-  filterSelectionButton.disabled = runActive || tourListLoading;
+  filterSelectionButton.disabled = runActive || tourListLoading || !preview.valid;
   cancelButton.hidden = !runActive;
   if (runActive && activeExportMode === 'gpx') status.textContent = 'Komoot lädt die ausgewählten GPX-Dateien nacheinander herunter.';
   else if (runActive) status.textContent = 'Komoot bereitet die ausgewählten Touren mit Bildern vor.';
@@ -1261,7 +1275,8 @@ async function downloadTrailthreadTourBackup(entries, cancelled) {
  */
 function ensureTourListEnhancement() {
   const currentTour = describeCurrentKomootTour();
-  if (!currentTour && !findTourLinks().length) return;
+  const isTourList = /\/user\/[^/]+\/(?:activities|routes)\/?$/i.test(location.pathname);
+  if (!currentTour && !isTourList && !findTourLinks().length && !toolbar) return;
   if (currentTour && !SELECTED_TOURS.size) SELECTED_TOURS.set(currentTour.tourId, currentTour);
   if (toolbar && selectionTemplate) {
     if (!currentTour) enhanceTourList(selectionTemplate);
@@ -1279,6 +1294,11 @@ function ensureTourListEnhancement() {
   }
   const toolbarFragment = toolbarTemplate.content.cloneNode(true);
   toolbar = toolbarFragment.querySelector('.trailthread-komoot-toolbar');
+  filterPreviewController = TrailthreadFilterPreview.createController({
+    container: toolbar.querySelector('.trailthread-komoot-filter-preview'),
+    rowTemplate: templates.querySelector('#trailthread-komoot-filter-row-template'),
+    buildRequest: TrailthreadTourSelection.buildRequest,
+  });
   toolbar.querySelector('.trailthread-komoot-toggle').addEventListener('click', () => {
     setToolbarCollapsed(!toolbar.classList.contains('is-collapsed'));
   });
@@ -1334,6 +1354,8 @@ function scheduleTourListEnhancement() {
  * @returns {void} Starts one throttled document-wide observer for the lifetime of this content script.
  */
 function observeKomootPage() {
+  window.addEventListener('popstate', scheduleTourListEnhancement);
+  if (window.navigation) window.navigation.addEventListener('navigatesuccess', scheduleTourListEnhancement);
   const observer = new MutationObserver(() => {
     scheduleTourListEnhancement();
   });

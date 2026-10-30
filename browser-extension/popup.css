@@ -5,13 +5,18 @@
 }
 
 body { margin: 0; min-width: 300px; }
-.popup-card { display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 10px; box-sizing: border-box; width: 320px; height: 310px; padding: 16px; }
+.popup-card { display: grid; grid-template-rows: auto auto minmax(90px, 1fr) auto auto auto; gap: 10px; box-sizing: border-box; width: 320px; min-height: 310px; max-height: 580px; overflow-y: auto; padding: 16px; }
 .popup-intro, .popup-hint { margin: 0; color: #bbd8cd; }
 .popup-hint { font-size: 12px; }
 .popup-progress { display: grid; grid-template-rows: 1fr auto auto; gap: 8px; min-height: 0; margin: 0; }
 .popup-progress div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px; min-height: 20px; }
 .popup-progress dt { color: #8fb8aa; }
 .popup-progress dd { margin: 0; overflow-wrap: anywhere; }
-.popup-status { overflow-y: auto; }
+.popup-status { max-height: 100px; overflow-y: auto; }
 .popup-cancel { border: 1px solid #5e9785; border-radius: 8px; padding: 8px 10px; color: #ecfff6; background: #30554a; font: inherit; cursor: pointer; }
 .popup-cancel:hover { background: #3d695c; }
+.popup-project-info { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid #30554a; font-size: 12px; }
+.popup-project-info span { color: #bbd8cd; }
+.popup-project-info a { color: #71e3b5; text-underline-offset: 2px; }
+.popup-project-info a:hover { color: #a4f0d1; }
+.popup-project-info a:focus-visible { outline: 2px solid #71e3b5; outline-offset: 3px; border-radius: 2px; }

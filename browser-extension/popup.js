@@ -65,7 +65,7 @@ async function cancelActiveRun() {
 }
 
 /**
- * Mounts the popup template and wires its user interactions.
+ * Mounts the popup template, displays the installed manifest version and wires its interactions.
  * @returns {void} Initializes the extension popup once its document is ready.
  */
 function initializePopup() {
@@ -73,6 +73,7 @@ function initializePopup() {
   const root = document.querySelector('#popup-root');
   const fragment = template.content.cloneNode(true);
   root.append(fragment);
+  document.querySelector('.popup-version').textContent = chrome.runtime.getManifest().version;
   const cancelButton = document.querySelector('.popup-cancel');
   if (cancelButton) cancelButton.addEventListener('click', () => void cancelActiveRun());
   void refreshRunStatus();

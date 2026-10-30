@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Trailthread Komoot Exporthelfer",
-  "version": "0.1.70",
+  "version": "0.1.74",
   "description": "Ergänzt eigene Komoot-Tourlisten um eine lokale Auswahl und erstellt Trailthread-Sicherungen mit GPX und Bildern.",
   "icons": {
     "16": "icon-16.png",
@@ -28,7 +28,7 @@
   "content_scripts": [
     {
       "matches": ["https://www.komoot.com/*", "https://komoot.com/*", "https://www.komoot.de/*", "https://komoot.de/*"],
-      "js": ["tour-selection.js", "content-komoot.js"],
+      "js": ["tour-selection.js", "filter-preview.js", "content-komoot.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     }

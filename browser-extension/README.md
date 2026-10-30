@@ -10,10 +10,32 @@
 
 Die Erweiterung nutzt ausschliesslich die bereits angemeldete Komoot-Sitzung im Browser. Sie fragt keine Komoot-Zugangsdaten ab.
 
-„Touren des aktuellen Filters hinzufügen“ übernimmt den Suchtext und Tourtyp der aktuellen Komoot-Übersicht. Die Erweiterung lädt sämtliche Ergebnisseiten über die bestehende Komoot-Sitzung nach, auch wenn zunächst nur 24 Karten angezeigt werden. Unterstützt werden Suchtext (`search` in der Übersicht, `name` in der API) und gemachte/geplante Touren. Weitere Filterparameter führen zu einem Hinweis; es wird dann keine ungefilterte Liste hinzugefügt.
+Ein Klick auf das Erweiterungssymbol zeigt den Exportstatus und die installierte Erweiterungsversion sowie Links zum GitHub-Projekt und zum Melden von Fehlern oder Verbesserungsvorschlägen. Die Links öffnen sich in einem neuen Tab.
 
-Zusätzlich stehen „Alle Touren hinzufügen“, „Alle gemachten Touren hinzufügen“ und „Alle geplanten Touren hinzufügen“ bereit. Diese drei Aktionen berücksichtigen keinen Suchtext. Auf der jeweiligen Komoot-Seite steht die passende Typ-Aktion zuerst. Alle Aktionen ergänzen die bestehende Auswahl ohne Duplikate. So lässt sich aus mehreren Suchen ein gemeinsames Exportpaket zusammenstellen. Der Status nennt neu hinzugefügte Touren und die Gesamtzahl. Bei einem Ladefehler bleiben die bisherige Auswahl und bereits hinzugefügte Treffer erhalten; der Status meldet die unvollständige Ergänzung. „Auswahl aufheben“ entfernt sämtliche Markierungen, auch bei Touren, die gerade nicht sichtbar sind.
+Über dem Filter-Button zeigt „Übernommene Filter“ vorab die wirksamen Einstellungen in lesbarer Form: Suchtext, Tourtyp, Sportarten, E-Bike-Varianten, Zeitraum, Umkreis, Sichtbarkeit und aktive Wertebereiche. Die Vorschau entsteht aus derselben Abfrage wie die spätere Auswahl und lädt selbst keine Touren. Sie aktualisiert sich bei Filterwechseln. Bei ungültigen oder unbekannten Filtern nennt „Filter bitte prüfen“ die Einstellungen und den Grund; der Filter-Button bleibt gesperrt. Die allgemeinen Hinzufügen-Aktionen sind weiterhin verfügbar.
 
-Die Abfrage- und Auswahlregeln liegen in `tour-selection.js`, das laut Manifest vor `content-komoot.js` geladen wird. `node scripts/check-komoot-selection.mjs` prüft die Modulverträge und Auswahlabläufe. `node scripts/check-komoot-selection-browser.cjs` prüft die echte Toolbar in Chromium mit simulierten Komoot-Antworten; dafür muss Playwright im Node-Suchpfad verfügbar sein. Dieser Test greift nicht auf das echte Komoot-Konto zu.
+„Touren des aktuellen Filters hinzufügen“ übernimmt die beobachteten Filter der aktuellen Komoot-Übersicht. Die Erweiterung lädt sämtliche Ergebnisseiten über die bestehende Komoot-Sitzung nach, auch wenn zunächst nur 24 Karten angezeigt werden. Unterstützt werden Suchtext, gemachte/geplante Touren, Sportarten mit der bestätigten E-Bike-Erweiterung, Datum, Umkreis, Sichtbarkeit, Höhenmeter sowie Länge oder Dauer. Unbekannte Parameter und ungültige Werte führen zu einem Hinweis, bevor Touren angefragt werden; die bestehende Auswahl bleibt erhalten.
+
+| Übersicht | API |
+| --- | --- |
+| `search` / `name`, `type` | `name`, `tour_recorded` / `tour_planned` |
+| `sport` (kommagetrennt oder mehrfach vorhanden) | `sport_types`, ohne doppelte Sportarten |
+| `include_ebike=true` | Ergänzt die beobachteten Varianten `e_mtb_easy` zu `mtb_easy` und `e_racebike` zu `racebike`. Bei `false` oder fehlender Option werden keine Varianten ergänzt. Bereits ausdrücklich gewählte E-Sportarten bleiben erhalten. |
+| `date=YYYY-MM-DD,YYYY-MM-DD` | `start_date`, `end_date`: inklusive lokaler Tagesgrenzen, als UTC-Zeitstempel und unter Berücksichtigung der Sommerzeit |
+| `location=Breite,Länge,Radiusr` | `center=Breite,Länge`, `max_distance`: Radius von Kilometern in Meter umgerechnet |
+| `visibility` | `visibilities` |
+| `min_uphill`, `max_uphill` | Unverändert in Metern; auch explizit gesetzte Nullwerte |
+| `min_length`, `max_length` | Unverändert in Metern |
+| `min_duration`, `max_duration` | Unverändert in Sekunden; der beobachtete obere Reglerwert `36000` (10 Stunden / unbegrenzt) wird wie bei Komoot weggelassen |
+
+`filter_by_duration=false` aktiviert die Längengrenzen und ignoriert eventuell noch vorhandene Dauerwerte. Bei `true` gilt das Umgekehrte. Fehlt der Umschalter, werden die vorhandenen Grenzen übernommen. Sämtliche aktiven Filter bleiben auf allen Folgeseiten erhalten.
+
+Der Übersichtsparameter `order` wird ignoriert: Die Sortierung ändert die Auswahl nicht und blockiert weder die Filtervorschau noch das Hinzufügen.
+
+Für weitere Sportarten werden die Bezeichner unverändert übernommen. Eine automatische E-Bike-Erweiterung anderer Sportarten wird bis zur Bestätigung ihrer API-Zuordnung mit einem Hinweis abgelehnt. Ohne ausgewählte Sportarten schränkt die E-Bike-Option allein die Abfrage nicht zusätzlich ein; das wird in der Vorschau angezeigt.
+
+Zusätzlich stehen „Alle Touren hinzufügen“, „Alle gemachten Touren hinzufügen“ und „Alle geplanten Touren hinzufügen“ bereit. Diese drei Aktionen berücksichtigen die übrigen Filter der Übersicht nicht. Auf der jeweiligen Komoot-Seite steht die passende Typ-Aktion zuerst. Alle Aktionen ergänzen die bestehende Auswahl ohne Duplikate. So lässt sich aus mehreren Suchen ein gemeinsames Exportpaket zusammenstellen. Der Status nennt neu hinzugefügte Touren und die Gesamtzahl. Bei einem Ladefehler bleiben die bisherige Auswahl und bereits hinzugefügte Treffer erhalten; der Status meldet die unvollständige Ergänzung. „Auswahl aufheben“ entfernt sämtliche Markierungen, auch bei Touren, die gerade nicht sichtbar sind.
+
+Die Abfrage- und Auswahlregeln liegen in `tour-selection.js`, die templatebasierte Vorschau in `filter-preview.js`. Beide Module werden laut Manifest vor `content-komoot.js` geladen. `node scripts/check-komoot-selection.mjs` prüft die Modulverträge, Vorschautexte und Auswahlabläufe. `node scripts/check-komoot-selection-browser.cjs` prüft die echte Toolbar und Vorschau in Chromium mit simulierten Komoot-Antworten; dafür muss Playwright im Node-Suchpfad verfügbar sein. Dieser Test greift nicht auf das echte Komoot-Konto zu.
 
 Die Kopfzeile „Trailthread“ klappt die Exportleiste ein und wieder auf. Eingeklappt bleiben nur Name und Aufklapp-Pfeil sichtbar. Auswahl und laufende Exporte bleiben erhalten; die Leiste startet auf einer neu geladenen Seite eingeklappt. Der Pfeil nach oben und „Trailthread aufklappen“ öffnen sie; der Pfeil nach unten und „Trailthread einklappen“ schließen sie.

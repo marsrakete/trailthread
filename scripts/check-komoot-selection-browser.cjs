@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs/promises');
 const { chromium } = require('playwright');
 
 /**
@@ -9,7 +10,7 @@ const { chromium } = require('playwright');
 async function main() {
   const browser = await chromium.launch({ headless: true });
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, timezoneId: 'Europe/Berlin' });
     const errors = [];
     const requests = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -39,7 +40,8 @@ async function main() {
     await page.addInitScript(() => {
       window.chrome = { runtime: { id: 'fixture', sendMessage: async () => ({}), onMessage: { addListener() {} } } };
     });
-    await page.goto('https://www.komoot.com/de-de/user/123/activities?type=recorded&search=Erft');
+    const observedFilters = '&location=50.909622,6.808193,30r&date=2026-09-01,2026-09-30&visibility=PUBLIC&min_uphill=0&max_uphill=1800&sport=mtb_easy,racebike&include_ebike=false&order=duration_desc';
+    await page.goto(`https://www.komoot.com/de-de/user/123/activities?type=recorded&search=Erft${observedFilters}&min_duration=9000&max_duration=16200`);
     await page.evaluate(() => {
       const main = document.querySelector('main');
       for (let id = 1; id <= 24; id += 1) {
@@ -54,9 +56,15 @@ async function main() {
     const extension = path.resolve(__dirname, '../browser-extension');
     await page.addStyleTag({ path: path.join(extension, 'styles.css') });
     await page.addScriptTag({ path: path.join(extension, 'tour-selection.js') });
+    await page.addScriptTag({ path: path.join(extension, 'filter-preview.js') });
     await page.addScriptTag({ path: path.join(extension, 'content-komoot.js') });
     await page.locator('.trailthread-komoot-toggle').click();
     const filtered = page.locator('[data-tour-type="filtered"]');
+    const preview = page.locator('.trailthread-komoot-filter-preview');
+    assert.equal(requests.length, 0);
+    assert.match(await preview.innerText(), /Mountainbike, Rennrad/);
+    assert.match(await preview.innerText(), /01\.09\.2026 – 30\.09\.2026/);
+    assert.match(await preview.innerText(), /2,5 – 4,5 h/);
     await filtered.click();
     await page.waitForFunction(() => document.querySelector('.trailthread-komoot-status').textContent === '50 Touren hinzugefügt, 50 insgesamt markiert.');
     assert.equal(requests.length, 3);
@@ -64,6 +72,33 @@ async function main() {
     for (const href of requests) {
       assert.equal(new URL(href).searchParams.get('name'), 'Erft');
       assert.equal(new URL(href).searchParams.get('type'), 'tour_recorded');
+      assert.equal(new URL(href).searchParams.has('order'), false);
+      const params = new URL(href).searchParams;
+      assert.equal(params.get('center'), '50.909622,6.808193');
+      assert.equal(params.get('max_distance'), '30000');
+      assert.equal(params.get('start_date'), '2026-08-31T22:00:00.000Z');
+      assert.equal(params.get('end_date'), '2026-09-30T21:59:59.999Z');
+      assert.equal(params.get('visibilities'), 'PUBLIC');
+      assert.equal(params.get('min_uphill'), '0');
+      assert.equal(params.get('max_uphill'), '1800');
+      assert.equal(params.get('min_duration'), '9000');
+      assert.equal(params.get('max_duration'), '16200');
+      assert.equal(params.get('sport_types'), 'mtb_easy,racebike');
+    }
+    await page.evaluate((query) => history.pushState({}, '', query), `?type=recorded&search=Erft${observedFilters.replace('include_ebike=false', 'include_ebike=true')}&filter_by_duration=false&min_length=35000&max_length=100000&min_duration=9000`);
+    await page.waitForFunction(() => document.querySelector('.trailthread-komoot-filter-preview').textContent.includes('E-Mountainbike'));
+    assert.match(await preview.innerText(), /35 – 100 km/);
+    assert.doesNotMatch(await preview.innerText(), /2,5 – 4,5 h/);
+    const lengthRequestStart = requests.length;
+    await filtered.click();
+    await page.waitForFunction(() => document.querySelector('.trailthread-komoot-status').textContent === '0 Touren hinzugefügt, 50 insgesamt markiert.');
+    assert.equal(requests.length - lengthRequestStart, 3);
+    for (const href of requests.slice(lengthRequestStart)) {
+      const params = new URL(href).searchParams;
+      assert.equal(params.get('min_length'), '35000');
+      assert.equal(params.get('max_length'), '100000');
+      assert.equal(params.has('min_duration'), false);
+      assert.equal(params.get('sport_types'), 'mtb_easy,e_mtb_easy,racebike,e_racebike');
     }
     await page.evaluate(() => history.pushState({}, '', '?type=recorded&search=Emscher'));
     await filtered.click();
@@ -72,17 +107,73 @@ async function main() {
     await page.waitForFunction(() => document.querySelector('.trailthread-komoot-status').textContent === '1 Tour hinzugefügt, 52 insgesamt markiert.');
     await page.locator('[data-tour-type="all"]').click();
     await page.waitForFunction(() => document.querySelector('.trailthread-komoot-status').textContent === '0 Touren hinzugefügt, 52 insgesamt markiert.');
-    await page.evaluate(() => history.pushState({}, '', '?type=recorded&search=Erft&sport=hike'));
+    await page.evaluate(() => history.pushState({}, '', '?type=recorded&search=Erft&new_filter=1'));
     const requestCount = requests.length;
-    await filtered.click();
-    await page.waitForFunction(() => document.querySelector('.trailthread-komoot-status').textContent.includes('noch nicht unterstützt'));
+    await page.waitForFunction(() => document.querySelector('[data-tour-type="filtered"]').disabled);
+    assert.match(await page.locator('.trailthread-komoot-filter-warning').innerText(), /new_filter/);
     assert.equal(requests.length, requestCount);
     const box = await filtered.boundingBox();
     assert.ok(box && box.width > 100 && box.x >= 0 && box.x + box.width <= 1280);
     await page.locator('.trailthread-komoot-clear-selection').click();
     assert.equal(await page.locator('.trailthread-komoot-selection-input:checked').count(), 0);
     assert.equal(await page.locator('.trailthread-komoot-summary').textContent(), '0 Touren ausgewählt');
+    await page.evaluate(() => history.pushState({}, '', '?type=recorded&search=%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E'));
+    await page.waitForFunction(() => !document.querySelector('[data-tour-type="filtered"]').disabled);
+    assert.equal(await preview.locator('img').count(), 0);
+    assert.match(await preview.innerText(), /<img src=x onerror=alert\(1\)>/);
+    await page.setViewportSize({ width: 844, height: 390 });
+    const toolbarBox = await page.locator('.trailthread-komoot-toolbar').boundingBox();
+    assert.ok(toolbarBox && toolbarBox.y >= 0 && toolbarBox.y + toolbarBox.height <= 390);
+    await page.goto('https://www.komoot.com/de-de/user/123/activities?type=recorded&search=KeineTreffer');
+    await page.addStyleTag({ path: path.join(extension, 'styles.css') });
+    await page.addScriptTag({ path: path.join(extension, 'tour-selection.js') });
+    await page.addScriptTag({ path: path.join(extension, 'filter-preview.js') });
+    await page.addScriptTag({ path: path.join(extension, 'content-komoot.js') });
+    await page.locator('.trailthread-komoot-toggle').click();
+    assert.match(await page.locator('.trailthread-komoot-filter-preview').innerText(), /KeineTreffer/);
     assert.deepEqual(errors, []);
+    const popup = await browser.newPage({ viewport: { width: 320, height: 600 } });
+    popup.on('pageerror', (error) => errors.push(error.message));
+    const manifest = JSON.parse(await fs.readFile(path.join(extension, 'manifest.json'), 'utf8'));
+    const popupFiles = {
+      '/popup.html': { contentType: 'text/html', body: await fs.readFile(path.join(extension, 'popup.html'), 'utf8') },
+      '/popup.js': { contentType: 'application/javascript', body: await fs.readFile(path.join(extension, 'popup.js'), 'utf8') },
+      '/popup.css': { contentType: 'text/css', body: await fs.readFile(path.join(extension, 'popup.css'), 'utf8') },
+    };
+    await popup.route('https://trailthread-popup.test/**', async (route) => {
+      const file = popupFiles[new URL(route.request().url()).pathname];
+      if (file) await route.fulfill(file);
+      else await route.fulfill({ status: 404, body: '' });
+    });
+    await popup.addInitScript((version) => {
+      window.fixtureRun = null;
+      window.chrome = {
+        tabs: { query: async () => [{ id: 1 }] },
+        runtime: { getManifest: () => ({ version }), sendMessage: async () => ({ ok: true, run: window.fixtureRun }) },
+      };
+    }, manifest.version);
+    await popup.goto('https://trailthread-popup.test/popup.html');
+    assert.equal(await popup.locator('.popup-version').textContent(), manifest.version);
+    assert.equal(await popup.locator('.popup-status').textContent(), 'Kein Export aktiv.');
+    const projectLinks = popup.locator('.popup-project-info a');
+    assert.equal(await projectLinks.count(), 2);
+    assert.equal(await projectLinks.nth(0).getAttribute('href'), 'https://github.com/marsrakete/trailthread');
+    assert.equal(await projectLinks.nth(1).getAttribute('href'), 'https://github.com/marsrakete/trailthread/issues/new');
+    for (const link of await projectLinks.all()) {
+      assert.equal(await link.getAttribute('target'), '_blank');
+      assert.match(await link.getAttribute('rel'), /noopener/);
+    }
+    await popup.evaluate(async () => {
+      window.fixtureRun = { status: 'Bilder werden geladen.', current: 3, total: 10, tourName: 'Erft-Tour' };
+      await refreshRunStatus();
+    });
+    assert.equal(await popup.locator('.popup-count').textContent(), 'Tour 3/10');
+    assert.equal(await popup.locator('.popup-cancel').isVisible(), true);
+    const footerBox = await popup.locator('.popup-project-info').boundingBox();
+    assert.ok(footerBox && footerBox.y >= 0 && footerBox.y + footerBox.height <= 600);
+    assert.equal(await popup.evaluate(() => document.documentElement.scrollWidth <= 320), true);
+    assert.deepEqual(errors, []);
+    console.log('Popup test passed: installed version, project/issue links, active export status and 320px layout; no pageerrors.');
     console.log('Chromium toolbar test passed: no pageerrors, 50 filtered tours, additive searches/types, checkbox sync, unsupported filters, clear selection and button geometry.');
   } finally {
     await browser.close();
