@@ -10,6 +10,12 @@
 
 Die Erweiterung nutzt ausschliesslich die bereits angemeldete Komoot-Sitzung im Browser. Sie fragt keine Komoot-Zugangsdaten ab.
 
+Enthält ein Trailthread-Export genau eine Tour, trägt die Datei denselben Namen wie deren GPX-Datei, mit der Endung `.json.gz` statt `.gpx`. Bei mehreren enthaltenen Touren bleibt der Sammelname `trailthread-komoot-touren.json.gz` erhalten. Entscheidend sind die tatsächlich erfolgreich eingebetteten Touren, auch bei einem unvollständigen Export.
+
+Das Erweiterungssymbol ist nur auf HTTPS-Seiten von `komoot.com` und `komoot.de` (jeweils mit oder ohne `www`) aktiv und anklickbar. Auf anderen Seiten bleibt es deaktiviert. Die Zuordnung wird bei Navigation, Tabwechsel und Browserstart aktualisiert; auch beim Installieren oder Neuladen werden bereits geöffnete Tabs berücksichtigt. Das Hintergrundmodul `action-state.js` steuert diesen Zustand ohne zusätzliche Berechtigungen.
+
+`node scripts/check-extension-action.mjs` prüft Domainabgrenzung und Browserereignisse mit API-Fixtures. `node scripts/check-extension-action-browser.cjs` lädt die tatsächliche entpackte Erweiterung in Chromium und prüft den Browserstatus auf Komoot- und anderen Tabs; dafür muss Playwright im Node-Suchpfad verfügbar sein. Der [deaktivierte Standardzustand der Toolbar-Aktion](https://developer.chrome.com/docs/extensions/reference/api/action#enabled-state) verhindert die Aktivierung auf fremden Seiten bereits vor der ersten Tabprüfung.
+
 Ein Klick auf das Erweiterungssymbol zeigt den Exportstatus und die installierte Erweiterungsversion sowie Links zum GitHub-Projekt und zum Melden von Fehlern oder Verbesserungsvorschlägen. Die Links öffnen sich in einem neuen Tab.
 
 Über dem Filter-Button zeigt „Übernommene Filter“ vorab die wirksamen Einstellungen in lesbarer Form: Suchtext, Tourtyp, Sportarten, E-Bike-Varianten, Zeitraum, Umkreis, Sichtbarkeit und aktive Wertebereiche. Die Vorschau entsteht aus derselben Abfrage wie die spätere Auswahl und lädt selbst keine Touren. Sie aktualisiert sich bei Filterwechseln. Bei ungültigen oder unbekannten Filtern nennt „Filter bitte prüfen“ die Einstellungen und den Grund; der Filter-Button bleibt gesperrt. Die allgemeinen Hinzufügen-Aktionen sind weiterhin verfügbar.

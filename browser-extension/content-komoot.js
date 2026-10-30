@@ -1249,14 +1249,15 @@ async function gzipJsonBlob(payload) {
 }
 
 /**
- * Downloads one compressed Trailthread backup that contains GPX text, metadata and embedded images.
+ * Downloads a compressed backup, reusing the GPX basename for exactly one included tour.
  * @param {Array<object>} entries Tour metadata, GPX text and photos gathered during the export run.
  * @param {boolean} cancelled Whether the user stopped the run early.
  * @returns {Promise<number>} Number of successfully included tracks.
  */
 async function downloadTrailthreadTourBackup(entries, cancelled) {
   const exportedAt = new Date().toISOString();
-  const tracks = entries.filter((entry) => typeof entry.gpxText === 'string' && entry.gpxText.trim()).map((entry) => createTrailthreadBackupTrack(entry, exportedAt));
+  const exportedEntries = entries.filter((entry) => typeof entry.gpxText === 'string' && entry.gpxText.trim());
+  const tracks = exportedEntries.map((entry) => createTrailthreadBackupTrack(entry, exportedAt));
   if (!tracks.length) return 0;
   const payload = { kind: 'gpx-bibliothek-touren', version: 1, exportedAt, cancelled, tracks };
   const blob = await gzipJsonBlob(payload);
@@ -1264,6 +1265,11 @@ async function downloadTrailthreadTourBackup(entries, cancelled) {
   const link = document.createElement('a');
   link.href = url;
   link.download = 'trailthread-komoot-touren.json.gz';
+  if (exportedEntries.length === 1) {
+    const entry = exportedEntries[0];
+    const gpxFileName = komootPhotoText(entry.gpxFileName) || komootGpxFileName(entry.dateStart, entry.name);
+    link.download = `${gpxFileName.replace(/\.gpx$/i, '')}.json.gz`;
+  }
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
   return tracks.length;

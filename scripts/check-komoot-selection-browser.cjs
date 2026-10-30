@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs/promises');
+const { gunzipSync } = require('node:zlib');
 const { chromium } = require('playwright');
 
 /**
@@ -132,6 +133,24 @@ async function main() {
     await page.locator('.trailthread-komoot-toggle').click();
     assert.match(await page.locator('.trailthread-komoot-filter-preview').innerText(), /KeineTreffer/);
     assert.deepEqual(errors, []);
+    const exportEntry = { tourId: '123', name: 'Runde ab Frechen', dateStart: '2026-09-27T06:02:00Z',
+      gpxText: '<gpx />', gpxFileName: '20260927_0602_Runde ab Frechen.gpx' };
+    for (const test of [
+      { entries: [exportEntry], expected: '20260927_0602_Runde ab Frechen.json.gz', count: 1 },
+      { entries: [exportEntry, { ...exportEntry, tourId: '456' }], expected: 'trailthread-komoot-touren.json.gz', count: 2 },
+      { entries: [{ ...exportEntry, gpxText: null }, exportEntry], expected: '20260927_0602_Runde ab Frechen.json.gz', count: 1 },
+      { entries: [{ ...exportEntry, gpxFileName: null }], expected: '20260927_0602_Runde ab Frechen.json.gz', count: 1 },
+    ]) {
+      const downloadEvent = page.waitForEvent('download');
+      const count = await page.evaluate((entries) => downloadTrailthreadTourBackup(entries, false), test.entries);
+      const download = await downloadEvent;
+      assert.equal(download.suggestedFilename(), test.expected);
+      assert.equal(count, test.count);
+      const payload = JSON.parse(gunzipSync(await fs.readFile(await download.path())).toString('utf8'));
+      assert.equal(payload.kind, 'gpx-bibliothek-touren');
+      assert.equal(payload.tracks.length, test.count);
+    }
+    console.log('Backup downloads passed: single-tour GPX basename, multi-tour collection name, failed entries and metadata fallback; gzip payloads verified.');
     const popup = await browser.newPage({ viewport: { width: 320, height: 600 } });
     popup.on('pageerror', (error) => errors.push(error.message));
     const manifest = JSON.parse(await fs.readFile(path.join(extension, 'manifest.json'), 'utf8'));

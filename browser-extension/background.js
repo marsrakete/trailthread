@@ -1,3 +1,7 @@
+import { registerActionState } from './action-state.js';
+
+registerActionState(chrome);
+
 const runs = new Map();
 let pendingGpxDownload = null;
 
