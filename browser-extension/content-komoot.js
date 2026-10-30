@@ -19,6 +19,8 @@ const TOUR_SELECTION_MESSAGES = Object.freeze({
   'invalid-tour-response': 'Komoot hat keine lesbare Tourenliste geliefert.',
   'invalid-next-page': 'Die nächste Ergebnisseite konnte nicht sicher zugeordnet werden.',
   'repeated-page': 'Komoot hat dieselbe Ergebnisseite erneut geliefert.',
+  'invalid-collection': 'Die Kollektion konnte in der aktuellen Seitenadresse nicht erkannt werden.',
+  collectionHint: 'Füge die Tracks dieser Kollektion hinzu oder wähle einzelne Touren aus.',
   unknown: 'Unbekannter Fehler',
 });
 let runActive = false;
@@ -29,6 +31,7 @@ let listEnhancementIsStarting = false;
 let enhancementQueued = false;
 let lastRunFailureCount = 0;
 let activeExportMode = null;
+let activeBackupCollectionName = null;
 const completedBackupEntries = [];
 let currentExportCancelled = false;
 let currentExportAbortController = null;
@@ -69,7 +72,20 @@ function describeTourLink(link) {
   if (!match) return null;
   const card = link.closest('article, li, [role="listitem"]') || link.parentElement;
   const heading = card?.querySelector('h1, h2, h3, h4') || link;
-  return { tourId: match[1], tourUrl: canonicalTourUrl(link.href, match[1]), name: heading.textContent.trim(), card };
+  return { tourId: match[1], tourUrl: canonicalTourUrl(link.href, match[1]), name: heading.textContent.trim(), card, collection: currentKomootCollection() };
+}
+
+/**
+ * Reads the current collection identity and its visible heading for selection provenance.
+ * @returns {{id:string,name:string}|null} Current collection context or null outside collections.
+ */
+function currentKomootCollection() {
+  const id = TrailthreadTourSelection.collectionId(location.href);
+  if (!id) return null;
+  const heading = document.querySelector('main h1, h1');
+  let name = '';
+  if (heading) name = heading.textContent.trim();
+  return { id, name };
 }
 
 /**
@@ -116,6 +132,7 @@ function createToolbarTemplates() {
         </button>
         <div class="trailthread-komoot-body" id="trailthread-komoot-toolbar-body" hidden>
           <span class="trailthread-komoot-summary">Keine Tour ausgewählt</span>
+          <button class="trailthread-komoot-load-all trailthread-komoot-collection-selection" data-tour-type="collection" type="button" hidden>Alle Tracks der Kollektion hinzufügen</button>
           <section class="trailthread-komoot-filter-preview" aria-label="Übernommene Filter">
             <strong class="trailthread-komoot-filter-title">Übernommene Filter</strong>
             <dl class="trailthread-komoot-filter-rows"></dl>
@@ -204,17 +221,21 @@ function renderToolbar() {
   const loadAllButtons = selectionActions.querySelectorAll('[data-tour-type]');
   const clearSelectionButton = toolbar.querySelector('.trailthread-komoot-clear-selection');
   const filterSelectionButton = toolbar.querySelector('.trailthread-komoot-filter-selection');
+  const collectionButton = toolbar.querySelector('.trailthread-komoot-collection-selection');
+  const isCollection = TrailthreadTourSelection.collectionId(location.href) !== null;
   const cancelButton = toolbar.querySelector('.trailthread-komoot-cancel');
   const status = toolbar.querySelector('.trailthread-komoot-status');
   const previewContainer = toolbar.querySelector('.trailthread-komoot-filter-preview');
-  previewContainer.hidden = isKomootTourDetailPage();
+  previewContainer.hidden = isKomootTourDetailPage() || isCollection;
   const preview = filterPreviewController.update(location.href);
   if (isKomootTourDetailPage()) summary.textContent = 'Aktuelle Tour';
   else if (count === 1) summary.textContent = '1 Tour ausgewählt';
   else summary.textContent = `${count} Touren ausgewählt`;
   gpxDownloadButton.disabled = !count || runActive || tourListLoading;
   backupDownloadButton.disabled = !count || runActive || tourListLoading;
-  selectionActions.hidden = isKomootTourDetailPage();
+  selectionActions.hidden = isKomootTourDetailPage() || isCollection;
+  collectionButton.hidden = !isCollection;
+  collectionButton.disabled = runActive || tourListLoading;
   const preferredType = currentKomootListType();
   for (const button of loadAllButtons) {
     button.disabled = runActive || tourListLoading;
@@ -222,7 +243,7 @@ function renderToolbar() {
   }
   clearSelectionButton.hidden = isKomootTourDetailPage();
   clearSelectionButton.disabled = !count || runActive || tourListLoading;
-  filterSelectionButton.hidden = isKomootTourDetailPage();
+  filterSelectionButton.hidden = isKomootTourDetailPage() || isCollection;
   filterSelectionButton.disabled = runActive || tourListLoading || !preview.valid;
   cancelButton.hidden = !runActive;
   if (runActive && activeExportMode === 'gpx') status.textContent = 'Komoot lädt die ausgewählten GPX-Dateien nacheinander herunter.';
@@ -231,6 +252,7 @@ function renderToolbar() {
   else if (tourListLoadStatus) status.textContent = tourListLoadStatus;
   else if (isKomootTourDetailPage()) status.textContent = 'Wähle GPX-Download oder Trailthread-Datei mit eingebetteten Bildern.';
   else if (count) status.textContent = 'Wähle GPX-Massendownload oder eine gemeinsame Trailthread-Datei.';
+  else if (isCollection) status.textContent = tourSelectionMessage('collectionHint');
   else status.textContent = 'Wähle eigene Touren aus.';
 }
 
@@ -249,7 +271,7 @@ function addTourSelection(link, selectionTemplate) {
   input.checked = SELECTED_TOURS.has(tour.tourId);
   input.disabled = runActive || tourListLoading;
   input.addEventListener('change', () => {
-    if (input.checked) SELECTED_TOURS.set(tour.tourId, { tourId: tour.tourId, tourUrl: tour.tourUrl, name: tour.name });
+    if (input.checked) SELECTED_TOURS.set(tour.tourId, { tourId: tour.tourId, tourUrl: tour.tourUrl, name: tour.name, collection: tour.collection });
     else SELECTED_TOURS.delete(tour.tourId);
     renderToolbar();
   });
@@ -379,13 +401,16 @@ function tourSelectionMessage(key, values = {}) {
 }
 
 /**
- * Loads own tours through every API page and adds them to the current package.
- * @param {'all'|'recorded'|'planned'|'filtered'} [tourType='all'] Type or overview filter to add.
+ * Loads profile or collection tours through every API page into the current package.
+ * @param {'all'|'recorded'|'planned'|'filtered'|'collection'} [tourType='all'] Selection scope.
  * @returns {Promise<void>} Resolves after all available pages were processed or a failure was shown.
  */
 async function loadAllKomootTours(tourType = 'all') {
   if (tourListLoading || runActive || isKomootTourDetailPage()) return;
-  if (!['all', 'recorded', 'planned', 'filtered'].includes(tourType)) return;
+  if (!['all', 'recorded', 'planned', 'filtered', 'collection'].includes(tourType)) return;
+  const isCollection = TrailthreadTourSelection.collectionId(location.href) !== null;
+  if (isCollection && tourType !== 'collection') return;
+  if (!isCollection && tourType === 'collection') return;
   const overviewHref = location.href;
   const originalSize = SELECTED_TOURS.size;
   tourListLoading = true;
@@ -393,8 +418,12 @@ async function loadAllKomootTours(tourType = 'all') {
   syncTourSelectionControls();
   renderToolbar();
   try {
-    const userId = await loadKomootUserId();
-    const request = TrailthreadTourSelection.buildRequest(overviewHref, userId, tourType);
+    let request;
+    if (tourType === 'collection') request = TrailthreadTourSelection.buildCollectionRequest(overviewHref, currentKomootCollection().name);
+    else {
+      const userId = await loadKomootUserId();
+      request = TrailthreadTourSelection.buildRequest(overviewHref, userId, tourType);
+    }
     const result = await TrailthreadTourSelection.addTours(request, {
       selection: SELECTED_TOURS,
       loadPage: (url) => loadKomootApiPage(sameOriginKomootApiPageUrl(url), url),
@@ -482,19 +511,7 @@ function normalizeKomootTourType(value) {
  * @returns {string} File name in YYYYMMDD_HHMM_Titel.gpx format.
  */
 function komootGpxFileName(dateStart, title) {
-  let datePrefix = '00000000_0000';
-  const dateText = komootPhotoText(dateStart);
-  if (dateText) {
-    const match = dateText.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
-    if (match) {
-      let hours = '00';
-      let minutes = '00';
-      if (match[4]) hours = match[4];
-      if (match[5]) minutes = match[5];
-      datePrefix = `${match[1]}${match[2]}${match[3]}_${hours}${minutes}`;
-    }
-  }
-  return `${datePrefix}_${title}.gpx`;
+  return TrailthreadBackupFilenames.gpxFileName(dateStart, title);
 }
 
 /**
@@ -1249,12 +1266,13 @@ async function gzipJsonBlob(payload) {
 }
 
 /**
- * Downloads a compressed backup, reusing the GPX basename for exactly one included tour.
+ * Downloads a compressed backup using the collection name or the existing tour naming policy.
  * @param {Array<object>} entries Tour metadata, GPX text and photos gathered during the export run.
  * @param {boolean} cancelled Whether the user stopped the run early.
+ * @param {string|null} [collectionName=null] Collection name captured at export start.
  * @returns {Promise<number>} Number of successfully included tracks.
  */
-async function downloadTrailthreadTourBackup(entries, cancelled) {
+async function downloadTrailthreadTourBackup(entries, cancelled, collectionName = null) {
   const exportedAt = new Date().toISOString();
   const exportedEntries = entries.filter((entry) => typeof entry.gpxText === 'string' && entry.gpxText.trim());
   const tracks = exportedEntries.map((entry) => createTrailthreadBackupTrack(entry, exportedAt));
@@ -1264,12 +1282,7 @@ async function downloadTrailthreadTourBackup(entries, cancelled) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'trailthread-komoot-touren.json.gz';
-  if (exportedEntries.length === 1) {
-    const entry = exportedEntries[0];
-    const gpxFileName = komootPhotoText(entry.gpxFileName) || komootGpxFileName(entry.dateStart, entry.name);
-    link.download = `${gpxFileName.replace(/\.gpx$/i, '')}.json.gz`;
-  }
+  link.download = TrailthreadBackupFilenames.backupFileName(exportedEntries, collectionName);
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
   return tracks.length;
@@ -1282,7 +1295,8 @@ async function downloadTrailthreadTourBackup(entries, cancelled) {
 function ensureTourListEnhancement() {
   const currentTour = describeCurrentKomootTour();
   const isTourList = /\/user\/[^/]+\/(?:activities|routes)\/?$/i.test(location.pathname);
-  if (!currentTour && !isTourList && !findTourLinks().length && !toolbar) return;
+  const isCollection = TrailthreadTourSelection.collectionId(location.href) !== null;
+  if (!currentTour && !isTourList && !isCollection && !findTourLinks().length && !toolbar) return;
   if (currentTour && !SELECTED_TOURS.size) SELECTED_TOURS.set(currentTour.tourId, currentTour);
   if (toolbar && selectionTemplate) {
     if (!currentTour) enhanceTourList(selectionTemplate);
@@ -1331,6 +1345,8 @@ function ensureTourListEnhancement() {
  * @returns {void} Sends the selected tour queue to the background worker.
  */
 function startKomootExport(exportMode) {
+  activeBackupCollectionName = null;
+  if (exportMode === 'backup') activeBackupCollectionName = TrailthreadBackupFilenames.collectionNameForSelection([...SELECTED_TOURS.values()]);
   runActive = true;
   activeExportMode = exportMode;
   completedBackupEntries.length = 0;
@@ -1377,7 +1393,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.exportMode === 'backup') {
         const backupEntries = [...completedBackupEntries];
         try {
-          includedCount = await downloadTrailthreadTourBackup(backupEntries, message.cancelled === true);
+          includedCount = await downloadTrailthreadTourBackup(backupEntries, message.cancelled === true, activeBackupCollectionName);
         } catch (error) {
           includedCount = 0;
         }
@@ -1386,6 +1402,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       runActive = false;
       activeExportMode = null;
+      activeBackupCollectionName = null;
       lastRunFailureCount = runEntries.filter((entry) => entry.exportError).length;
       SELECTED_TOURS.clear();
       syncTourSelectionControls();

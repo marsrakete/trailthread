@@ -9,11 +9,12 @@ const root = new URL('../browser-extension/', import.meta.url);
 const context = vm.createContext({
   URL, console, Error,
   location: new URL('https://www.komoot.com/de-de/user/123/activities?type=recorded'),
-  document: { querySelectorAll: () => [] },
+  document: { querySelectorAll: () => [], querySelector: () => null },
   chrome: { runtime: { onMessage: { addListener() {} } } },
 });
 vm.runInContext(await readFile(new URL('tour-selection.js', root), 'utf8'), context);
 vm.runInContext(await readFile(new URL('filter-preview.js', root), 'utf8'), context);
+vm.runInContext(await readFile(new URL('backup-filenames.js', root), 'utf8'), context);
 const source = await readFile(new URL('content-komoot.js', root), 'utf8');
 vm.runInContext(source.replace(/^observeKomootPage\(\);$/m, '').replace(/^void sendRuntimeMessage\(\{ type: 'trailthread:detail-ready' \}\);$/m, ''), context);
 const api = context.TrailthreadTourSelection;
@@ -204,5 +205,59 @@ await assert.rejects(api.addTours(filtered, {
 vm.runInContext('clearTourSelection()', context);
 assert.equal(selectedIds().length, 0);
 const manifest = JSON.parse(await readFile(new URL('manifest.json', root), 'utf8'));
-assert.deepEqual(manifest.content_scripts[0].js, ['tour-selection.js', 'filter-preview.js', 'content-komoot.js']);
+assert.deepEqual(manifest.content_scripts[0].js, ['tour-selection.js', 'filter-preview.js', 'backup-filenames.js', 'content-komoot.js']);
+const filenames = context.TrailthreadBackupFilenames;
+assert.equal(filenames.gpxFileName('2026-09-27T06:02:00Z', 'Tour'), '20260927_0602_Tour.gpx');
+assert.equal(filenames.gpxFileName(null, 'Tour'), '00000000_0000_Tour.gpx');
+const singleEntry = { dateStart: '2026-09-27T06:02:00Z', name: 'Tour' };
+assert.equal(filenames.backupFileName([singleEntry]), '20260927_0602_Tour.json.gz');
+assert.equal(filenames.backupFileName([singleEntry, singleEntry]), 'trailthread-komoot-touren.json.gz');
+assert.equal(filenames.backupFileName([], 'Vennbahn'), 'Vennbahn.json.gz');
+assert.equal(filenames.backupFileName([singleEntry], 'Vennbahn: drei/Länder?'), 'Vennbahn_ drei_Länder_.json.gz');
+assert.equal(filenames.backupFileName([], 'CON'), '_CON.json.gz');
+assert.equal(filenames.backupFileName([], 'Vennbahn. '), 'Vennbahn.json.gz');
+assert.equal(filenames.backupFileName([], ' '), 'trailthread-komoot-touren.json.gz');
+assert.equal(filenames.backupFileName(null), 'trailthread-komoot-touren.json.gz');
+assert.equal(filenames.collectionNameForSelection([]), null);
+assert.equal(filenames.collectionNameForSelection(null), null);
+const originA = { id: '1', name: 'Vennbahn' };
+const originB = { id: '2', name: 'Andere Kollektion' };
+assert.equal(filenames.collectionNameForSelection([{ collection: originA }, { collection: originA }]), 'Vennbahn');
+assert.equal(filenames.collectionNameForSelection([{ collection: originA }, { collection: originB }]), null);
+assert.equal(filenames.collectionNameForSelection([{ collection: originA }, {}]), null);
+const collectionHref = 'https://www.komoot.com/de-de/collection/3179080/eine-vennbahn-reise';
+assert.equal(api.collectionId(collectionHref), '3179080');
+assert.equal(api.collectionId('https://www.komoot.com/collection/3179080'), '3179080');
+assert.equal(api.collectionId('https://www.komoot.com/user/123/activities'), null);
+assert.equal(api.collectionId('invalid'), null);
+assert.throws(() => api.buildCollectionRequest(overview), /invalid-collection/);
+const collectionRequest = api.buildCollectionRequest(collectionHref, 'Vennbahn');
+assert.equal(new URL(collectionRequest.href).pathname, '/api/v007/collections/3179080/compilation/');
+assert.equal(collectionRequest.kind, 'collection');
+context.location = new URL(collectionHref);
+context.loadKomootUserId = async () => { throw new Error('Collection selection must not query a profile'); };
+vm.runInContext("SELECTED_TOURS.set('old', { tourId: 'old' })", context);
+const collectionPages = [
+  { _embedded: { items: [{ id: 301, type: 'tour_recorded' }, { id: 999, type: 'highlight' }] }, _links: { next: { href: 'https://api.komoot.de/v007/collections/3179080/compilation/?page=1' } } },
+  { _embedded: { items: [{ id: 302, type: 'tour_planned' }, { id: 303, type: 'tour_recorded' }, { id: 301, type: 'tour_recorded' }] } },
+];
+const collectionRequests = await add('collection', collectionPages);
+assert.equal(collectionRequests.length, 2);
+assert.deepEqual(selectedIds(), ['old', '301', '302', '303']);
+assert.equal(vm.runInContext("SELECTED_TOURS.get('301').collection.id", context), '3179080');
+await add('collection', collectionPages);
+assert.match(vm.runInContext('tourListLoadStatus', context), /^0 Touren hinzugefügt, 4 insgesamt/);
+await add('collection', [{ _embedded: { items: [] } }]);
+assert.equal(selectedIds().length, 4);
+assert.deepEqual(await add('all', collectionPages), []);
+await add('collection', [{ _embedded: { items: [{ id: 304, type: 'tour_recorded' }] }, _links: { next: { href: '?page=1' } } }, new Error('offline')]);
+assert.deepEqual(selectedIds(), ['old', '301', '302', '303', '304']);
+assert.match(vm.runInContext('tourListLoadStatus', context), /nicht vollständig hinzugefügt/);
+await assert.rejects(api.addTours(collectionRequest, {
+  selection: new Map(), describeTour: () => null, onProgress() {},
+  loadPage: async () => ({ _embedded: { items: [] }, _links: { next: { href: 'https://api.komoot.de/v007/collections/999/compilation/?page=1' } } }),
+}), /invalid-next-page/);
+context.location = new URL(overview);
+assert.deepEqual(await add('collection', collectionPages), []);
 console.log('Komoot selection checks passed: additive scopes, URL mapping, 50 filtered results, pagination, deduplication, empty results, unsupported filters and partial failures.');
+console.log('Collection checks passed: URL detection, compilation pages, tour-only selection, no profile lookup, additive deduplication, empty lists and partial failures.');

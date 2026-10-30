@@ -28,6 +28,15 @@ async function main() {
         return;
       }
       requests.push(url.href);
+      if (url.pathname === '/api/v007/collections/3179080/compilation/') {
+        let response = { _embedded: { items: [{ id: '302', type: 'tour_planned' }, { id: '303', type: 'tour_recorded' }, { id: '301', type: 'tour_recorded' }] } };
+        if (!url.searchParams.has('page')) response = {
+          _embedded: { items: [{ id: '1', type: 'tour_recorded' }, { id: '301', type: 'tour_recorded' }, { id: '999', type: 'highlight' }] },
+          _links: { next: { href: 'https://api.komoot.de/v007/collections/3179080/compilation/?page=1&limit=24' } },
+        };
+        await route.fulfill({ json: response });
+        return;
+      }
       const name = (url.searchParams.get('name') || '').toLowerCase();
       const type = url.searchParams.get('type');
       const matches = tours.filter((tour) => (!type || tour.type === type) && tour.name.toLowerCase().includes(name));
@@ -39,7 +48,8 @@ async function main() {
       await route.fulfill({ json: response });
     });
     await page.addInitScript(() => {
-      window.chrome = { runtime: { id: 'fixture', sendMessage: async () => ({}), onMessage: { addListener() {} } } };
+      window.fixtureMessageListeners = [];
+      window.chrome = { runtime: { id: 'fixture', sendMessage: async () => ({}), onMessage: { addListener(listener) { window.fixtureMessageListeners.push(listener); } } } };
     });
     const observedFilters = '&location=50.909622,6.808193,30r&date=2026-09-01,2026-09-30&visibility=PUBLIC&min_uphill=0&max_uphill=1800&sport=mtb_easy,racebike&include_ebike=false&order=duration_desc';
     await page.goto(`https://www.komoot.com/de-de/user/123/activities?type=recorded&search=Erft${observedFilters}&min_duration=9000&max_duration=16200`);
@@ -58,6 +68,7 @@ async function main() {
     await page.addStyleTag({ path: path.join(extension, 'styles.css') });
     await page.addScriptTag({ path: path.join(extension, 'tour-selection.js') });
     await page.addScriptTag({ path: path.join(extension, 'filter-preview.js') });
+    await page.addScriptTag({ path: path.join(extension, 'backup-filenames.js') });
     await page.addScriptTag({ path: path.join(extension, 'content-komoot.js') });
     await page.locator('.trailthread-komoot-toggle').click();
     const filtered = page.locator('[data-tour-type="filtered"]');
@@ -108,6 +119,22 @@ async function main() {
     await page.waitForFunction(() => document.querySelector('.trailthread-komoot-status').textContent === '1 Tour hinzugefügt, 52 insgesamt markiert.');
     await page.locator('[data-tour-type="all"]').click();
     await page.waitForFunction(() => document.querySelector('.trailthread-komoot-status').textContent === '0 Touren hinzugefügt, 52 insgesamt markiert.');
+    await page.evaluate(() => history.pushState({}, '', '/de-de/collection/3179080/eine-vennbahn-reise'));
+    const collectionButton = page.locator('[data-tour-type="collection"]');
+    await collectionButton.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.trailthread-komoot-selection-actions').isVisible(), false);
+    assert.equal(await filtered.isVisible(), false);
+    assert.equal(await preview.isVisible(), false);
+    const collectionRequestStart = requests.length;
+    await collectionButton.click();
+    await page.waitForFunction(() => document.querySelector('.trailthread-komoot-status').textContent === '3 Touren hinzugefügt, 55 insgesamt markiert.');
+    assert.equal(requests.length - collectionRequestStart, 2);
+    for (const href of requests.slice(collectionRequestStart)) assert.equal(new URL(href).pathname, '/api/v007/collections/3179080/compilation/');
+    await collectionButton.click();
+    await page.waitForFunction(() => document.querySelector('.trailthread-komoot-status').textContent === '0 Touren hinzugefügt, 55 insgesamt markiert.');
+    await page.evaluate(() => history.pushState({}, '', '/de-de/user/123/activities?type=recorded'));
+    await filtered.waitFor({ state: 'visible' });
+    assert.equal(await collectionButton.isVisible(), false);
     await page.evaluate(() => history.pushState({}, '', '?type=recorded&search=Erft&new_filter=1'));
     const requestCount = requests.length;
     await page.waitForFunction(() => document.querySelector('[data-tour-type="filtered"]').disabled);
@@ -125,10 +152,40 @@ async function main() {
     await page.setViewportSize({ width: 844, height: 390 });
     const toolbarBox = await page.locator('.trailthread-komoot-toolbar').boundingBox();
     assert.ok(toolbarBox && toolbarBox.y >= 0 && toolbarBox.y + toolbarBox.height <= 390);
+    await page.goto('https://www.komoot.com/de-de/collection/3179080/eine-vennbahn-reise');
+    await page.evaluate(() => {
+      const heading = document.createElement('h1');
+      heading.textContent = 'Eine Vennbahn-Reise: Bikepacking / drei Länder?';
+      document.querySelector('main').append(heading);
+    });
+    await page.addStyleTag({ path: path.join(extension, 'styles.css') });
+    await page.addScriptTag({ path: path.join(extension, 'tour-selection.js') });
+    await page.addScriptTag({ path: path.join(extension, 'filter-preview.js') });
+    await page.addScriptTag({ path: path.join(extension, 'backup-filenames.js') });
+    await page.addScriptTag({ path: path.join(extension, 'content-komoot.js') });
+    await page.locator('.trailthread-komoot-toggle').click();
+    assert.equal(await page.locator('.trailthread-komoot-summary').textContent(), '0 Touren ausgewählt');
+    assert.equal(await page.locator('[data-tour-type="collection"]').isVisible(), true);
+    await page.locator('[data-tour-type="collection"]').click();
+    await page.waitForFunction(() => document.querySelector('.trailthread-komoot-status').textContent === '4 Touren hinzugefügt, 4 insgesamt markiert.');
+    await page.locator('.trailthread-komoot-download-backup').click();
+    const collectionDownloadEvent = page.waitForEvent('download');
+    await page.evaluate(() => {
+      completedBackupEntries.push({ tourId: '301', name: 'Etappe 1', gpxText: '<gpx />' });
+      history.pushState({}, '', '/de-de/collection/999/andere-kollektion');
+      document.querySelector('h1').textContent = 'Andere Kollektion';
+      window.fixtureMessageListeners[0]({ type: 'trailthread:run-complete', exportMode: 'backup', entries: [{ tourId: '301' }] }, {}, () => {});
+    });
+    const collectionDownload = await collectionDownloadEvent;
+    assert.equal(collectionDownload.suggestedFilename(), 'Eine Vennbahn-Reise_ Bikepacking _ drei Länder_.json.gz');
+    const collectionPayload = JSON.parse(gunzipSync(await fs.readFile(await collectionDownload.path())).toString('utf8'));
+    assert.equal(collectionPayload.tracks.length, 1);
+    console.log('Collection backup naming passed: original collection title survives navigation and a partial export.');
     await page.goto('https://www.komoot.com/de-de/user/123/activities?type=recorded&search=KeineTreffer');
     await page.addStyleTag({ path: path.join(extension, 'styles.css') });
     await page.addScriptTag({ path: path.join(extension, 'tour-selection.js') });
     await page.addScriptTag({ path: path.join(extension, 'filter-preview.js') });
+    await page.addScriptTag({ path: path.join(extension, 'backup-filenames.js') });
     await page.addScriptTag({ path: path.join(extension, 'content-komoot.js') });
     await page.locator('.trailthread-komoot-toggle').click();
     assert.match(await page.locator('.trailthread-komoot-filter-preview').innerText(), /KeineTreffer/);

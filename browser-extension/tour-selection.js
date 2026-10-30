@@ -192,8 +192,39 @@ globalThis.TrailthreadTourSelection = (() => {
   }
 
   /**
+   * Identifies the collection currently shown in a localized Komoot page URL.
+   * @param {string} href Current page URL.
+   * @returns {string|null} Numeric collection identifier or null outside collection pages.
+   */
+  function collectionId(href) {
+    try {
+      const url = new URL(href);
+      const match = url.pathname.match(/^(?:\/[a-z]{2}(?:-[a-z]{2})?)?\/collection\/(\d+)(?:\/|$)/i);
+      if (match) return match[1];
+    } catch {
+      // Invalid URLs cannot identify a collection.
+    }
+    return null;
+  }
+
+  /**
+   * Builds the paginated compilation request for the active collection.
+   * @param {string} href Collection page URL, including its optional title slug.
+   * @param {string} [name=''] Collection title captured from the page.
+   * @returns {{href:string,type:string,kind:string,collection:object}} Collection query and selection provenance.
+   */
+  function buildCollectionRequest(href, name = '') {
+    const id = collectionId(href);
+    if (!id) throw new Error('invalid-collection');
+    const overview = new URL(href);
+    const url = new URL(`/api/v007/collections/${id}/compilation/`, overview.origin);
+    url.searchParams.set('limit', '24');
+    return { href: url.href, type: 'all', kind: 'collection', collection: { id, name } };
+  }
+
+  /**
    * Adds matching tours from every linked result page while preserving prior selections.
-   * @param {{href:string,type:string}} request Query returned by buildRequest.
+   * @param {{href:string,type:string,kind?:string}} request Profile or collection query.
    * @param {{selection:Map,loadPage:Function,describeTour:Function,onProgress:Function}} dependencies Explicit state, API loader, descriptor adapter and progress callback.
    * @returns {Promise<{added:number,total:number}>} New unique tours and complete package size; partial results survive errors.
    */
@@ -208,13 +239,16 @@ globalThis.TrailthreadTourSelection = (() => {
       pages.add(pageUrl);
       onProgress({ page: pages.size, added, total: selection.size });
       const payload = await loadPage(pageUrl);
-      const tours = payload?._embedded?.tours;
+      let tours = payload?._embedded?.tours;
+      if (request.kind === 'collection') tours = payload?._embedded?.items;
       if (!Array.isArray(tours)) throw new Error('invalid-tour-response');
       for (const tour of tours) {
+        if (request.kind === 'collection' && normalizeTourType(tour?.type) === 'unknown') continue;
         const descriptor = describeTour(tour);
         if (!descriptor) continue;
         if (request.type !== 'all' && descriptor.type !== request.type) continue;
         if (selection.has(descriptor.tourId)) continue;
+        if (request.kind === 'collection') descriptor.collection = { ...request.collection };
         selection.set(descriptor.tourId, descriptor);
         added += 1;
       }
@@ -236,5 +270,5 @@ globalThis.TrailthreadTourSelection = (() => {
     return { added, total: selection.size };
   }
 
-  return Object.freeze({ normalizeTourType, listType, buildRequest, addTours });
+  return Object.freeze({ normalizeTourType, listType, buildRequest, collectionId, buildCollectionRequest, addTours });
 })();
